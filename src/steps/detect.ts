@@ -11,8 +11,14 @@ export interface Environment {
   claudeHomeExists: boolean;
 }
 
+const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
+
 export async function detect(): Promise<Environment> {
-  const os = platform() as Environment["os"];
+  const p = platform();
+  if (!SUPPORTED_PLATFORMS.has(p)) {
+    throw new Error(`Unsupported platform: ${p}. Expected linux, darwin, or win32.`);
+  }
+  const os = p as Environment["os"];
   const isWsl = os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;

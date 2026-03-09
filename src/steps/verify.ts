@@ -147,12 +147,14 @@ export async function verify(): Promise<VerifyResult> {
 function extractApiKey(
   config: Record<string, unknown>,
 ): string | undefined {
-  const servers = config.mcpServers as
-    | Record<string, { env?: Record<string, string> }>
-    | undefined;
+  const raw = config.mcpServers;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return process.env["ULUOPS_API_KEY"];
+  }
+  const servers = raw as Record<string, { env?: Record<string, string> }>;
   return (
-    servers?.["uluops-registry"]?.env?.["ULUOPS_API_KEY"] ??
-    servers?.["uluops-tracker"]?.env?.["ULUOPS_TRACKER_API_KEY"] ??
+    servers["uluops-registry"]?.env?.["ULUOPS_API_KEY"] ??
+    servers["uluops-tracker"]?.env?.["ULUOPS_TRACKER_API_KEY"] ??
     process.env["ULUOPS_API_KEY"]
   );
 }

@@ -63,6 +63,9 @@ npx @uluops/setup --scope local
 # Preview without changes
 npx @uluops/setup --dry-run --api-key ulr_abc123
 
+# Persist API key in shell profile (~/.zshrc, ~/.bashrc, etc.)
+npx @uluops/setup --shell
+
 # Check existing installation
 npx @uluops/setup --verify
 
