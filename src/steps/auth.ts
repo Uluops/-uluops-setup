@@ -100,7 +100,9 @@ async function validateKey(
     const data = (await res.json()) as { email?: string };
     return { email: data.email ?? null };
   } catch (err) {
-    if (err instanceof TypeError && (err as NodeJS.ErrnoException).code !== undefined) {
+    // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED).
+    // Re-thrown errors from the res.status checks above are plain Error instances.
+    if (err instanceof TypeError) {
       throw new Error(
         "Can't reach api.uluops.ai — check your connection. Use --skip-validation to continue offline.",
       );

@@ -1,3 +1,5 @@
+import { readFile, writeFile, access } from "node:fs/promises";
+import { join } from "node:path";
 import {
   readConfig,
   mergeUluopsMcp,
@@ -39,9 +41,6 @@ export async function uninstallMcp(configPath: string): Promise<void> {
 }
 
 async function addToGitignore(): Promise<void> {
-  const { readFile, writeFile, access } = await import("node:fs/promises");
-  const { join } = await import("node:path");
-
   const gitignorePath = join(process.cwd(), ".gitignore");
   try {
     await access(join(process.cwd(), ".git"));

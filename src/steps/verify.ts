@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { loadManifest } from "../lib/manifest.js";
 import { readConfig } from "../lib/config-merger.js";
@@ -78,7 +78,6 @@ export async function verify(): Promise<VerifyResult> {
     let found = 0;
     for (const cmd of manifest.commands) {
       try {
-        const { access } = await import("node:fs/promises");
         await access(join(commandsDir, cmd));
         found++;
       } catch {
@@ -113,7 +112,10 @@ export async function verify(): Promise<VerifyResult> {
     try {
       const res = await fetch(
         "https://api.uluops.ai/api/v1/registry/users/me",
-        { headers: { Authorization: `Bearer ${apiKey}` } },
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(5000),
+        },
       );
       if (res.ok) {
         const data = (await res.json()) as { email?: string };

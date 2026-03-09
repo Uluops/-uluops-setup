@@ -1,7 +1,7 @@
-import { readdir, readFile, writeFile, mkdir, unlink } from "node:fs/promises";
+import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
 import { ASSETS_DIR, getCommandsDir } from "../lib/paths.js";
+import { copyIfChanged } from "../lib/file-ops.js";
 
 export interface CommandsResult {
   agentCommands: number;
@@ -9,10 +9,6 @@ export interface CommandsResult {
   skipped: number;
   removed: number;
   files: string[];
-}
-
-function fileHash(content: string): string {
-  return createHash("sha256").update(content).digest("hex").slice(0, 12);
 }
 
 const SUBDIRS = ["agents", "workflows"] as const;
@@ -46,28 +42,19 @@ export async function installCommands(
     }
 
     for (const file of files) {
-      const srcContent = await readFile(join(srcDir, file), "utf-8");
-      const destPath = join(destDir, file);
       const relativePath = `${subdir}/${file}`;
+      const result = await copyIfChanged(
+        join(srcDir, file),
+        join(destDir, file),
+        dryRun,
+      );
 
-      // Check if destination already has identical content
-      try {
-        const destContent = await readFile(destPath, "utf-8");
-        if (fileHash(srcContent) === fileHash(destContent)) {
-          skipped++;
-          allFiles.push(relativePath);
-          continue;
-        }
-      } catch {
-        // File doesn't exist yet
+      if (result === "copied") {
+        if (subdir === "agents") agentCommands++;
+        else workflowCommands++;
+      } else {
+        skipped++;
       }
-
-      if (!dryRun) {
-        await writeFile(destPath, srcContent);
-      }
-
-      if (subdir === "agents") agentCommands++;
-      else workflowCommands++;
 
       allFiles.push(relativePath);
     }
@@ -103,16 +90,6 @@ export async function uninstallCommands(
   files: string[],
   defsPath: string,
 ): Promise<number> {
-  let removed = 0;
-  const commandsDir = join(defsPath, "commands");
-
-  for (const file of files) {
-    try {
-      await unlink(join(commandsDir, file));
-      removed++;
-    } catch {
-      // Already gone
-    }
-  }
-  return removed;
+  const { unlinkFiles } = await import("../lib/file-ops.js");
+  return unlinkFiles(join(defsPath, "commands"), files);
 }

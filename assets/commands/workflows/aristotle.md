@@ -1,5 +1,5 @@
 ---
-name: aristotle-pipeline
+name: aristotle
 description: Sequential four-phase Aristotelian analysis pipeline. Explorer maps the categorical landscape, Analyst decomposes four causes, Validator checks teleological alignment, Forecaster projects actualization trajectory. Each phase builds on the previous for progressively deeper ontological understanding.
 tools: Read, Grep, Glob, Bash
 model: opus

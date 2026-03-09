@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 import chalk from "chalk";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,7 @@ import {
   saveManifest,
   deleteManifest,
 } from "./lib/manifest.js";
-import { getClaudeHome } from "./lib/paths.js";
+import { getClaudeHome, getAgentsDir, ASSETS_DIR } from "./lib/paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -73,7 +73,7 @@ async function runSetup(opts: {
       ok("Key validated");
     }
   } catch (err) {
-    fail((err as Error).message);
+    fail(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
 
@@ -169,15 +169,50 @@ async function runSetup(opts: {
     });
   }
 
-  // Summary
-  const toolCount = 73;
+  printSetupSummary({
+    agentCount: agentsResult.files.length,
+    commandCount: cmdTotal,
+    apiKey,
+  });
+}
+
+// MCP tool count across both servers. Update when server toolsets change.
+const TOOL_COUNT = 73;
+
+const AGENT_LIST: [string, string, string][] = [
+  ["/agents:validate", "Code quality", "sonnet"],
+  ["/agents:type-safety", "TypeScript", "sonnet"],
+  ["/agents:test-review", "Test quality", "sonnet"],
+  ["/agents:optimize", "Performance", "sonnet"],
+  ["/agents:frontend", "React/a11y", "sonnet"],
+  ["/agents:mcp-validate", "MCP compliance", "sonnet"],
+  ["/agents:architect", "Design review", "sonnet"],
+  ["/agents:audit", "Runtime bugs", "opus"],
+  ["/agents:security", "OWASP", "sonnet"],
+  ["/agents:api-contract", "API alignment", "sonnet"],
+  ["/agents:release", "Publish ready", "sonnet"],
+  ["/agents:public-interface", "README/exports", "sonnet"],
+  ["/agents:docs-validate", "Documentation", "sonnet"],
+  ["/agents:prompt-validate", "Prompt review", "sonnet"],
+  ["/agents:prompt-quality", "Prompt quality", "sonnet"],
+  ["/agents:pattern-analyzer", "Patterns", "sonnet"],
+  ["/agents:aristotle-explorer", "Categories", "opus"],
+  ["/agents:aristotle-analyst", "Four causes", "opus"],
+  ["/agents:aristotle-validator", "Teleology", "opus"],
+  ["/agents:aristotle-forecaster", "Potentiality", "opus"],
+  ["/agents:assumption-excavator", "Assumptions", "sonnet"],
+];
+
+function printSetupSummary(opts: {
+  agentCount: number;
+  commandCount: number;
+  apiKey: string;
+}): void {
+  console.log();
+  console.log(`  ${chalk.dim("━".repeat(46))}`);
   console.log();
   console.log(
-    `  ${chalk.dim("━".repeat(46))}`,
-  );
-  console.log();
-  console.log(
-    `  ${chalk.bold("Setup complete!")} ${toolCount} MCP tools · ${agentsResult.files.length} agents · ${cmdTotal} slash commands`,
+    `  ${chalk.bold("Setup complete!")} ${TOOL_COUNT} MCP tools · ${opts.agentCount} agents · ${opts.commandCount} slash commands`,
   );
   console.log();
   warn("Restart Claude Code to load agents, then try:");
@@ -185,63 +220,23 @@ async function runSetup(opts: {
   info(`  ${chalk.cyan("/workflows:post-implementation .")}`);
   console.log();
 
-  // Workflow/pipeline listing
   info(chalk.bold("WORKFLOWS"));
-  info(
-    `  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:ship")}                  Final gate before shipping`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:prompt-audit")}          Audit agent prompts`,
-  );
+  info(`  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`);
+  info(`  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`);
+  info(`  ${chalk.cyan("/workflows:ship")}                  Final gate before shipping`);
+  info(`  ${chalk.cyan("/workflows:prompt-audit")}          Audit agent prompts`);
   console.log();
-  info(chalk.bold("PIPELINES"));
-  info(
-    `  ${chalk.cyan("/pipelines:aristotle")}             Four-cause teleological analysis`,
-  );
+  info(`  ${chalk.cyan("/workflows:aristotle")}             Four-cause teleological analysis`);
   console.log();
 
-  // Agent listing
   info(`${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`);
-  const agentList: [string, string, string][] = [
-    ["/agents:validate", "Code quality", "sonnet"],
-    ["/agents:type-safety", "TypeScript", "sonnet"],
-    ["/agents:test-review", "Test quality", "sonnet"],
-    ["/agents:optimize", "Performance", "sonnet"],
-    ["/agents:frontend", "React/a11y", "sonnet"],
-    ["/agents:mcp-validate", "MCP compliance", "sonnet"],
-    ["/agents:architect", "Design review", "sonnet"],
-    ["/agents:audit", "Runtime bugs", "opus"],
-    ["/agents:security", "OWASP", "sonnet"],
-    ["/agents:api-contract", "API alignment", "sonnet"],
-    ["/agents:release", "Publish ready", "sonnet"],
-    ["/agents:public-interface", "README/exports", "sonnet"],
-    ["/agents:docs-validate", "Documentation", "sonnet"],
-    ["/agents:prompt-validate", "Prompt review", "sonnet"],
-    ["/agents:prompt-quality", "Prompt quality", "sonnet"],
-    ["/agents:pattern-analyzer", "Patterns", "sonnet"],
-    ["/agents:aristotle-explorer", "Categories", "opus"],
-    ["/agents:aristotle-analyst", "Four causes", "opus"],
-    ["/agents:aristotle-validator", "Teleology", "opus"],
-    ["/agents:aristotle-forecaster", "Potentiality", "opus"],
-    ["/agents:assumption-excavator", "Assumptions", "sonnet"],
-  ];
-  for (const [cmd, desc, model] of agentList) {
-    const padCmd = cmd.padEnd(34);
-    const padDesc = desc.padEnd(17);
-    info(`  ${chalk.cyan(padCmd)}${padDesc}${chalk.dim(model)}`);
+  for (const [cmd, desc, model] of AGENT_LIST) {
+    info(`  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(model)}`);
   }
 
   console.log();
-  info(
-    `For SDK/CLI usage, add to your shell profile:`,
-  );
-  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${apiKey}"`)}`);
+  info("For SDK/CLI usage, add to your shell profile:");
+  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${opts.apiKey}"`)}`);
   console.log();
   info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
   console.log();
@@ -337,10 +332,6 @@ async function runVerify(): Promise<void> {
 }
 
 async function checkConflicts(localDefs: boolean): Promise<void> {
-  const { readdir } = await import("node:fs/promises");
-  const { getAgentsDir } = await import("./lib/paths.js");
-  const { ASSETS_DIR } = await import("./lib/paths.js");
-  const { join } = await import("node:path");
 
   const destDir = getAgentsDir(localDefs);
   const srcDir = join(ASSETS_DIR, "agents");
@@ -357,10 +348,8 @@ async function checkConflicts(localDefs: boolean): Promise<void> {
   const conflicts = assetFiles.filter((f) => existingFiles.includes(f));
   if (conflicts.length === 0) return;
 
-  console.log(
-    warn(
-      `Found ${conflicts.length} existing agents that match UluOps definitions:`,
-    ) ?? "",
+  warn(
+    `Found ${conflicts.length} existing agents that match UluOps definitions:`,
   );
   for (const f of conflicts.slice(0, 5)) {
     info(`  ${f}`);
@@ -458,6 +447,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  console.error(chalk.red(`\n  Error: ${(err as Error).message}\n`));
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(chalk.red(`\n  Error: ${msg}\n`));
   process.exit(1);
 });
