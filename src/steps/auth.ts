@@ -32,7 +32,7 @@ export async function resolveApiKey(options: {
     // 4. Interactive prompt
     if (!options.interactive) {
       throw new Error(
-        "No API key found. Pass --api-key or set ULUOPS_API_KEY.",
+        "No API key found. Pass --api-key or set ULUOPS_API_KEY. Get one at app.uluops.ai/settings/api-keys",
       );
     }
 

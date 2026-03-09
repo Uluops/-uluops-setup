@@ -75,14 +75,19 @@ export async function syncAssets(opts: {
   let copied = 0;
   let skipped = 0;
 
+  const errors: string[] = [];
   for (const file of assetFiles) {
-    const result = await copyIfChanged(
-      join(opts.srcDir, file),
-      join(opts.destDir, file),
-      opts.dryRun,
-    );
-    if (result === "copied") copied++;
-    else skipped++;
+    try {
+      const result = await copyIfChanged(
+        join(opts.srcDir, file),
+        join(opts.destDir, file),
+        opts.dryRun,
+      );
+      if (result === "copied") copied++;
+      else skipped++;
+    } catch (err) {
+      errors.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // Remove files that were in the old manifest but no longer in the package
@@ -100,6 +105,10 @@ export async function syncAssets(opts: {
         removed++;
       }
     }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Failed to copy ${errors.length} file(s):\n  ${errors.join("\n  ")}`);
   }
 
   return { copied, skipped, removed, files: assetFiles };

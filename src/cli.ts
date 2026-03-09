@@ -61,7 +61,7 @@ async function runSetup(opts: {
     const auth = await resolveApiKey({
       apiKeyFlag: opts.apiKey,
       skipValidation: opts.skipValidation,
-      interactive: !opts.apiKey && !process.env["ULUOPS_API_KEY"],
+      interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
     });
     apiKey = auth.apiKey;
     email = auth.email;
@@ -147,9 +147,13 @@ async function runSetup(opts: {
   }
 
   // Shell export
+  let shellModified = false;
   if (opts.shell && env.shellProfile) {
     await writeShellExport(env.shellProfile, apiKey, opts.dryRun);
     ok(`ULUOPS_API_KEY added to ${env.shellProfile}`);
+    shellModified = true;
+  } else if (opts.shell) {
+    warn("--shell requested but no supported shell detected ($SHELL). Skipping.");
   }
 
   // Save manifest
@@ -163,7 +167,7 @@ async function runSetup(opts: {
       defsPath: opts.localDefs
         ? join(process.cwd(), "uluops")
         : getClaudeHome(),
-      shellModified: opts.shell,
+      shellModified,
       agents: agentsResult.files,
       commands: commandsResult.files,
     });
@@ -433,6 +437,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (opts.scope && opts.scope !== "local" && opts.scope !== "global") {
+    console.error(
+      chalk.red(`\n  Invalid --scope "${opts.scope}". Expected "global" or "local".\n`),
+    );
+    process.exit(1);
+  }
   const scope = opts.scope === "local" ? "local" : "global";
 
   await runSetup({

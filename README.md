@@ -110,6 +110,7 @@ npx @uluops/setup --uninstall
 | `/agents:aristotle-validator` | Teleology | opus |
 | `/agents:aristotle-forecaster` | Potentiality | opus |
 | `/agents:assumption-excavator` | Assumptions | sonnet |
+| `/agents:workflow-synthesis` | Cross-agent synthesis | opus |
 
 ### MCP servers
 
@@ -140,8 +141,10 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, and she
 ## Requirements
 
 - Node.js >= 18
-- Claude Code installed
-- UluOps API key
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
+- UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
+
+> **Global install:** If you install globally with `npm i -g @uluops/setup`, the binary is `uluops-setup`.
 
 ## Platform support
 
