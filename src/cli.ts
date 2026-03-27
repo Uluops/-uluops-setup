@@ -45,7 +45,12 @@ async function runSetup(opts: {
   yes: boolean;
 }): Promise<void> {
   const version = await getVersion();
-  console.log(`\n  ${chalk.bold("UluOps Setup")} v${version}\n`);
+  console.log();
+  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`);
+  console.log(`      ${chalk.dim("operating intelligence as infrastructure")}`);
+  console.log();
+  console.log(`  Setup v${version}`)
+  console.log();
 
   if (opts.dryRun) {
     info(chalk.dim("(dry run — no changes will be made)\n"));
@@ -273,7 +278,9 @@ function printAgentList(): void {
 
 async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
   const version = await getVersion();
-  console.log(`\n  ${chalk.bold("UluOps Uninstall")} v${version}\n`);
+  console.log();
+  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} ${chalk.red("Uninstall")} v${version}`);
+  console.log();
 
   if (opts.dryRun) {
     info(chalk.dim("(dry run — no changes will be made)\n"));
@@ -337,7 +344,9 @@ async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
 
 async function runVerify(): Promise<void> {
   const version = await getVersion();
-  console.log(`\n  ${chalk.bold("UluOps Installation Check")} v${version}\n`);
+  console.log();
+  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} Installation Check v${version}`);
+  console.log();
 
   const result = await verify();
 
@@ -455,7 +464,9 @@ async function main(): Promise<void> {
   }>();
 
   if (opts.list) {
-    console.log(`\n  ${chalk.bold("UluOps")} v${version} — available agents and workflows\n`);
+    console.log();
+    console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} v${version} — available agents and workflows`);
+    console.log();
     printAgentList();
     info(`Install with: ${chalk.cyan("npx @uluops/setup")}`);
     console.log();
