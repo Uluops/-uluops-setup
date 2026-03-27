@@ -82,6 +82,15 @@ async function runSetup(opts: {
   // Load existing manifest for update detection
   const existingManifest = await loadManifest();
 
+  // Show update info if re-running with newer version
+  if (existingManifest && existingManifest.version !== version) {
+    info(`Updating ${chalk.dim(existingManifest.version)} → ${chalk.green(version)}`);
+    console.log();
+  } else if (existingManifest) {
+    info(chalk.dim(`Already at v${version} — checking for changes`));
+    console.log();
+  }
+
   // Check for conflicts on first install
   if (!existingManifest && !opts.yes && !opts.dryRun) {
     await checkConflicts(opts.localDefs);
@@ -205,6 +214,7 @@ const AGENT_LIST: [string, string, string][] = [
   ["/agents:aristotle-validator", "Teleology", "opus"],
   ["/agents:aristotle-forecaster", "Potentiality", "opus"],
   ["/agents:assumption-excavator", "Assumptions", "sonnet"],
+  ["/agents:workflow-synthesis", "Cross-agent synthesis", "opus"],
 ];
 
 function printSetupSummary(opts: {
@@ -219,11 +229,29 @@ function printSetupSummary(opts: {
     `  ${chalk.bold("Setup complete!")} ${TOOL_COUNT} MCP tools · ${opts.agentCount} agents · ${opts.commandCount} slash commands`,
   );
   console.log();
-  warn("Restart Claude Code to load agents, then try:");
+
+  printAgentList();
+
+  info("For SDK/CLI usage, add to your shell profile:");
+  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${opts.apiKey}"`)}`);
   console.log();
-  info(`  ${chalk.cyan("/workflows:post-implementation .")}`);
+  info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
   console.log();
 
+  // Restart warning — last and prominent
+  console.log(`  ${chalk.dim("━".repeat(46))}`);
+  console.log();
+  console.log(`  ${chalk.yellow.bold("Restart Claude Code to load agents.")}`);
+  console.log();
+  info("After restart, verify with:");
+  info(`  ${chalk.cyan("/agents:validate --help")}`);
+  console.log();
+  info("Then try:");
+  info(`  ${chalk.cyan("/workflows:post-implementation .")}`);
+  console.log();
+}
+
+function printAgentList(): void {
   info(chalk.bold("WORKFLOWS"));
   info(`  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`);
   info(`  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`);
@@ -239,10 +267,7 @@ function printSetupSummary(opts: {
   }
 
   console.log();
-  info("For SDK/CLI usage, add to your shell profile:");
-  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${opts.apiKey}"`)}`);
-  console.log();
-  info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
+  info(chalk.dim(`  This is the starter set. Browse 135+ agents at registry.uluops.ai`));
   console.log();
 }
 
@@ -409,6 +434,7 @@ async function main(): Promise<void> {
       "Accept API key without verifying",
       false,
     )
+    .option("--list", "Show available agents and workflows without installing")
     .option("--verify", "Check existing installation health")
     .option("--uninstall", "Remove all UluOps artifacts")
     .option("--dry-run", "Show what would happen", false)
@@ -421,11 +447,20 @@ async function main(): Promise<void> {
     localDefs: boolean;
     shell: boolean;
     skipValidation: boolean;
+    list: boolean;
     verify: boolean;
     uninstall: boolean;
     dryRun: boolean;
     yes: boolean;
   }>();
+
+  if (opts.list) {
+    console.log(`\n  ${chalk.bold("UluOps")} v${version} — available agents and workflows\n`);
+    printAgentList();
+    info(`Install with: ${chalk.cyan("npx @uluops/setup")}`);
+    console.log();
+    return;
+  }
 
   if (opts.verify) {
     await runVerify();

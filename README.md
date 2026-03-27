@@ -12,7 +12,7 @@ npx @uluops/setup
 |----------|-------|-------------|
 | MCP servers | 2 | `~/.claude.json` |
 | Agent definitions | 22 | `~/.claude/agents/` |
-| Slash commands | 26 | `~/.claude/commands/` |
+| Slash commands | 27 | `~/.claude/commands/` |
 
 The installer validates your API key, writes MCP config for the tracker and registry servers, copies pre-rendered agent and command definitions, and runs a health check against both APIs.
 
@@ -45,6 +45,7 @@ npx @uluops/setup [options]
   --local-defs         Save definitions to ./uluops/ instead of ~/.claude/
   --shell              Write API key export to shell profile
   --skip-validation    Accept API key without server verification
+  --list               Show available agents and workflows without installing
   --verify             Check existing installation health (no changes)
   --uninstall          Remove all UluOps-managed artifacts
   --dry-run            Show what would happen without making changes
@@ -65,6 +66,9 @@ npx @uluops/setup --dry-run --api-key ulr_abc123
 
 # Persist API key in shell profile (~/.zshrc, ~/.bashrc, etc.)
 npx @uluops/setup --shell
+
+# Preview what's included without installing
+npx @uluops/setup --list
 
 # Check existing installation
 npx @uluops/setup --verify
@@ -111,6 +115,8 @@ npx @uluops/setup --uninstall
 | `/agents:aristotle-forecaster` | Potentiality | opus |
 | `/agents:assumption-excavator` | Assumptions | sonnet |
 | `/agents:workflow-synthesis` | Cross-agent synthesis | opus |
+
+> This is the starter set. Browse 135+ agents at [registry.uluops.ai](https://registry.uluops.ai).
 
 ### MCP servers
 
