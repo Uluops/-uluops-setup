@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { detect } from "./steps/detect.js";
 import { resolveApiKey } from "./steps/auth.js";
+import { signup } from "./steps/signup.js";
 import { installMcp, uninstallMcp } from "./steps/mcp.js";
 import { installAgents, uninstallAgents } from "./steps/agents.js";
 import { installCommands, uninstallCommands } from "./steps/commands.js";
@@ -37,6 +38,7 @@ const info = (msg: string) => console.log(`  ${msg}`);
 
 async function runSetup(opts: {
   apiKey?: string;
+  signup: boolean;
   scope: "global" | "local";
   localDefs: boolean;
   shell: boolean;
@@ -59,23 +61,32 @@ async function runSetup(opts: {
   // Detect environment
   const env = await detect();
 
-  // Resolve API key
+  // Resolve API key — via signup or existing key
   let apiKey: string;
   let email: string | null = null;
   try {
-    const auth = await resolveApiKey({
-      apiKeyFlag: opts.apiKey,
-      skipValidation: opts.skipValidation,
-      interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
-    });
-    apiKey = auth.apiKey;
-    email = auth.email;
-    if (email) {
-      ok(`Key validated (${email})`);
-    } else if (opts.skipValidation) {
-      ok("Key accepted (validation skipped)");
+    if (opts.signup) {
+      info("Create your UluOps account\n");
+      const auth = await signup();
+      apiKey = auth.apiKey;
+      email = auth.email;
+      ok(`Account created (${email})`);
+      ok(`API key generated`);
     } else {
-      ok("Key validated");
+      const auth = await resolveApiKey({
+        apiKeyFlag: opts.apiKey,
+        skipValidation: opts.skipValidation,
+        interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
+      });
+      apiKey = auth.apiKey;
+      email = auth.email;
+      if (email) {
+        ok(`Key validated (${email})`);
+      } else if (opts.skipValidation) {
+        ok("Key accepted (validation skipped)");
+      } else {
+        ok("Key validated");
+      }
     }
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
@@ -423,6 +434,7 @@ async function main(): Promise<void> {
     .description("Zero-friction installer for UluOps + Claude Code")
     .version(version)
     .option("--api-key <key>", "API key (skip prompt)")
+    .option("--signup", "Create a new account (email + password, no browser)")
     .option(
       "--scope <mode>",
       'MCP config scope: "global" or "local"',
@@ -452,6 +464,7 @@ async function main(): Promise<void> {
   program.parse();
   const opts = program.opts<{
     apiKey?: string;
+    signup: boolean;
     scope: string;
     localDefs: boolean;
     shell: boolean;
@@ -493,6 +506,7 @@ async function main(): Promise<void> {
 
   await runSetup({
     apiKey: opts.apiKey,
+    signup: opts.signup ?? false,
     scope,
     localDefs: opts.localDefs,
     shell: opts.shell,

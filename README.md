@@ -24,6 +24,14 @@ npx @uluops/setup
 
 You'll be prompted for your API key (get one at [app.uluops.ai/settings/api-keys](https://app.uluops.ai/settings/api-keys)). Everything else uses smart defaults — no other prompts.
 
+**New to UluOps?** Create an account without leaving the terminal:
+
+```
+npx @uluops/setup --signup
+```
+
+You'll be prompted for email and password. Account + API key are created automatically.
+
 **Restart Claude Code after setup to load agents.**
 
 ### API key resolution
@@ -41,6 +49,7 @@ The installer checks these sources in order:
 npx @uluops/setup [options]
 
   --api-key <key>      API key (skip prompt)
+  --signup             Create account from terminal (email + password)
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
   --local-defs         Save definitions to ./uluops/ instead of ~/.claude/
   --shell              Write API key export to shell profile
@@ -55,6 +64,9 @@ npx @uluops/setup [options]
 ### Examples
 
 ```bash
+# New user — create account + install in one shot
+npx @uluops/setup --signup
+
 # Non-interactive (CI/automation)
 npx @uluops/setup --api-key ulr_abc123 -y
 
