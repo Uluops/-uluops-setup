@@ -14,6 +14,7 @@ import { installAgents, uninstallAgents } from "./steps/agents.js";
 import { installCommands, uninstallCommands } from "./steps/commands.js";
 import { writeShellExport, removeShellExport } from "./steps/shell.js";
 import { verify } from "./steps/verify.js";
+import { installMetrics, uninstallMetrics } from "./steps/metrics.js";
 import {
   loadManifest,
   saveManifest,
@@ -154,6 +155,18 @@ async function runSetup(opts: {
     `${cmdTotal} commands → ${opts.localDefs ? "./uluops/commands/" : "~/.claude/commands/"}${cmdParts.length ? ` (${cmdParts.join(", ")})` : ""}`,
   );
 
+  // Agent metrics (SubagentStop hook for auto-capture)
+  const metricsResult = await installMetrics(opts.dryRun);
+  if (metricsResult.hookConfigured) {
+    const parts: string[] = [];
+    if (metricsResult.toolFilesCopied > 0)
+      parts.push(`${metricsResult.toolFilesCopied} files`);
+    parts.push("hook configured");
+    ok(`Agent metrics → ~/.claude/tools/agent-metrics/ (${parts.join(", ")})`);
+  } else {
+    warn("Agent metrics hook not configured (tool files not found)");
+  }
+
   // Health check
   if (!opts.skipValidation && !opts.dryRun) {
     try {
@@ -195,6 +208,7 @@ async function runSetup(opts: {
       shellModified,
       agents: agentsResult.files,
       commands: commandsResult.files,
+      metricsHookInstalled: metricsResult.hookConfigured,
     });
   }
 
@@ -242,7 +256,7 @@ function printSetupSummary(opts: {
   console.log(`  ${chalk.dim("━".repeat(46))}`);
   console.log();
   console.log(
-    `  ${chalk.bold("Setup complete!")} ${TOOL_COUNT} MCP tools · ${opts.agentCount} agents · ${opts.commandCount} slash commands`,
+    `  ${chalk.bold("Setup complete!")} ${TOOL_COUNT} MCP tools · ${opts.agentCount} agents · ${opts.commandCount} slash commands · metrics`,
   );
   console.log();
 
@@ -328,6 +342,16 @@ async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
     ok(`Removed MCP servers from ${manifest.mcpConfigPath}`);
   } else {
     ok(`Would remove MCP servers from ${manifest.mcpConfigPath}`);
+  }
+
+  // Remove agent metrics hook and tool files
+  if (manifest.metricsHookInstalled) {
+    if (!opts.dryRun) {
+      await uninstallMetrics(false);
+      ok("Removed agent-metrics hook and tool files");
+    } else {
+      ok("Would remove agent-metrics hook and tool files");
+    }
   }
 
   // Remove shell export

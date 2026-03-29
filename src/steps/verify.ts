@@ -2,6 +2,8 @@ import { readdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { loadManifest } from "../lib/manifest.js";
 import { readConfig } from "../lib/config-merger.js";
+import { readSettings, hasUluopsHook } from "../lib/settings-merger.js";
+import { getMetricsToolDir, getSettingsPath } from "./metrics.js";
 
 interface VerifyResult {
   ok: boolean;
@@ -106,7 +108,41 @@ export async function verify(): Promise<VerifyResult> {
     allOk = false;
   }
 
-  // 5. API connectivity
+  // 5. Agent metrics hook
+  if (manifest.metricsHookInstalled) {
+    const settings = await readSettings(getSettingsPath());
+    const hookPresent = hasUluopsHook(settings);
+    const toolDir = getMetricsToolDir();
+    let hookFilePresent = false;
+    try {
+      await access(join(toolDir, "dist", "hook.js"));
+      hookFilePresent = true;
+    } catch {
+      // Missing
+    }
+
+    if (hookPresent && hookFilePresent) {
+      checks.push({
+        label: "Agent metrics hook configured and tool files present",
+        passed: true,
+      });
+    } else {
+      const missing = [
+        !hookPresent && "hook not in settings.json",
+        !hookFilePresent && "hook.js not found",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      checks.push({
+        label: "Agent metrics",
+        passed: false,
+        detail: missing,
+      });
+      allOk = false;
+    }
+  }
+
+  // 6. API connectivity
   const apiKey = extractApiKey(config);
   if (apiKey) {
     try {

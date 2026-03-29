@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^7.0.0",
+    "@uluops/agent-metrics": "file:../-uluops-agent-metrics",
     "chalk": "^5.0.0",
     "commander": "^12.0.0"
   },

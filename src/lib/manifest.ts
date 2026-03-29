@@ -11,6 +11,8 @@ export interface Manifest {
   shellModified: boolean;
   agents: string[];
   commands: string[];
+  /** Whether agent-metrics hook is configured */
+  metricsHookInstalled?: boolean;
 }
 
 function isManifest(obj: unknown): obj is Manifest {
