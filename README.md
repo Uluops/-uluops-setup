@@ -1,3 +1,7 @@
+**[UluOps](https://uluops.ai)** · Operating Intelligence as Infrastructure
+
+---
+
 # @uluops/setup
 
 Zero-friction installer for [UluOps](https://uluops.ai) + Claude Code. One command sets up MCP servers, agents, and slash commands.
