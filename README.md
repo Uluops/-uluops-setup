@@ -17,8 +17,15 @@ npx @uluops/setup
 | MCP servers | 2 | `~/.claude.json` |
 | Agent definitions | 22 | `~/.claude/agents/` |
 | Slash commands | 27 | `~/.claude/commands/` |
+| Agent metrics hook | 1 | `~/.claude/tools/agent-metrics/` |
 
-The installer validates your API key, writes MCP config for the tracker and registry servers, copies pre-rendered agent and command definitions, and runs a health check against both APIs.
+The installer runs five steps in sequence:
+
+1. **Authenticate** — Validates your API key (or creates an account with `--signup`)
+2. **MCP config** — Writes tracker and registry server entries to Claude's config
+3. **Definitions** — Copies pre-rendered agent and command markdown files
+4. **Metrics hook** — Configures a Claude Code SubagentStop hook for automatic agent run capture (optional — proceeds without it if tool files aren't found)
+5. **Health check** — Verifies both API endpoints are reachable
 
 ## Usage
 
@@ -26,7 +33,7 @@ The installer validates your API key, writes MCP config for the tracker and regi
 npx @uluops/setup
 ```
 
-You'll be prompted for your API key (get one at [app.uluops.ai/settings/api-keys](https://app.uluops.ai/settings/api-keys)). Everything else uses smart defaults — no other prompts.
+You'll be prompted for your API key (get one at [app.uluops.ai/settings/api-keys](https://app.uluops.ai/settings/api-keys)). Everything else uses smart defaults — no other prompts. See [What it does](#what-it-does) for the full list of changes made.
 
 **New to UluOps?** Create an account without leaving the terminal:
 
@@ -55,11 +62,11 @@ npx @uluops/setup [options]
   --api-key <key>      API key (skip prompt)
   --signup             Create account from terminal (email + password)
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
-  --local-defs         Save definitions to ./uluops/ instead of ~/.claude/
+  --local-defs         Save definitions to ./uluops/ for review (not loaded by Claude Code)
   --shell              Write API key export to shell profile
   --skip-validation    Accept API key without server verification
   --list               Show available agents and workflows without installing
-  --verify             Check existing installation health (no changes)
+  --verify             Check installation health: manifest, files, MCP config, API connectivity (no changes)
   --uninstall          Remove all UluOps-managed artifacts
   --dry-run            Show what would happen without making changes
   -y, --yes            Skip confirmations
@@ -86,7 +93,7 @@ npx @uluops/setup --shell
 # Preview what's included without installing
 npx @uluops/setup --list
 
-# Check existing installation
+# Check existing installation (manifest + file presence + API connectivity)
 npx @uluops/setup --verify
 
 # Clean removal
@@ -95,15 +102,17 @@ npx @uluops/setup --uninstall
 
 ## What's included
 
-### Workflows
+### Workflows & Pipelines
 
-| Command | Description |
-|---------|-------------|
-| `/workflows:pre-implementation` | Design review before coding |
-| `/workflows:post-implementation` | Iterative validation loop |
-| `/workflows:ship` | Final gate before shipping |
-| `/workflows:prompt-audit` | Audit agent prompts |
-| `/workflows:aristotle` | Four-phase Aristotelian analysis |
+Workflows are multi-phase agent compositions with quality gates. Pipelines are deterministic DAG-based compositions that orchestrate workflows and agents.
+
+| Command | Type | Description |
+|---------|------|-------------|
+| `/pipelines:pre-implementation` | pipeline | Design review before coding |
+| `/pipelines:post-implementation` | pipeline | Iterative validation loop |
+| `/pipelines:ship` | pipeline | Final gate before shipping |
+| `/pipelines:prompt-audit` | pipeline | Audit agent prompts |
+| `/pipelines:aristotle-pipeline` | pipeline | Four-phase Aristotelian analysis |
 
 ### Agents
 
@@ -150,7 +159,7 @@ Re-running `npx @uluops/setup` is safe and idempotent:
 - Removed definitions are cleaned up
 - Your custom agents and non-UluOps MCP servers are never touched
 
-A manifest at `~/.claude/uluops-manifest.json` tracks what was installed.
+Setup manages four surfaces: agent files, command files, MCP config entries, and the metrics hook in `settings.json`. A manifest at `~/.claude/uluops-manifest.json` tracks what was installed so `--uninstall` can cleanly reverse all changes.
 
 ## Uninstall
 
