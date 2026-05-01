@@ -11,6 +11,41 @@ interface ClaudeConfig {
   [key: string]: unknown;
 }
 
+const MCP_PACKAGES = ["uluops-tracker-mcp-client", "uluops-registry-mcp-client"];
+
+/** Check whether the UluOps MCP client packages exist on the npm registry. Returns lists of available and missing packages. */
+export async function checkMcpPackageAvailability(): Promise<{
+  available: string[];
+  missing: string[];
+}> {
+  const available: string[] = [];
+  const missing: string[] = [];
+
+  const results = await Promise.allSettled(
+    MCP_PACKAGES.map((pkg) =>
+      fetch(`https://registry.npmjs.org/${pkg}`, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5000),
+        redirect: "follow",
+      }).then((res) => ({ pkg, ok: res.ok }))
+    ),
+  );
+
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value.ok) {
+      available.push(result.value.pkg);
+    } else {
+      const pkg =
+        result.status === "fulfilled"
+          ? (result.value as any).pkg ?? MCP_PACKAGES[missing.length]
+          : MCP_PACKAGES[missing.length];
+      missing.push(pkg);
+    }
+  }
+
+  return { available, missing };
+}
+
 /**
  * Read an existing config file, or return empty object if it doesn't exist.
  */

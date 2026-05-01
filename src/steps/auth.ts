@@ -7,6 +7,10 @@ export interface AuthResult {
   email: string | null;
 }
 
+function getKeyPrefix(): string {
+  return process.env["ULUOPS_KEY_PREFIX"] ?? "ulr_";
+}
+
 /**
  * Resolve API key from flags, env, credentials file, or interactive prompt.
  */
@@ -36,22 +40,22 @@ export async function resolveApiKey(options: {
       );
     }
 
+    const prefix = getKeyPrefix();
     const { input } = await import("@inquirer/prompts");
     apiKey = await input({
       message: "Enter your UluOps API key",
       validate: (val) => {
         if (!val.trim()) return "Get a key at app.uluops.ai/settings/api-keys";
-        if (!val.startsWith("ulr_"))
-          return "API keys start with ulr_ — get one at app.uluops.ai/settings/api-keys";
+        if (!val.startsWith(prefix))
+          return `API keys typically start with ${prefix} — if your key has a different format, just paste it and server validation will check it`;
         return true;
       },
     });
   }
 
-  if (!apiKey?.startsWith("ulr_")) {
-    throw new Error(
-      "API keys start with ulr_ — get one at app.uluops.ai/settings/api-keys",
-    );
+  const prefix = getKeyPrefix();
+  if (!apiKey.startsWith(prefix) && !options.skipValidation) {
+    console.warn(`  ⚠ Key does not start with expected prefix "${prefix}" — proceeding with server validation`);
   }
 
   // Validate against server

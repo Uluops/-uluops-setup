@@ -13,13 +13,14 @@ export interface CommandsResult {
 
 const SUBDIRS = ["agents", "workflows"] as const;
 
+/** Install slash-command .md files (agents/ and workflows/ subdirectories) to the Claude commands directory. */
 export async function installCommands(
   localDefs: boolean,
   dryRun: boolean,
   existingManifestCommands?: string[],
 ): Promise<CommandsResult> {
   const srcBase = join(ASSETS_DIR, "commands");
-  const destBase = getCommandsDir(localDefs);
+  const destBase = await getCommandsDir(localDefs);
 
   let agentCommands = 0;
   let workflowCommands = 0;
@@ -86,6 +87,7 @@ export async function installCommands(
   };
 }
 
+/** Remove previously installed command files by relative path. Returns count of successfully removed files. */
 export async function uninstallCommands(
   files: string[],
   defsPath: string,

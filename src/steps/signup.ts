@@ -3,18 +3,20 @@ import type { AuthResult } from "./auth.js";
 const API_BASE = "https://api.uluops.ai/api/v1";
 
 /**
- * Password complexity rules (matches ops-uluops-api validation).
- * Validated client-side for instant feedback before network round-trip.
+ * Advisory password hints. Returns warning strings for inquirer display,
+ * but all are non-blocking — server validation is the authority.
+ * @internal Exported for testing only — not part of the public API.
  */
-function validatePassword(password: string): string | true {
-  if (password.length < 8) return "Password must be at least 8 characters";
-  if (password.length > 128) return "Password must be at most 128 characters";
-  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter";
-  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter";
-  if (!/[0-9]/.test(password)) return "Password must include a number";
+function validatePassword(password: string): true {
+  if (password.length < 8) console.warn("  ⚠ Hint: server may require at least 8 characters");
+  else if (password.length > 128) console.warn("  ⚠ Hint: server may reject passwords over 128 characters");
+  else if (!/[a-z]/.test(password)) console.warn("  ⚠ Hint: server may require a lowercase letter");
+  else if (!/[A-Z]/.test(password)) console.warn("  ⚠ Hint: server may require an uppercase letter");
+  else if (!/[0-9]/.test(password)) console.warn("  ⚠ Hint: server may require a number");
   return true;
 }
 
+/** @internal Exported for testing only — not part of the public API. */
 function validateEmail(email: string): string | true {
   if (!email.trim()) return "Email is required";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Invalid email format";
@@ -139,5 +141,5 @@ async function callApi<T>(
   throw new Error(`Signup failed (${res.status}): ${message}`);
 }
 
-// Exported for testing
+/** @internal Exported for testing only — not part of the public API. */
 export { validatePassword, validateEmail };

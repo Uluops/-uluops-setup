@@ -171,7 +171,7 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, and she
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
 

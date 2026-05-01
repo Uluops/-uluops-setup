@@ -165,15 +165,17 @@ export async function installMetrics(
     }
   }
 
-  // Configure hook in settings.json
+  // Configure hook in settings.json only if hook.js actually exists
   let hookConfigured = false;
-  if (!dryRun) {
+  const hookJsPath = join(toolDir, "dist", "hook.js");
+  const hookJsExists = await access(hookJsPath).then(() => true, () => false);
+  if (hookJsExists && !dryRun) {
     const settings = await readSettings(settingsPath);
     const hookCommand = getHookCommand();
     const merged = mergeUluopsHook(settings, hookCommand);
     await writeSettings(settingsPath, merged);
     hookConfigured = true;
-  } else {
+  } else if (hookJsExists && dryRun) {
     hookConfigured = true;
   }
 

@@ -23,13 +23,13 @@ describe("resolveApiKey", () => {
     expect(result.apiKey).toBe("ulr_envkey");
   });
 
-  it("throws when key does not start with ulr_", async () => {
-    await expect(
-      resolveApiKey({
-        apiKeyFlag: "bad_key",
-        skipValidation: true,
-      }),
-    ).rejects.toThrow("API keys start with ulr_");
+  it("accepts key with non-standard prefix when skipValidation is true", async () => {
+    const result = await resolveApiKey({
+      apiKeyFlag: "bad_key",
+      skipValidation: true,
+    });
+    expect(result.apiKey).toBe("bad_key");
+    expect(result.email).toBeNull();
   });
 
   it("throws when no key found and not interactive", async () => {

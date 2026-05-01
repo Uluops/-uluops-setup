@@ -5,22 +5,33 @@ import {
   mergeUluopsMcp,
   removeUluopsMcp,
   writeConfig,
+  checkMcpPackageAvailability,
 } from "../lib/config-merger.js";
 import { getClaudeJsonPath, getLocalMcpPath } from "../lib/paths.js";
 
 export interface McpResult {
   configPath: string;
   scope: "global" | "local";
+  packageWarnings: string[];
 }
 
+/** Write UluOps MCP server entries (tracker + registry) into Claude's config file. Adds .mcp.json to .gitignore for local scope. */
 export async function installMcp(
   apiKey: string,
   scope: "global" | "local",
   dryRun: boolean,
 ): Promise<McpResult> {
-  const configPath = scope === "global" ? getClaudeJsonPath() : getLocalMcpPath();
+  const configPath = scope === "global" ? getClaudeJsonPath() : await getLocalMcpPath();
   const config = await readConfig(configPath);
   const merged = mergeUluopsMcp(config, apiKey);
+
+  const packageWarnings: string[] = [];
+  const { missing } = await checkMcpPackageAvailability();
+  if (missing.length > 0) {
+    packageWarnings.push(
+      `npm packages not found in registry: ${missing.join(", ")}. MCP servers may fail to start.`,
+    );
+  }
 
   if (!dryRun) {
     await writeConfig(configPath, merged);
@@ -31,9 +42,10 @@ export async function installMcp(
     await addToGitignore();
   }
 
-  return { configPath, scope };
+  return { configPath, scope, packageWarnings };
 }
 
+/** Remove UluOps MCP server entries from the given config file and write it back. */
 export async function uninstallMcp(configPath: string): Promise<void> {
   const config = await readConfig(configPath);
   const cleaned = removeUluopsMcp(config);

@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 const FENCE_START = "# --- UluOps (managed by @uluops/setup) ---";
 const FENCE_END = "# --- /UluOps ---";
 
+/** Write a fenced ULUOPS_API_KEY export block into the user's shell profile, replacing any existing UluOps block. */
 export async function writeShellExport(
   profilePath: string,
   apiKey: string,
@@ -38,6 +39,7 @@ export async function writeShellExport(
   }
 }
 
+/** Remove the fenced UluOps export block from the user's shell profile. */
 export async function removeShellExport(profilePath: string): Promise<void> {
   let content: string;
   try {

@@ -5,11 +5,21 @@ import { readConfig } from "../lib/config-merger.js";
 import { readSettings, hasUluopsHook } from "../lib/settings-merger.js";
 import { getMetricsToolDir, getSettingsPath } from "./metrics.js";
 
-interface VerifyResult {
+function getHealthTimeout(): number {
+  const env = process.env["ULUOPS_HEALTH_TIMEOUT"];
+  if (env) {
+    const ms = Number(env);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+  return 10_000;
+}
+
+export interface VerifyResult {
   ok: boolean;
   checks: { label: string; passed: boolean; detail?: string }[];
 }
 
+/** Run all verification checks against the current installation and return structured results. */
 export async function verify(): Promise<VerifyResult> {
   const checks: VerifyResult["checks"] = [];
   let allOk = true;
@@ -150,7 +160,7 @@ export async function verify(): Promise<VerifyResult> {
         "https://api.uluops.ai/api/v1/registry/users/me",
         {
           headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(getHealthTimeout()),
         },
       );
       if (res.ok) {

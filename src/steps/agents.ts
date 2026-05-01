@@ -9,6 +9,7 @@ export interface AgentsResult {
   files: string[];
 }
 
+/** Copy agent .md files from assets to the Claude agents directory, using hash comparison to skip unchanged files. */
 export async function installAgents(
   localDefs: boolean,
   dryRun: boolean,
@@ -16,12 +17,13 @@ export async function installAgents(
 ): Promise<AgentsResult> {
   return syncAssets({
     srcDir: join(ASSETS_DIR, "agents"),
-    destDir: getAgentsDir(localDefs),
+    destDir: await getAgentsDir(localDefs),
     dryRun,
     oldManifestFiles: existingManifestAgents,
   });
 }
 
+/** Remove previously installed agent files by name. Returns count of successfully removed files. */
 export async function uninstallAgents(
   files: string[],
   defsPath: string,

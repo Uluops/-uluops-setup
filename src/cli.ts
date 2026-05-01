@@ -15,12 +15,14 @@ import { installCommands, uninstallCommands } from "./steps/commands.js";
 import { writeShellExport, removeShellExport } from "./steps/shell.js";
 import { verify } from "./steps/verify.js";
 import { installMetrics, uninstallMetrics } from "./steps/metrics.js";
+import { probeHookSupport } from "./lib/settings-merger.js";
 import {
   loadManifest,
   saveManifest,
   deleteManifest,
+  validateManifest,
 } from "./lib/manifest.js";
-import { getClaudeHome, getAgentsDir, ASSETS_DIR } from "./lib/paths.js";
+import { getClaudeHome, getAgentsDir, ASSETS_DIR, probeClaudePaths } from "./lib/paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -59,42 +61,17 @@ async function runSetup(opts: {
     info(chalk.dim("(dry run — no changes will be made)\n"));
   }
 
-  // Detect environment
-  const env = await detect();
-
-  // Resolve API key — via signup or existing key
-  let apiKey: string;
-  let email: string | null = null;
-  try {
-    if (opts.signup) {
-      info("Create your UluOps account\n");
-      const auth = await signup();
-      apiKey = auth.apiKey;
-      email = auth.email;
-      ok(`Account created (${email})`);
-      ok(`API key generated`);
-    } else {
-      const auth = await resolveApiKey({
-        apiKeyFlag: opts.apiKey,
-        skipValidation: opts.skipValidation,
-        interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
-      });
-      apiKey = auth.apiKey;
-      email = auth.email;
-      if (email) {
-        ok(`Key validated (${email})`);
-      } else if (opts.skipValidation) {
-        ok("Key accepted (validation skipped)");
-      } else {
-        ok("Key validated");
-      }
-    }
-  } catch (err) {
-    fail(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
-
+  const { env, apiKey } = await initContext(opts);
   console.log();
+
+  if (!opts.localDefs) {
+    const probe = await probeClaudePaths();
+    for (const w of probe.warnings) warn(w);
+    if (!probe.homeDirExists && !probe.jsonFileExists) {
+      warn("Claude Code config not detected. Install may not take effect until Claude Code is configured.");
+    }
+    if (probe.warnings.length > 0) console.log();
+  }
 
   // Load existing manifest for update detection
   const existingManifest = await loadManifest();
@@ -113,86 +90,18 @@ async function runSetup(opts: {
     await checkConflicts(opts.localDefs);
   }
 
-  // MCP config
-  const mcpResult = await installMcp(apiKey, opts.scope, opts.dryRun);
-  ok(
-    `MCP config → ${mcpResult.configPath} (2 servers)`,
-  );
+  const mcpResult = await configureMcp(apiKey, opts);
 
-  // Agents
-  const agentsResult = await installAgents(
-    opts.localDefs,
-    opts.dryRun,
-    existingManifest?.agents,
-  );
-  const agentParts: string[] = [];
-  if (agentsResult.copied > 0)
-    agentParts.push(`${agentsResult.copied} copied`);
-  if (agentsResult.skipped > 0)
-    agentParts.push(`${agentsResult.skipped} unchanged`);
-  if (agentsResult.removed > 0)
-    agentParts.push(`${agentsResult.removed} removed`);
-  ok(
-    `${agentsResult.files.length} agents → ${opts.localDefs ? "./uluops/agents/" : "~/.claude/agents/"}${agentParts.length ? ` (${agentParts.join(", ")})` : ""}`,
-  );
+  const agentsResult = await installDefs("agents", opts, existingManifest?.agents);
 
-  // Commands
-  const commandsResult = await installCommands(
-    opts.localDefs,
-    opts.dryRun,
-    existingManifest?.commands,
-  );
-  const totalCommands =
-    commandsResult.agentCommands + commandsResult.workflowCommands;
-  const cmdSkipped = commandsResult.skipped;
+  const commandsResult = await installDefs("commands", opts, existingManifest?.commands);
   const cmdTotal = commandsResult.files.length;
-  const cmdParts: string[] = [];
-  if (totalCommands > 0) cmdParts.push(`${totalCommands} copied`);
-  if (cmdSkipped > 0) cmdParts.push(`${cmdSkipped} unchanged`);
-  if (commandsResult.removed > 0)
-    cmdParts.push(`${commandsResult.removed} removed`);
-  ok(
-    `${cmdTotal} commands → ${opts.localDefs ? "./uluops/commands/" : "~/.claude/commands/"}${cmdParts.length ? ` (${cmdParts.join(", ")})` : ""}`,
-  );
 
-  // Agent metrics (SubagentStop hook for auto-capture)
-  const metricsResult = await installMetrics(opts.dryRun);
-  if (metricsResult.hookConfigured) {
-    const parts: string[] = [];
-    if (metricsResult.toolFilesCopied > 0)
-      parts.push(`${metricsResult.toolFilesCopied} files`);
-    parts.push("hook configured");
-    ok(`Agent metrics → ~/.claude/tools/agent-metrics/ (${parts.join(", ")})`);
-  } else {
-    warn("Agent metrics hook not configured (tool files not found)");
-  }
+  const metricsResult = await configureMetrics(opts);
 
-  // Health check
-  if (!opts.skipValidation && !opts.dryRun) {
-    try {
-      const [trackerOk, registryOk] = await Promise.all([
-        checkEndpoint("https://api.uluops.ai/api/v1/health"),
-        checkEndpoint("https://api.uluops.ai/api/v1/registry/health"),
-      ]);
-      if (trackerOk && registryOk) {
-        ok("Health check passed — both APIs reachable");
-      } else {
-        warn("Some APIs unreachable (MCP tools may have limited functionality)");
-      }
-    } catch {
-      warn("Health check skipped (network issue)");
-    }
-  }
+  await runHealthCheck(opts);
 
-  // Shell export
-  let shellModified = false;
-  if (opts.shell && env.shellProfile) {
-    await writeShellExport(env.shellProfile, apiKey, opts.dryRun);
-    ok(`ULUOPS_API_KEY added to ${env.shellProfile}`);
-    shellModified = true;
-  } else if (opts.shell) {
-    warn("--shell requested but no supported shell detected ($SHELL). Skipping.");
-  }
+  const shellModified = await configureShell(env, apiKey, opts);
 
   // Save manifest
   if (!opts.dryRun) {
@@ -217,6 +126,122 @@ async function runSetup(opts: {
     commandCount: cmdTotal,
     apiKey,
   });
+}
+
+// --- extracted helpers ---
+
+async function initContext(opts: any) {
+  const env = await detect();
+  let apiKey: string;
+  try {
+    if (opts.signup) {
+      info("Create your UluOps account\n");
+      const auth = await signup();
+      apiKey = auth.apiKey;
+      ok(`Account created (${auth.email})`);
+      ok(`API key generated`);
+    } else {
+      const auth = await resolveApiKey({
+        apiKeyFlag: opts.apiKey,
+        skipValidation: opts.skipValidation,
+        interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
+      });
+      apiKey = auth.apiKey;
+      if (auth.email) ok(`Key validated (${auth.email})`);
+      else if (opts.skipValidation) ok("Key accepted (validation skipped)");
+      else ok("Key validated");
+    }
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+  return { env, apiKey };
+}
+
+async function configureMcp(apiKey: string, opts: any) {
+  const res = await installMcp(apiKey, opts.scope, opts.dryRun);
+  ok(`MCP config → ${res.configPath} (2 servers)`);
+  for (const w of res.packageWarnings) warn(w);
+  return res;
+}
+
+async function installDefs(kind: "agents" | "commands", opts: any, prev?: any) {
+  if (kind === "agents") {
+    const res = await installAgents(opts.localDefs, opts.dryRun, prev);
+    const parts: string[] = [];
+    if (res.copied > 0) parts.push(`${res.copied} copied`);
+    if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
+    if (res.removed > 0) parts.push(`${res.removed} removed`);
+    ok(`${res.files.length} agents → ${opts.localDefs ? "./uluops/agents/" : "~/.claude/agents/"}${parts.length ? ` (${parts.join(", ")})` : ""}`);
+    return res;
+  }
+  const res = await installCommands(opts.localDefs, opts.dryRun, prev);
+  const total = res.agentCommands + res.workflowCommands;
+  const parts: string[] = [];
+  if (total > 0) parts.push(`${total} copied`);
+  if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
+  if (res.removed > 0) parts.push(`${res.removed} removed`);
+  ok(`${res.files.length} commands → ${opts.localDefs ? "./uluops/commands/" : "~/.claude/commands/"}${parts.length ? ` (${parts.join(", ")})` : ""}`);
+  return res;
+}
+
+async function configureMetrics(opts: any) {
+  const probe = probeHookSupport();
+  if (probe.warning) warn(probe.warning);
+
+  const res = await installMetrics(opts.dryRun);
+  if (res.hookConfigured) {
+    const parts: string[] = [];
+    if (res.toolFilesCopied > 0) parts.push(`${res.toolFilesCopied} files`);
+    parts.push("hook configured");
+    ok(`Agent metrics → ~/.claude/tools/agent-metrics/ (${parts.join(", ")})`);
+  } else {
+    warn("Agent metrics hook not configured (tool files not found)");
+  }
+  return res;
+}
+
+async function runHealthCheck(opts: any) {
+  if (!opts.skipValidation && !opts.dryRun) {
+    try {
+      const [trackerOk, registryOk] = await Promise.all([
+        checkEndpoint("https://api.uluops.ai/api/v1/health"),
+        checkEndpoint("https://api.uluops.ai/api/v1/registry/health"),
+      ]);
+      if (trackerOk && registryOk) ok("Health check passed — both APIs reachable");
+      else warn("Some APIs unreachable (MCP tools may have limited functionality)");
+    } catch {
+      warn("Health check skipped (network issue)");
+    }
+  }
+}
+
+async function configureShell(env: any, apiKey: string, opts: any) {
+  let modified = false;
+  if (opts.shell && env.shellProfile) {
+    if (!opts.yes && !opts.dryRun) {
+      const confirmed = await confirmShellWrite(env.shellProfile);
+      if (!confirmed) {
+        warn("Skipped writing API key to shell profile");
+        return false;
+      }
+    }
+    await writeShellExport(env.shellProfile, apiKey, opts.dryRun);
+    ok(`ULUOPS_API_KEY added to ${env.shellProfile}`);
+    warn("API key stored in plaintext in shell profile. Consider rotating if shared machine.");
+    modified = true;
+  } else if (opts.shell) {
+    warn("--shell requested but no supported shell detected ($SHELL). Skipping.");
+  }
+  return modified;
+}
+
+async function confirmShellWrite(profilePath: string): Promise<boolean> {
+  const readline = await import("node:readline/promises");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(`Write ULUOPS_API_KEY to ${profilePath}? (y/N) `);
+  rl.close();
+  return answer.trim().toLowerCase() === "y";
 }
 
 // MCP tool count across both servers. Update when server toolsets change.
@@ -262,8 +287,9 @@ function printSetupSummary(opts: {
 
   printAgentList();
 
+  const masked = maskKey(opts.apiKey);
   info("For SDK/CLI usage, add to your shell profile:");
-  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${opts.apiKey}"`)}`);
+  info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${masked}"`)}`);
   console.log();
   info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
   console.log();
@@ -279,6 +305,12 @@ function printSetupSummary(opts: {
   info("Then try:");
   info(`  ${chalk.cyan("/workflows:post-implementation .")}`);
   console.log();
+}
+
+function maskKey(key: string): string {
+  if (!key || key.length <= 4) return "****";
+  const last4 = key.slice(-4);
+  return `${"*".repeat(Math.max(4, key.length - 4))}${last4}`;
 }
 
 function printAgentList(): void {
@@ -315,6 +347,19 @@ async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
   if (!manifest) {
     warn("No manifest found — nothing to uninstall.");
     return;
+  }
+
+  const validation = await validateManifest(manifest);
+  if (!validation.valid) {
+    fail("Manifest references paths that no longer exist:");
+    for (const err of validation.errors) info(`  ${err}`);
+    console.log();
+    info("Uninstall may be incomplete. Proceeding with what's available.");
+    console.log();
+  }
+  if (validation.warnings.length > 0) {
+    for (const w of validation.warnings) warn(w);
+    console.log();
   }
 
   // Remove agents
@@ -406,7 +451,7 @@ async function runVerify(): Promise<void> {
 
 async function checkConflicts(localDefs: boolean): Promise<void> {
 
-  const destDir = getAgentsDir(localDefs);
+  const destDir = await getAgentsDir(localDefs);
   const srcDir = join(ASSETS_DIR, "agents");
 
   let existingFiles: string[];
@@ -441,9 +486,18 @@ async function checkConflicts(localDefs: boolean): Promise<void> {
   }
 }
 
+function getHealthTimeout(): number {
+  const env = process.env["ULUOPS_HEALTH_TIMEOUT"];
+  if (env) {
+    const ms = Number(env);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+  }
+  return 10_000;
+}
+
 async function checkEndpoint(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(getHealthTimeout()) });
     return res.ok;
   } catch {
     return false;

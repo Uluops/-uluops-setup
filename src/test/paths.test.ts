@@ -8,6 +8,8 @@ import {
   getManifestPath,
   getAgentsDir,
   getCommandsDir,
+  findProjectRoot,
+  setProjectRoot,
 } from "../lib/paths.js";
 
 describe("path resolution", () => {
@@ -19,8 +21,9 @@ describe("path resolution", () => {
     expect(getClaudeJsonPath()).toBe(join(homedir(), ".claude.json"));
   });
 
-  it("getLocalMcpPath returns .mcp.json in cwd", () => {
-    expect(getLocalMcpPath()).toBe(join(process.cwd(), ".mcp.json"));
+  it("getLocalMcpPath returns .mcp.json in project root", async () => {
+    const root = await findProjectRoot();
+    expect(await getLocalMcpPath()).toBe(join(root, ".mcp.json"));
   });
 
   it("getManifestPath returns ~/.claude/uluops-manifest.json", () => {
@@ -29,21 +32,30 @@ describe("path resolution", () => {
     );
   });
 
-  it("getAgentsDir returns ~/.claude/agents when not local", () => {
-    expect(getAgentsDir(false)).toBe(join(homedir(), ".claude", "agents"));
+  it("getAgentsDir returns ~/.claude/agents when not local", async () => {
+    expect(await getAgentsDir(false)).toBe(join(homedir(), ".claude", "agents"));
   });
 
-  it("getAgentsDir returns ./uluops/agents when local", () => {
-    expect(getAgentsDir(true)).toBe(join(process.cwd(), "uluops", "agents"));
+  it("getAgentsDir returns ./uluops/agents when local", async () => {
+    const root = await findProjectRoot();
+    expect(await getAgentsDir(true)).toBe(join(root, "uluops", "agents"));
   });
 
-  it("getCommandsDir returns ~/.claude/commands when not local", () => {
-    expect(getCommandsDir(false)).toBe(join(homedir(), ".claude", "commands"));
+  it("getCommandsDir returns ~/.claude/commands when not local", async () => {
+    expect(await getCommandsDir(false)).toBe(join(homedir(), ".claude", "commands"));
   });
 
-  it("getCommandsDir returns ./uluops/commands when local", () => {
-    expect(getCommandsDir(true)).toBe(
-      join(process.cwd(), "uluops", "commands"),
+  it("getCommandsDir returns ./uluops/commands when local", async () => {
+    const root = await findProjectRoot();
+    expect(await getCommandsDir(true)).toBe(
+      join(root, "uluops", "commands"),
     );
+  });
+
+  it("setProjectRoot overrides findProjectRoot", async () => {
+    setProjectRoot("/tmp/test-project");
+    expect(await findProjectRoot()).toBe("/tmp/test-project");
+    expect(await getAgentsDir(true)).toBe("/tmp/test-project/uluops/agents");
+    setProjectRoot(null);
   });
 });

@@ -30,7 +30,7 @@ describe("metrics hook integration", () => {
     const existing = {
       theme: "dark",
       hooks: {
-        SomeOtherHook: [{ command: "echo hello" }],
+        SomeOtherHook: [{ hooks: [{ type: "command", command: "echo hello" }] }],
       },
     };
     await writeFile(settingsPath, JSON.stringify(existing));
@@ -49,7 +49,7 @@ describe("metrics hook integration", () => {
     const withHook = {
       theme: "dark",
       hooks: {
-        SomeOtherHook: [{ command: "echo hello" }],
+        SomeOtherHook: [{ hooks: [{ type: "command", command: "echo hello" }] }],
       },
     };
     // First install the hook

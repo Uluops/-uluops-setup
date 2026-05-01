@@ -13,12 +13,19 @@ export interface Environment {
 
 const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
 
+/** Detect the current environment: OS, shell, Node version, and Claude home status. */
 export async function detect(): Promise<Environment> {
   const p = platform();
   if (!SUPPORTED_PLATFORMS.has(p)) {
     throw new Error(`Unsupported platform: ${p}. Expected linux, darwin, or win32.`);
   }
   const os = p as Environment["os"];
+  // Block native Windows; require WSL2 instead
+  if (os === "win32") {
+    throw new Error(
+      "Windows (native) is not supported. Please use WSL2 (Ubuntu) and run setup inside WSL."
+    );
+  }
   const isWsl = os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;

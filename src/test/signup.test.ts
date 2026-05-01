@@ -6,25 +6,40 @@ describe("validatePassword", () => {
     expect(validatePassword("GoodPass1")).toBe(true);
   });
 
-  it("rejects passwords shorter than 8 chars", () => {
-    expect(validatePassword("Short1A")).toContain("at least 8");
+  it("warns for passwords shorter than 8 chars", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(validatePassword("Short1A")).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("at least 8"));
+    warnSpy.mockRestore();
   });
 
-  it("rejects passwords longer than 128 chars", () => {
+  it("warns for passwords longer than 128 chars", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const long = "Aa1" + "x".repeat(126);
-    expect(validatePassword(long)).toContain("at most 128");
+    expect(validatePassword(long)).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("128"));
+    warnSpy.mockRestore();
   });
 
-  it("rejects passwords without lowercase", () => {
-    expect(validatePassword("ALLCAPS123")).toContain("lowercase");
+  it("warns for passwords without lowercase", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(validatePassword("ALLCAPS123")).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("lowercase"));
+    warnSpy.mockRestore();
   });
 
-  it("rejects passwords without uppercase", () => {
-    expect(validatePassword("alllower123")).toContain("uppercase");
+  it("warns for passwords without uppercase", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(validatePassword("alllower123")).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("uppercase"));
+    warnSpy.mockRestore();
   });
 
-  it("rejects passwords without number", () => {
-    expect(validatePassword("NoNumbersHere")).toContain("number");
+  it("warns for passwords without number", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(validatePassword("NoNumbersHere")).toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("number"));
+    warnSpy.mockRestore();
   });
 });
 
@@ -64,7 +79,6 @@ describe("signup (network)", () => {
 
     const { signup } = await import("../steps/signup.js");
 
-    // Mock inquirer prompts
     vi.mock("@inquirer/prompts", () => ({
       input: vi.fn().mockResolvedValue("existing@example.com"),
       password: vi.fn().mockResolvedValue("ValidPass1"),

@@ -27,6 +27,39 @@ interface ClaudeSettings {
 /** Marker embedded in hook commands to identify UluOps-managed entries */
 const ULUOPS_HOOK_MARKER = "tools/agent-metrics";
 
+/** Supported hook event types in Claude Code. Update when Claude Code adds/renames types. */
+const SUPPORTED_HOOK_TYPES = new Set([
+  "SubagentStop",
+  "PreToolUse",
+  "PostToolUse",
+  "Notification",
+  "Stop",
+]);
+
+/** Configurable hook type via env var. Falls back to SubagentStop. */
+function getHookEventType(): string {
+  return process.env["ULUOPS_HOOK_TYPE"] ?? "SubagentStop";
+}
+
+export interface HookProbeResult {
+  hookType: string;
+  supported: boolean;
+  warning?: string;
+}
+
+/** Check whether the configured hook event type is in the known supported set. Returns the resolved hook type and a warning if unsupported. */
+export function probeHookSupport(): HookProbeResult {
+  const hookType = getHookEventType();
+  if (SUPPORTED_HOOK_TYPES.has(hookType)) {
+    return { hookType, supported: true };
+  }
+  return {
+    hookType,
+    supported: false,
+    warning: `Hook type "${hookType}" is not in the known supported set {${[...SUPPORTED_HOOK_TYPES].join(", ")}}. Metrics may silently fail if this hook type does not exist in Claude Code.`,
+  };
+}
+
 /**
  * Read an existing settings.json, or return empty object if it doesn't exist.
  */
@@ -57,15 +90,14 @@ export function mergeUluopsHook(
   settings: ClaudeSettings,
   hookCommand: string,
 ): ClaudeSettings {
+  const hookType = getHookEventType();
   const hooks = settings.hooks ?? {};
-  const existing = hooks["SubagentStop"] ?? [];
+  const existing = hooks[hookType] ?? [];
 
-  // Remove any existing UluOps hook entries
   const filtered = existing.filter(
     (m) => !m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
   );
 
-  // Add the new UluOps hook
   const uluopsHook: HookMatcher = {
     hooks: [
       {
@@ -80,7 +112,7 @@ export function mergeUluopsHook(
     ...settings,
     hooks: {
       ...hooks,
-      SubagentStop: [...filtered, uluopsHook],
+      [hookType]: [...filtered, uluopsHook],
     },
   };
 }
@@ -90,21 +122,22 @@ export function mergeUluopsHook(
  * the key is removed. If hooks becomes empty, the key is removed.
  */
 export function removeUluopsHook(settings: ClaudeSettings): ClaudeSettings {
+  const hookType = getHookEventType();
   const hooks = settings.hooks;
   if (!hooks) return settings;
 
-  const subagentStop = hooks["SubagentStop"];
-  if (!subagentStop) return settings;
+  const hookEntries = hooks[hookType];
+  if (!hookEntries) return settings;
 
-  const filtered = subagentStop.filter(
+  const filtered = hookEntries.filter(
     (m) => !m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
   );
 
   const updatedHooks = { ...hooks };
   if (filtered.length === 0) {
-    delete updatedHooks["SubagentStop"];
+    delete updatedHooks[hookType];
   } else {
-    updatedHooks["SubagentStop"] = filtered;
+    updatedHooks[hookType] = filtered;
   }
 
   const result = { ...settings };
@@ -121,9 +154,10 @@ export function removeUluopsHook(settings: ClaudeSettings): ClaudeSettings {
  * Check if a UluOps hook is configured in settings.
  */
 export function hasUluopsHook(settings: ClaudeSettings): boolean {
-  const subagentStop = settings.hooks?.["SubagentStop"];
-  if (!subagentStop) return false;
-  return subagentStop.some((m) =>
+  const hookType = getHookEventType();
+  const hookEntries = settings.hooks?.[hookType];
+  if (!hookEntries) return false;
+  return hookEntries.some((m) =>
     m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
   );
 }

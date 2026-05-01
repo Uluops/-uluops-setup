@@ -6,17 +6,26 @@
   "bin": {
     "uluops-setup": "./dist/cli.js"
   },
+  "exports": {
+    ".": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
+  },
   "files": [
-    "dist",
+    "dist/cli.js",
+    "dist/cli.d.ts",
+    "dist/lib/**",
+    "dist/steps/**",
     "assets"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/cli.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "prepublishOnly": "npm run build"
