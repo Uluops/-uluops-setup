@@ -68,9 +68,24 @@ export async function getLocalMcpPath(): Promise<string> {
   return join(await findProjectRoot(), ".mcp.json");
 }
 
-/** Return the path to the UluOps install manifest file. */
+/** Return the UluOps state directory (~/.uluops/). Harness-neutral. */
+export function getUluopsDir(): string {
+  return join(homedir(), ".uluops");
+}
+
+/** Return the path to the UluOps install manifest file (new location). */
 export function getManifestPath(): string {
+  return join(getUluopsDir(), "manifest.json");
+}
+
+/** Return the legacy manifest path for migration. */
+export function getLegacyManifestPath(): string {
   return join(getClaudeHome(), "uluops-manifest.json");
+}
+
+/** Return the backup directory for a harness's config files. */
+export function getBackupDir(harnessName: string): string {
+  return join(getUluopsDir(), "backups", harnessName);
 }
 
 /** Return the directory where agent .md files should be installed (local or global scope). */

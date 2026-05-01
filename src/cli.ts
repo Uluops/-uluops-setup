@@ -22,7 +22,15 @@ import {
   deleteManifest,
   validateManifest,
 } from "./lib/manifest.js";
-import { getClaudeHome, getAgentsDir, ASSETS_DIR, probeClaudePaths } from "./lib/paths.js";
+import type { HarnessManifest } from "./lib/manifest.js";
+import { ASSETS_DIR, findProjectRoot } from "./lib/paths.js";
+import {
+  getProfile,
+  resolveHarnessName,
+  listHarnesses,
+  HarnessNotTestedError,
+} from "./harnesses/index.js";
+import type { HarnessProfile } from "./harnesses/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,13 +56,20 @@ async function runSetup(opts: {
   skipValidation: boolean;
   dryRun: boolean;
   yes: boolean;
+  harness: string;
 }): Promise<void> {
   const version = await getVersion();
+  const profile = getProfile(opts.harness);
+
   console.log();
-  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`);
-  console.log(`      ${chalk.dim("operating intelligence as infrastructure")}`);
+  console.log(
+    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
+  );
+  console.log(
+    `      ${chalk.dim("operating intelligence as infrastructure")}`,
+  );
   console.log();
-  console.log(`  Setup v${version}`)
+  console.log(`  Setup v${version} — ${chalk.bold(profile.displayName)}`);
   console.log();
 
   if (opts.dryRun) {
@@ -64,40 +79,40 @@ async function runSetup(opts: {
   const { env, apiKey } = await initContext(opts);
   console.log();
 
-  if (!opts.localDefs) {
-    const probe = await probeClaudePaths();
-    for (const w of probe.warnings) warn(w);
-    if (!probe.homeDirExists && !probe.jsonFileExists) {
-      warn("Claude Code config not detected. Install may not take effect until Claude Code is configured.");
-    }
-    if (probe.warnings.length > 0) console.log();
-  }
-
   // Load existing manifest for update detection
   const existingManifest = await loadManifest();
+  const existingHarness = existingManifest?.harnesses[profile.name];
 
-  // Show update info if re-running with newer version
   if (existingManifest && existingManifest.version !== version) {
-    info(`Updating ${chalk.dim(existingManifest.version)} → ${chalk.green(version)}`);
+    info(
+      `Updating ${chalk.dim(existingManifest.version)} → ${chalk.green(version)}`,
+    );
     console.log();
-  } else if (existingManifest) {
+  } else if (existingHarness) {
     info(chalk.dim(`Already at v${version} — checking for changes`));
     console.log();
   }
 
-  // Check for conflicts on first install
-  if (!existingManifest && !opts.yes && !opts.dryRun) {
-    await checkConflicts(opts.localDefs);
+  // Check for conflicts on first install for this harness
+  if (!existingHarness && !opts.yes && !opts.dryRun) {
+    await checkConflicts(profile, opts.localDefs);
   }
 
-  const mcpResult = await configureMcp(apiKey, opts);
+  const mcpResult = await configureMcpStep(profile, apiKey, opts);
 
-  const agentsResult = await installDefs("agents", opts, existingManifest?.agents);
+  const agentsResult = await installAgentsDefs(
+    profile,
+    opts,
+    existingHarness?.agents,
+  );
 
-  const commandsResult = await installDefs("commands", opts, existingManifest?.commands);
-  const cmdTotal = commandsResult.files.length;
+  const commandsResult = await installCommandsDefs(
+    profile,
+    opts,
+    existingHarness?.commands,
+  );
 
-  const metricsResult = await configureMetrics(opts);
+  const metricsResult = await configureMetricsStep(profile, opts);
 
   await runHealthCheck(opts);
 
@@ -105,32 +120,51 @@ async function runSetup(opts: {
 
   // Save manifest
   if (!opts.dryRun) {
-    await saveManifest({
-      version,
-      installedAt: new Date().toISOString(),
+    const now = new Date().toISOString();
+    const harnessEntry: HarnessManifest = {
+      installedAt: now,
+      setupVersion: version,
       mcpScope: opts.scope,
       mcpConfigPath: mcpResult.configPath,
       defsScope: opts.localDefs ? "local" : "global",
       defsPath: opts.localDefs
-        ? join(process.cwd(), "uluops")
-        : getClaudeHome(),
-      shellModified,
+        ? join(await findProjectRoot(), "uluops")
+        : profile.paths.home,
       agents: agentsResult.files,
       commands: commandsResult.files,
-      metricsHookInstalled: metricsResult.hookConfigured,
-    });
+      hooksInstalled: metricsResult.hookConfigured,
+    };
+
+    const manifest = existingManifest ?? {
+      version,
+      installedAt: now,
+      shellModified: false,
+      harnesses: {},
+    };
+    manifest.version = version;
+    manifest.installedAt = now;
+    manifest.shellModified = shellModified || manifest.shellModified;
+    manifest.harnesses[profile.name] = harnessEntry;
+
+    await saveManifest(manifest);
   }
 
   printSetupSummary({
+    profile,
     agentCount: agentsResult.files.length,
-    commandCount: cmdTotal,
+    commandCount: commandsResult.files.length,
     apiKey,
   });
 }
 
 // --- extracted helpers ---
 
-async function initContext(opts: any) {
+async function initContext(opts: {
+  apiKey?: string;
+  signup: boolean;
+  skipValidation: boolean;
+  yes: boolean;
+}) {
   const env = await detect();
   let apiKey: string;
   try {
@@ -144,7 +178,8 @@ async function initContext(opts: any) {
       const auth = await resolveApiKey({
         apiKeyFlag: opts.apiKey,
         skipValidation: opts.skipValidation,
-        interactive: !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
+        interactive:
+          !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
       });
       apiKey = auth.apiKey;
       if (auth.email) ok(`Key validated (${auth.email})`);
@@ -158,65 +193,128 @@ async function initContext(opts: any) {
   return { env, apiKey };
 }
 
-async function configureMcp(apiKey: string, opts: any) {
-  const res = await installMcp(apiKey, opts.scope, opts.dryRun);
+async function configureMcpStep(
+  profile: HarnessProfile,
+  apiKey: string,
+  opts: { scope: "global" | "local"; dryRun: boolean },
+) {
+  const res = await installMcp(profile, apiKey, opts.scope, opts.dryRun);
   ok(`MCP config → ${res.configPath} (2 servers)`);
   for (const w of res.packageWarnings) warn(w);
   return res;
 }
 
-async function installDefs(kind: "agents" | "commands", opts: any, prev?: any) {
-  if (kind === "agents") {
-    const res = await installAgents(opts.localDefs, opts.dryRun, prev);
-    const parts: string[] = [];
-    if (res.copied > 0) parts.push(`${res.copied} copied`);
-    if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
-    if (res.removed > 0) parts.push(`${res.removed} removed`);
-    ok(`${res.files.length} agents → ${opts.localDefs ? "./uluops/agents/" : "~/.claude/agents/"}${parts.length ? ` (${parts.join(", ")})` : ""}`);
+async function installAgentsDefs(
+  profile: HarnessProfile,
+  opts: { localDefs: boolean; dryRun: boolean },
+  prev?: string[],
+) {
+  const res = await installAgents(profile, opts.localDefs, opts.dryRun, prev);
+  const parts: string[] = [];
+  if (res.copied > 0) parts.push(`${res.copied} copied`);
+  if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
+  if (res.removed > 0) parts.push(`${res.removed} removed`);
+  const dest = opts.localDefs
+    ? "./uluops/agents/"
+    : `${profile.paths.agentsDir.replace(process.env["HOME"] ?? "", "~")}/`;
+  ok(
+    `${res.files.length} agents → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
+  );
+  return res;
+}
+
+async function installCommandsDefs(
+  profile: HarnessProfile,
+  opts: { localDefs: boolean; dryRun: boolean },
+  prev?: string[],
+) {
+  const res = await installCommands(
+    profile,
+    opts.localDefs,
+    opts.dryRun,
+    prev,
+  );
+  if (res.skippedReason === "not-supported") {
+    info(
+      chalk.dim(
+        `Commands not yet supported for ${profile.displayName} (coming soon)`,
+      ),
+    );
     return res;
   }
-  const res = await installCommands(opts.localDefs, opts.dryRun, prev);
   const total = res.agentCommands + res.workflowCommands;
   const parts: string[] = [];
   if (total > 0) parts.push(`${total} copied`);
   if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
   if (res.removed > 0) parts.push(`${res.removed} removed`);
-  ok(`${res.files.length} commands → ${opts.localDefs ? "./uluops/commands/" : "~/.claude/commands/"}${parts.length ? ` (${parts.join(", ")})` : ""}`);
+  const dest = opts.localDefs
+    ? "./uluops/commands/"
+    : `${profile.paths.commandsDir.replace(process.env["HOME"] ?? "", "~")}/`;
+  ok(
+    `${res.files.length} commands → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
+  );
   return res;
 }
 
-async function configureMetrics(opts: any) {
+async function configureMetricsStep(
+  profile: HarnessProfile,
+  opts: { dryRun: boolean },
+) {
+  if (!profile.hooks) {
+    info(
+      chalk.dim(
+        `Metrics hooks not supported for ${profile.displayName}`,
+      ),
+    );
+    return { toolFilesCopied: 0, hookConfigured: false };
+  }
+
   const probe = probeHookSupport();
   if (probe.warning) warn(probe.warning);
 
-  const res = await installMetrics(opts.dryRun);
+  const res = await installMetrics(profile, opts.dryRun);
   if (res.hookConfigured) {
     const parts: string[] = [];
     if (res.toolFilesCopied > 0) parts.push(`${res.toolFilesCopied} files`);
     parts.push("hook configured");
-    ok(`Agent metrics → ~/.claude/tools/agent-metrics/ (${parts.join(", ")})`);
+    const toolPath = profile.paths.toolsDir?.replace(
+      process.env["HOME"] ?? "",
+      "~",
+    );
+    ok(`Agent metrics → ${toolPath}/ (${parts.join(", ")})`);
   } else {
     warn("Agent metrics hook not configured (tool files not found)");
   }
   return res;
 }
 
-async function runHealthCheck(opts: any) {
+async function runHealthCheck(opts: {
+  skipValidation: boolean;
+  dryRun: boolean;
+}) {
   if (!opts.skipValidation && !opts.dryRun) {
     try {
       const [trackerOk, registryOk] = await Promise.all([
         checkEndpoint("https://api.uluops.ai/api/v1/health"),
         checkEndpoint("https://api.uluops.ai/api/v1/registry/health"),
       ]);
-      if (trackerOk && registryOk) ok("Health check passed — both APIs reachable");
-      else warn("Some APIs unreachable (MCP tools may have limited functionality)");
+      if (trackerOk && registryOk)
+        ok("Health check passed — both APIs reachable");
+      else
+        warn(
+          "Some APIs unreachable (MCP tools may have limited functionality)",
+        );
     } catch {
       warn("Health check skipped (network issue)");
     }
   }
 }
 
-async function configureShell(env: any, apiKey: string, opts: any) {
+async function configureShell(
+  env: { shellProfile: string | null },
+  apiKey: string,
+  opts: { shell: boolean; yes: boolean; dryRun: boolean },
+) {
   let modified = false;
   if (opts.shell && env.shellProfile) {
     if (!opts.yes && !opts.dryRun) {
@@ -228,18 +326,27 @@ async function configureShell(env: any, apiKey: string, opts: any) {
     }
     await writeShellExport(env.shellProfile, apiKey, opts.dryRun);
     ok(`ULUOPS_API_KEY added to ${env.shellProfile}`);
-    warn("API key stored in plaintext in shell profile. Consider rotating if shared machine.");
+    warn(
+      "API key stored in plaintext in shell profile. Consider rotating if shared machine.",
+    );
     modified = true;
   } else if (opts.shell) {
-    warn("--shell requested but no supported shell detected ($SHELL). Skipping.");
+    warn(
+      "--shell requested but no supported shell detected ($SHELL). Skipping.",
+    );
   }
   return modified;
 }
 
 async function confirmShellWrite(profilePath: string): Promise<boolean> {
   const readline = await import("node:readline/promises");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question(`Write ULUOPS_API_KEY to ${profilePath}? (y/N) `);
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const answer = await rl.question(
+    `Write ULUOPS_API_KEY to ${profilePath}? (y/N) `,
+  );
   rl.close();
   return answer.trim().toLowerCase() === "y";
 }
@@ -273,6 +380,7 @@ const AGENT_LIST: [string, string, string][] = [
 ];
 
 function printSetupSummary(opts: {
+  profile: HarnessProfile;
   agentCount: number;
   commandCount: number;
   apiKey: string;
@@ -280,12 +388,18 @@ function printSetupSummary(opts: {
   console.log();
   console.log(`  ${chalk.dim("━".repeat(46))}`);
   console.log();
+
+  const parts = [`${TOOL_COUNT} MCP tools`, `${opts.agentCount} agents`];
+  if (opts.commandCount > 0) parts.push(`${opts.commandCount} slash commands`);
+  if (opts.profile.hooks) parts.push("metrics");
   console.log(
-    `  ${chalk.bold("Setup complete!")} ${TOOL_COUNT} MCP tools · ${opts.agentCount} agents · ${opts.commandCount} slash commands · metrics`,
+    `  ${chalk.bold("Setup complete!")} ${chalk.dim(`(${opts.profile.displayName})`)} ${parts.join(" · ")}`,
   );
   console.log();
 
-  printAgentList();
+  if (opts.profile.name === "claude-code") {
+    printAgentList();
+  }
 
   const masked = maskKey(opts.apiKey);
   info("For SDK/CLI usage, add to your shell profile:");
@@ -294,16 +408,11 @@ function printSetupSummary(opts: {
   info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
   console.log();
 
-  // Restart warning — last and prominent
   console.log(`  ${chalk.dim("━".repeat(46))}`);
   console.log();
-  console.log(`  ${chalk.yellow.bold("Restart Claude Code to load agents.")}`);
-  console.log();
-  info("After restart, verify with:");
-  info(`  ${chalk.cyan("/agents:validate --help")}`);
-  console.log();
-  info("Then try:");
-  info(`  ${chalk.cyan("/workflows:post-implementation .")}`);
+  console.log(
+    `  ${chalk.yellow.bold(`Restart ${opts.profile.displayName} to load agents.`)}`,
+  );
   console.log();
 }
 
@@ -315,28 +424,48 @@ function maskKey(key: string): string {
 
 function printAgentList(): void {
   info(chalk.bold("WORKFLOWS"));
-  info(`  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`);
-  info(`  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`);
-  info(`  ${chalk.cyan("/workflows:ship")}                  Final gate before shipping`);
-  info(`  ${chalk.cyan("/workflows:prompt-audit")}          Audit agent prompts`);
+  info(
+    `  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`,
+  );
+  info(
+    `  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`,
+  );
+  info(
+    `  ${chalk.cyan("/workflows:ship")}                  Final gate before shipping`,
+  );
+  info(
+    `  ${chalk.cyan("/workflows:prompt-audit")}          Audit agent prompts`,
+  );
   console.log();
-  info(`  ${chalk.cyan("/workflows:aristotle")}             Four-cause teleological analysis`);
+  info(
+    `  ${chalk.cyan("/workflows:aristotle")}             Four-cause teleological analysis`,
+  );
   console.log();
 
-  info(`${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`);
+  info(
+    `${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`,
+  );
   for (const [cmd, desc, model] of AGENT_LIST) {
-    info(`  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(model)}`);
+    info(
+      `  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(model)}`,
+    );
   }
 
   console.log();
-  info(chalk.dim(`  This is the starter set. Browse 135+ agents at registry.uluops.ai`));
+  info(
+    chalk.dim(
+      `  This is the starter set. Browse 135+ agents at registry.uluops.ai`,
+    ),
+  );
   console.log();
 }
 
 async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
   const version = await getVersion();
   console.log();
-  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} ${chalk.red("Uninstall")} v${version}`);
+  console.log(
+    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} ${chalk.red("Uninstall")} v${version}`,
+  );
   console.log();
 
   if (opts.dryRun) {
@@ -362,70 +491,84 @@ async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
     console.log();
   }
 
-  // Remove agents
-  if (!opts.dryRun) {
-    const removed = await uninstallAgents(manifest.agents, manifest.defsPath);
-    ok(`Removed ${removed} agent(s)`);
-  } else {
-    ok(`Would remove ${manifest.agents.length} agent(s)`);
-  }
-
-  // Remove commands
-  if (!opts.dryRun) {
-    const removed = await uninstallCommands(
-      manifest.commands,
-      manifest.defsPath,
-    );
-    ok(`Removed ${removed} command(s)`);
-  } else {
-    ok(`Would remove ${manifest.commands.length} command(s)`);
-  }
-
-  // Remove MCP config
-  if (!opts.dryRun) {
-    await uninstallMcp(manifest.mcpConfigPath);
-    ok(`Removed MCP servers from ${manifest.mcpConfigPath}`);
-  } else {
-    ok(`Would remove MCP servers from ${manifest.mcpConfigPath}`);
-  }
-
-  // Remove agent metrics hook and tool files
-  if (manifest.metricsHookInstalled) {
-    if (!opts.dryRun) {
-      await uninstallMetrics(false);
-      ok("Removed agent-metrics hook and tool files");
-    } else {
-      ok("Would remove agent-metrics hook and tool files");
+  for (const [harnessName, hm] of Object.entries(manifest.harnesses)) {
+    let profile: HarnessProfile;
+    try {
+      profile = getProfile(harnessName);
+    } catch {
+      warn(`Unknown harness "${harnessName}" in manifest — skipping`);
+      continue;
     }
+
+    info(chalk.bold(profile.displayName));
+
+    if (!opts.dryRun) {
+      const agentCount = await uninstallAgents(hm.agents, hm.defsPath);
+      ok(`Removed ${agentCount} agent(s)`);
+    } else {
+      ok(`Would remove ${hm.agents.length} agent(s)`);
+    }
+
+    if (hm.commands.length > 0) {
+      if (!opts.dryRun) {
+        const cmdCount = await uninstallCommands(hm.commands, hm.defsPath);
+        ok(`Removed ${cmdCount} command(s)`);
+      } else {
+        ok(`Would remove ${hm.commands.length} command(s)`);
+      }
+    }
+
+    if (!opts.dryRun) {
+      try {
+        await uninstallMcp(profile, hm.mcpConfigPath);
+        ok(`Removed MCP servers from ${hm.mcpConfigPath}`);
+      } catch {
+        warn(`Could not remove MCP servers from ${hm.mcpConfigPath}`);
+      }
+    } else {
+      ok(`Would remove MCP servers from ${hm.mcpConfigPath}`);
+    }
+
+    if (hm.hooksInstalled) {
+      if (!opts.dryRun) {
+        await uninstallMetrics(profile, false);
+        ok("Removed agent-metrics hook and tool files");
+      } else {
+        ok("Would remove agent-metrics hook and tool files");
+      }
+    }
+
+    console.log();
   }
 
   // Remove shell export
   if (manifest.shellModified) {
     const { getShellProfile } = await import("./lib/paths.js");
-    const profile = getShellProfile();
-    if (profile && !opts.dryRun) {
-      await removeShellExport(profile.path);
-      ok(`Removed export from ${profile.path}`);
-    } else if (profile) {
-      ok(`Would remove export from ${profile.path}`);
+    const shellProfile = getShellProfile();
+    if (shellProfile && !opts.dryRun) {
+      await removeShellExport(shellProfile.path);
+      ok(`Removed export from ${shellProfile.path}`);
+    } else if (shellProfile) {
+      ok(`Would remove export from ${shellProfile.path}`);
     }
   }
 
-  // Delete manifest
   if (!opts.dryRun) {
     await deleteManifest();
     ok("Manifest deleted");
   }
 
   console.log();
-  info("UluOps has been removed. Restart Claude Code to complete.");
+  info("UluOps has been removed. Restart your harness to complete.");
   console.log();
 }
 
 async function runVerify(): Promise<void> {
   const version = await getVersion();
   console.log();
-  console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} Installation Check v${version}`);
+  console.log(
+    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} Installation Check v${version}`,
+  );
   console.log();
 
   const result = await verify();
@@ -449,10 +592,14 @@ async function runVerify(): Promise<void> {
   process.exit(result.ok ? 0 : 1);
 }
 
-async function checkConflicts(localDefs: boolean): Promise<void> {
-
-  const destDir = await getAgentsDir(localDefs);
-  const srcDir = join(ASSETS_DIR, "agents");
+async function checkConflicts(
+  profile: HarnessProfile,
+  localDefs: boolean,
+): Promise<void> {
+  const destDir = localDefs
+    ? join(await findProjectRoot(), "uluops", "agents")
+    : profile.paths.agentsDir;
+  const srcDir = join(ASSETS_DIR, "agents", profile.name);
 
   let existingFiles: string[];
   let assetFiles: string[];
@@ -460,7 +607,7 @@ async function checkConflicts(localDefs: boolean): Promise<void> {
     existingFiles = await readdir(destDir);
     assetFiles = await readdir(srcDir);
   } catch {
-    return; // Directory doesn't exist yet
+    return;
   }
 
   const conflicts = assetFiles.filter((f) => existingFiles.includes(f));
@@ -497,7 +644,9 @@ function getHealthTimeout(): number {
 
 async function checkEndpoint(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(getHealthTimeout()) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(getHealthTimeout()),
+    });
     return res.ok;
   } catch {
     return false;
@@ -509,10 +658,18 @@ async function main(): Promise<void> {
 
   const program = new Command()
     .name("uluops-setup")
-    .description("Zero-friction installer for UluOps + Claude Code")
+    .description("Zero-friction installer for UluOps agentic harnesses")
     .version(version)
     .option("--api-key <key>", "API key (skip prompt)")
-    .option("--signup", "Create a new account (email + password, no browser)")
+    .option(
+      "--signup",
+      "Create a new account (email + password, no browser)",
+    )
+    .option(
+      "--harness <name>",
+      `Target harness: ${listHarnesses().join(", ")} (aliases: claude, oc, gemini)`,
+      "claude-code",
+    )
     .option(
       "--scope <mode>",
       'MCP config scope: "global" or "local"',
@@ -520,20 +677,15 @@ async function main(): Promise<void> {
     )
     .option(
       "--local-defs",
-      "Save agents/commands locally instead of ~/.claude/",
+      "Save agents/commands locally instead of harness global dir",
       false,
     )
+    .option("--shell", "Write API key export to shell profile", false)
+    .option("--skip-validation", "Accept API key without verifying", false)
     .option(
-      "--shell",
-      "Write API key export to shell profile",
-      false,
+      "--list",
+      "Show available agents and workflows without installing",
     )
-    .option(
-      "--skip-validation",
-      "Accept API key without verifying",
-      false,
-    )
-    .option("--list", "Show available agents and workflows without installing")
     .option("--verify", "Check existing installation health")
     .option("--uninstall", "Remove all UluOps artifacts")
     .option("--dry-run", "Show what would happen", false)
@@ -543,6 +695,7 @@ async function main(): Promise<void> {
   const opts = program.opts<{
     apiKey?: string;
     signup: boolean;
+    harness: string;
     scope: string;
     localDefs: boolean;
     shell: boolean;
@@ -556,7 +709,9 @@ async function main(): Promise<void> {
 
   if (opts.list) {
     console.log();
-    console.log(`  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} v${version} — available agents and workflows`);
+    console.log(
+      `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} v${version} — available agents and workflows`,
+    );
     console.log();
     printAgentList();
     info(`Install with: ${chalk.cyan("npx @uluops/setup")}`);
@@ -576,11 +731,16 @@ async function main(): Promise<void> {
 
   if (opts.scope && opts.scope !== "local" && opts.scope !== "global") {
     console.error(
-      chalk.red(`\n  Invalid --scope "${opts.scope}". Expected "global" or "local".\n`),
+      chalk.red(
+        `\n  Invalid --scope "${opts.scope}". Expected "global" or "local".\n`,
+      ),
     );
     process.exit(1);
   }
   const scope = opts.scope === "local" ? "local" : "global";
+
+  // Resolve harness name (supports aliases)
+  const harnessName = resolveHarnessName(opts.harness);
 
   await runSetup({
     apiKey: opts.apiKey,
@@ -591,10 +751,15 @@ async function main(): Promise<void> {
     skipValidation: opts.skipValidation,
     dryRun: opts.dryRun,
     yes: opts.yes,
+    harness: harnessName,
   });
 }
 
 main().catch((err: unknown) => {
+  if (err instanceof HarnessNotTestedError) {
+    console.error(chalk.yellow(`\n  ${err.message}\n`));
+    process.exit(1);
+  }
   const msg = err instanceof Error ? err.message : String(err);
   console.error(chalk.red(`\n  Error: ${msg}\n`));
   process.exit(1);

@@ -3,33 +3,54 @@ import { writeFile, unlink, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-// We need to control the manifest path, so we mock paths.js
 const tmpDir = join(tmpdir(), "uluops-manifest-test-" + Date.now());
-const manifestPath = join(tmpDir, "uluops-manifest.json");
+const manifestPath = join(tmpDir, "manifest.json");
+const legacyPath = join(tmpDir, "legacy-manifest.json");
 
 vi.mock("../lib/paths.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/paths.js")>();
   return {
     ...original,
     getManifestPath: () => manifestPath,
+    getLegacyManifestPath: () => legacyPath,
+    getUluopsDir: () => tmpDir,
   };
 });
 
-// Import after mock is set up
 const { loadManifest, saveManifest, deleteManifest } = await import(
   "../lib/manifest.js"
 );
 
 const sampleManifest = {
-  version: "0.1.0",
-  installedAt: "2026-03-08T00:00:00.000Z",
-  mcpScope: "global" as const,
+  version: "0.3.0",
+  installedAt: "2026-05-01T00:00:00.000Z",
+  shellModified: false,
+  harnesses: {
+    "claude-code": {
+      installedAt: "2026-05-01T00:00:00.000Z",
+      setupVersion: "0.3.0",
+      mcpScope: "global" as const,
+      mcpConfigPath: "/home/user/.claude.json",
+      defsScope: "global" as const,
+      defsPath: "/home/user/.claude",
+      agents: ["code-validator-agent.md"],
+      commands: ["agents/validate.md"],
+      hooksInstalled: true,
+    },
+  },
+};
+
+const legacyManifest = {
+  version: "0.2.0",
+  installedAt: "2026-04-01T00:00:00.000Z",
+  mcpScope: "global",
   mcpConfigPath: "/home/user/.claude.json",
-  defsScope: "global" as const,
+  defsScope: "global",
   defsPath: "/home/user/.claude",
   shellModified: false,
   agents: ["code-validator-agent.md"],
   commands: ["agents/validate.md"],
+  metricsHookInstalled: true,
 };
 
 beforeEach(async () => {
@@ -37,10 +58,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  try {
-    await unlink(manifestPath);
-  } catch {
-    // may not exist
+  for (const p of [manifestPath, legacyPath]) {
+    try {
+      await unlink(p);
+    } catch {
+      // may not exist
+    }
   }
 });
 
@@ -50,10 +73,22 @@ describe("loadManifest", () => {
     expect(result).toBeNull();
   });
 
-  it("returns parsed manifest when file exists", async () => {
+  it("returns parsed manifest when new-format file exists", async () => {
     await writeFile(manifestPath, JSON.stringify(sampleManifest, null, 2));
     const result = await loadManifest();
     expect(result).toEqual(sampleManifest);
+  });
+
+  it("migrates legacy manifest to new format", async () => {
+    await writeFile(legacyPath, JSON.stringify(legacyManifest, null, 2));
+    const result = await loadManifest();
+    expect(result).not.toBeNull();
+    expect(result!.harnesses).toBeDefined();
+    expect(result!.harnesses["claude-code"]).toBeDefined();
+    expect(result!.harnesses["claude-code"].agents).toEqual([
+      "code-validator-agent.md",
+    ]);
+    expect(result!.harnesses["claude-code"].hooksInstalled).toBe(true);
   });
 
   it("returns null on malformed JSON", async () => {
@@ -64,19 +99,24 @@ describe("loadManifest", () => {
 });
 
 describe("saveManifest", () => {
-  it("writes manifest as formatted JSON", async () => {
+  it("writes manifest with contentHash", async () => {
     await saveManifest(sampleManifest);
     const raw = await import("node:fs/promises").then((fs) =>
       fs.readFile(manifestPath, "utf-8"),
     );
     const parsed = JSON.parse(raw);
-    expect(parsed).toEqual(sampleManifest);
+    expect(parsed.harnesses).toBeDefined();
+    expect(parsed.contentHash).toBeDefined();
+    expect(typeof parsed.contentHash).toBe("string");
   });
 
   it("round-trips correctly through save and load", async () => {
     await saveManifest(sampleManifest);
     const loaded = await loadManifest();
-    expect(loaded).toEqual(sampleManifest);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.harnesses["claude-code"].agents).toEqual(
+      sampleManifest.harnesses["claude-code"].agents,
+    );
   });
 });
 

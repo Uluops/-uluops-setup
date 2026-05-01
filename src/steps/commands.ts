@@ -1,6 +1,7 @@
 import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
-import { ASSETS_DIR, getCommandsDir } from "../lib/paths.js";
+import type { HarnessProfile } from "../harnesses/index.js";
+import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
 import { copyIfChanged } from "../lib/file-ops.js";
 
 export interface CommandsResult {
@@ -9,18 +10,33 @@ export interface CommandsResult {
   skipped: number;
   removed: number;
   files: string[];
+  skippedReason?: string;
 }
 
 const SUBDIRS = ["agents", "workflows"] as const;
 
-/** Install slash-command .md files (agents/ and workflows/ subdirectories) to the Claude commands directory. */
+/** Install slash-command .md files. Commands are currently Claude Code-only. */
 export async function installCommands(
+  profile: HarnessProfile,
   localDefs: boolean,
   dryRun: boolean,
   existingManifestCommands?: string[],
 ): Promise<CommandsResult> {
+  if (profile.name !== "claude-code") {
+    return {
+      agentCommands: 0,
+      workflowCommands: 0,
+      skipped: 0,
+      removed: 0,
+      files: [],
+      skippedReason: "not-supported",
+    };
+  }
+
   const srcBase = join(ASSETS_DIR, "commands");
-  const destBase = await getCommandsDir(localDefs);
+  const destBase = localDefs
+    ? join(await findProjectRoot(), "uluops", "commands")
+    : profile.paths.commandsDir;
 
   let agentCommands = 0;
   let workflowCommands = 0;

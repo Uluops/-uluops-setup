@@ -1,39 +1,35 @@
 /**
  * Metrics Step
  *
- * Installs agent-metrics tool files to ~/.claude/tools/agent-metrics/
- * and configures the SubagentStop hook in settings.json for auto-capture.
+ * Installs agent-metrics tool files and configures post-agent hooks.
+ * Only active for harnesses that support hooks (currently Claude Code only).
  */
 
 import { mkdir, readdir, copyFile, rm, access } from "node:fs/promises";
 import { join } from "node:path";
-import { getClaudeHome } from "../lib/paths.js";
-import {
-  readSettings,
-  writeSettings,
-  mergeUluopsHook,
-  removeUluopsHook,
-} from "../lib/settings-merger.js";
+import type { HarnessProfile } from "../harnesses/index.js";
 
-/** Where agent-metrics dist files are installed */
-export function getMetricsToolDir(): string {
-  return join(getClaudeHome(), "tools", "agent-metrics");
+/** Where agent-metrics dist files are installed (derived from profile) */
+export function getMetricsToolDir(profile: HarnessProfile): string | null {
+  return profile.paths.toolsDir;
 }
 
-/** Path to Claude Code's settings.json */
-export function getSettingsPath(): string {
-  return join(getClaudeHome(), "settings.json");
+/** Path to harness settings.json (derived from profile) */
+export function getSettingsPath(profile: HarnessProfile): string | null {
+  return profile.paths.settingsPath;
 }
 
 /** The hook command that runs on SubagentStop */
-function getHookCommand(): string {
-  const toolDir = getMetricsToolDir();
+function getHookCommand(profile: HarnessProfile): string {
+  const toolDir = getMetricsToolDir(profile);
+  if (!toolDir) throw new Error("No tool dir for this harness");
   return `node ${join(toolDir, "dist", "hook.js")}`;
 }
 
 export interface MetricsResult {
   toolFilesCopied: number;
   hookConfigured: boolean;
+  skippedReason?: string;
 }
 
 /**
@@ -137,43 +133,45 @@ async function copyToolFiles(
 }
 
 /**
- * Install agent-metrics: copy tool files and configure SubagentStop hook.
+ * Install agent-metrics: copy tool files and configure hook.
+ * Skips entirely if the harness doesn't support hooks.
  */
 export async function installMetrics(
+  profile: HarnessProfile,
   dryRun: boolean,
 ): Promise<MetricsResult> {
-  const toolDir = getMetricsToolDir();
-  const settingsPath = getSettingsPath();
+  if (!profile.hooks || !profile.paths.toolsDir || !profile.paths.settingsPath) {
+    return { toolFilesCopied: 0, hookConfigured: false, skippedReason: "no-hook-support" };
+  }
 
-  // Find source package
+  const toolDir = profile.paths.toolsDir;
+  const settingsPath = profile.paths.settingsPath;
+
   const srcRoot = await findMetricsSource();
 
   let toolFilesCopied = 0;
   if (srcRoot) {
-    // Copy tool files
     if (!dryRun) {
       await mkdir(toolDir, { recursive: true });
     }
     toolFilesCopied = await copyToolFiles(srcRoot, toolDir, dryRun);
   } else {
-    // Check if already installed (from previous run or install.sh)
     try {
       await access(join(toolDir, "dist", "hook.js"));
     } catch {
-      // Not found anywhere — skip tool installation, just configure hook
-      // if files happen to exist
+      // Not found anywhere
     }
   }
 
-  // Configure hook in settings.json only if hook.js actually exists
   let hookConfigured = false;
   const hookJsPath = join(toolDir, "dist", "hook.js");
-  const hookJsExists = await access(hookJsPath).then(() => true, () => false);
+  const hookJsExists = await access(hookJsPath).then(
+    () => true,
+    () => false,
+  );
   if (hookJsExists && !dryRun) {
-    const settings = await readSettings(settingsPath);
-    const hookCommand = getHookCommand();
-    const merged = mergeUluopsHook(settings, hookCommand);
-    await writeSettings(settingsPath, merged);
+    const hookCommand = getHookCommand(profile);
+    await profile.hooks.install(settingsPath, hookCommand, false);
     hookConfigured = true;
   } else if (hookJsExists && dryRun) {
     hookConfigured = true;
@@ -183,23 +181,23 @@ export async function installMetrics(
 }
 
 /**
- * Uninstall agent-metrics: remove hook from settings and optionally remove tool files.
+ * Uninstall agent-metrics: remove hook and tool files.
  */
-export async function uninstallMetrics(dryRun: boolean): Promise<void> {
-  const settingsPath = getSettingsPath();
-  const toolDir = getMetricsToolDir();
-
-  // Remove hook from settings.json
-  if (!dryRun) {
-    const settings = await readSettings(settingsPath);
-    const cleaned = removeUluopsHook(settings);
-    await writeSettings(settingsPath, cleaned);
+export async function uninstallMetrics(
+  profile: HarnessProfile,
+  dryRun: boolean,
+): Promise<void> {
+  if (!profile.hooks || !profile.paths.toolsDir || !profile.paths.settingsPath) {
+    return;
   }
 
-  // Remove tool directory
+  if (!dryRun) {
+    await profile.hooks.remove(profile.paths.settingsPath, false);
+  }
+
   if (!dryRun) {
     try {
-      await rm(toolDir, { recursive: true, force: true });
+      await rm(profile.paths.toolsDir, { recursive: true, force: true });
     } catch {
       // Already gone
     }

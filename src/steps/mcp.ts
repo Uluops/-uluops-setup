@@ -1,13 +1,8 @@
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access, mkdir, copyFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  readConfig,
-  mergeUluopsMcp,
-  removeUluopsMcp,
-  writeConfig,
-  checkMcpPackageAvailability,
-} from "../lib/config-merger.js";
-import { getClaudeJsonPath, getLocalMcpPath } from "../lib/paths.js";
+import type { HarnessProfile } from "../harnesses/index.js";
+import { checkMcpPackageAvailability } from "../lib/config-merger.js";
+import { findProjectRoot, getBackupDir } from "../lib/paths.js";
 
 export interface McpResult {
   configPath: string;
@@ -15,15 +10,20 @@ export interface McpResult {
   packageWarnings: string[];
 }
 
-/** Write UluOps MCP server entries (tracker + registry) into Claude's config file. Adds .mcp.json to .gitignore for local scope. */
+/** Write UluOps MCP server entries into a harness's config file. */
 export async function installMcp(
+  profile: HarnessProfile,
   apiKey: string,
   scope: "global" | "local",
   dryRun: boolean,
 ): Promise<McpResult> {
-  const configPath = scope === "global" ? getClaudeJsonPath() : await getLocalMcpPath();
-  const config = await readConfig(configPath);
-  const merged = mergeUluopsMcp(config, apiKey);
+  const configPath =
+    scope === "global"
+      ? profile.paths.globalMcpConfig
+      : join(await findProjectRoot(), profile.paths.localMcpConfig);
+
+  const config = await profile.mcpConfig.read(configPath);
+  const merged = profile.mcpConfig.merge(config, apiKey);
 
   const packageWarnings: string[] = [];
   const { missing } = await checkMcpPackageAvailability();
@@ -34,37 +34,59 @@ export async function installMcp(
   }
 
   if (!dryRun) {
-    await writeConfig(configPath, merged);
+    // Backup before first write
+    await backupConfig(profile.name, configPath);
+    await profile.mcpConfig.write(configPath, merged);
   }
 
-  // If local scope in a git repo, add .mcp.json to .gitignore
   if (scope === "local" && !dryRun) {
-    await addToGitignore();
+    await addToGitignore(profile.paths.localMcpConfig);
   }
 
   return { configPath, scope, packageWarnings };
 }
 
-/** Remove UluOps MCP server entries from the given config file and write it back. */
-export async function uninstallMcp(configPath: string): Promise<void> {
-  const config = await readConfig(configPath);
-  const cleaned = removeUluopsMcp(config);
-  await writeConfig(configPath, cleaned);
+/** Remove UluOps MCP server entries from the harness config. */
+export async function uninstallMcp(
+  profile: HarnessProfile,
+  configPath: string,
+): Promise<void> {
+  const config = await profile.mcpConfig.read(configPath);
+  const cleaned = profile.mcpConfig.remove(config);
+  await profile.mcpConfig.write(configPath, cleaned);
 }
 
-async function addToGitignore(): Promise<void> {
+async function backupConfig(
+  harnessName: string,
+  configPath: string,
+): Promise<void> {
+  try {
+    await access(configPath);
+  } catch {
+    return; // Nothing to back up
+  }
+  const backupDir = getBackupDir(harnessName);
+  await mkdir(backupDir, { recursive: true });
+  const filename = configPath.split("/").pop() ?? "config.bak";
+  await copyFile(configPath, join(backupDir, `${filename}.bak`));
+}
+
+async function addToGitignore(localConfigFilename: string): Promise<void> {
   const gitignorePath = join(process.cwd(), ".gitignore");
   try {
     await access(join(process.cwd(), ".git"));
   } catch {
-    return; // Not a git repo
+    return;
   }
 
   try {
     const content = await readFile(gitignorePath, "utf-8");
-    if (content.includes(".mcp.json")) return;
-    await writeFile(gitignorePath, content.trimEnd() + "\n.mcp.json\n");
+    if (content.includes(localConfigFilename)) return;
+    await writeFile(
+      gitignorePath,
+      content.trimEnd() + `\n${localConfigFilename}\n`,
+    );
   } catch {
-    await writeFile(gitignorePath, ".mcp.json\n");
+    await writeFile(gitignorePath, `${localConfigFilename}\n`);
   }
 }

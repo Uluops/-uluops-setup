@@ -1,6 +1,8 @@
 import { platform, release } from "node:os";
 import { access } from "node:fs/promises";
 import { getClaudeHome, getShellProfile } from "../lib/paths.js";
+import { detectHarnesses } from "../harnesses/index.js";
+import type { HarnessProfile } from "../harnesses/index.js";
 
 export interface Environment {
   os: "linux" | "darwin" | "win32";
@@ -9,24 +11,27 @@ export interface Environment {
   shellProfile: string | null;
   nodeVersion: string;
   claudeHomeExists: boolean;
+  detectedHarnesses: HarnessProfile[];
 }
 
 const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
 
-/** Detect the current environment: OS, shell, Node version, and Claude home status. */
+/** Detect the current environment: OS, shell, Node version, harnesses, and Claude home status. */
 export async function detect(): Promise<Environment> {
   const p = platform();
   if (!SUPPORTED_PLATFORMS.has(p)) {
-    throw new Error(`Unsupported platform: ${p}. Expected linux, darwin, or win32.`);
-  }
-  const os = p as Environment["os"];
-  // Block native Windows; require WSL2 instead
-  if (os === "win32") {
     throw new Error(
-      "Windows (native) is not supported. Please use WSL2 (Ubuntu) and run setup inside WSL."
+      `Unsupported platform: ${p}. Expected linux, darwin, or win32.`,
     );
   }
-  const isWsl = os === "linux" && release().toLowerCase().includes("microsoft");
+  const os = p as Environment["os"];
+  if (os === "win32") {
+    throw new Error(
+      "Windows (native) is not supported. Please use WSL2 (Ubuntu) and run setup inside WSL.",
+    );
+  }
+  const isWsl =
+    os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;
 
@@ -38,6 +43,8 @@ export async function detect(): Promise<Environment> {
     // Does not exist
   }
 
+  const detectedHarnesses = detectHarnesses();
+
   return {
     os,
     isWsl,
@@ -45,5 +52,6 @@ export async function detect(): Promise<Environment> {
     shellProfile: profile?.path ?? null,
     nodeVersion,
     claudeHomeExists,
+    detectedHarnesses,
   };
 }

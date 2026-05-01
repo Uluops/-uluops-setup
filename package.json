@@ -1,7 +1,7 @@
 {
   "name": "@uluops/setup",
-  "version": "0.2.0",
-  "description": "Zero-friction installer for UluOps + Claude Code",
+  "version": "0.3.0",
+  "description": "Zero-friction installer for UluOps agentic harnesses",
   "type": "module",
   "bin": {
     "uluops-setup": "./dist/cli.js"
@@ -17,6 +17,7 @@
     "dist/cli.d.ts",
     "dist/lib/**",
     "dist/steps/**",
+    "dist/harnesses/**",
     "assets"
   ],
   "engines": {
@@ -34,7 +35,8 @@
     "@inquirer/prompts": "^7.0.0",
     "@uluops/agent-metrics": "^0.2.0",
     "chalk": "^5.0.0",
-    "commander": "^12.0.0"
+    "commander": "^12.0.0",
+    "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

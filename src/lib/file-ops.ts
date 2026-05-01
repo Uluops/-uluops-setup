@@ -55,6 +55,7 @@ export async function syncAssets(opts: {
   srcDir: string;
   destDir: string;
   dryRun: boolean;
+  extension?: string;
   oldManifestFiles?: string[];
 }): Promise<{
   copied: number;
@@ -68,8 +69,9 @@ export async function syncAssets(opts: {
     await mkdir(opts.destDir, { recursive: true });
   }
 
+  const ext = opts.extension ?? ".md";
   const assetFiles = (await readdir(opts.srcDir)).filter((f) =>
-    f.endsWith(".md"),
+    f.endsWith(ext),
   );
 
   let copied = 0;

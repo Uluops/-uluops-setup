@@ -26,9 +26,9 @@ describe("path resolution", () => {
     expect(await getLocalMcpPath()).toBe(join(root, ".mcp.json"));
   });
 
-  it("getManifestPath returns ~/.claude/uluops-manifest.json", () => {
+  it("getManifestPath returns ~/.uluops/manifest.json", () => {
     expect(getManifestPath()).toBe(
-      join(homedir(), ".claude", "uluops-manifest.json"),
+      join(homedir(), ".uluops", "manifest.json"),
     );
   });
 
