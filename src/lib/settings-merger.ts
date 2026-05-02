@@ -19,7 +19,7 @@ interface HookMatcher {
   hooks: HookEntry[];
 }
 
-interface ClaudeSettings {
+export interface ClaudeSettings {
   permissions?: Record<string, unknown>;
   hooks?: Record<string, HookMatcher[]>;
   [key: string]: unknown;

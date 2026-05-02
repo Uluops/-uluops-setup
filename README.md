@@ -126,46 +126,11 @@ npx @uluops/setup --uninstall
 
 ## What's included
 
-### Workflows
+### Agents & Workflows
 
-Workflows are multi-phase agent compositions with quality gates.
+Setup installs the starter set of agent and workflow slash commands. Run `npx @uluops/setup --list` to see what's included.
 
-| Command | Type | Description |
-|---------|------|-------------|
-| `/workflows:pre-implementation` | workflow | Design review before coding |
-| `/workflows:post-implementation` | workflow | Iterative validation loop |
-| `/workflows:ship` | workflow | Final gate before shipping |
-| `/workflows:prompt-audit` | workflow | Audit agent prompts |
-| `/workflows:aristotle` | workflow | Four-phase Aristotelian analysis |
-
-### Agents
-
-| Command | Focus | Model |
-|---------|-------|-------|
-| `/agents:validate` | Code quality | sonnet |
-| `/agents:type-safety` | TypeScript | sonnet |
-| `/agents:test-review` | Test quality | sonnet |
-| `/agents:optimize` | Performance | sonnet |
-| `/agents:frontend` | React/a11y | sonnet |
-| `/agents:mcp-validate` | MCP compliance | sonnet |
-| `/agents:architect` | Design review | sonnet |
-| `/agents:audit` | Runtime bugs | opus |
-| `/agents:security` | OWASP | sonnet |
-| `/agents:api-contract` | API alignment | sonnet |
-| `/agents:release` | Publish ready | sonnet |
-| `/agents:public-interface` | README/exports | sonnet |
-| `/agents:docs-validate` | Documentation | sonnet |
-| `/agents:prompt-validate` | Prompt review | sonnet |
-| `/agents:prompt-quality` | Prompt quality | sonnet |
-| `/agents:pattern-analyzer` | Patterns | sonnet |
-| `/agents:aristotle-explorer` | Categories | opus |
-| `/agents:aristotle-analyst` | Four causes | opus |
-| `/agents:aristotle-validator` | Teleology | opus |
-| `/agents:aristotle-forecaster` | Potentiality | opus |
-| `/agents:assumption-excavator` | Assumptions | sonnet |
-| `/agents:workflow-synthesis` | Cross-agent synthesis | opus |
-
-> This is the starter set. Browse 135+ agents at [registry.uluops.ai](https://registry.uluops.ai).
+> Browse more agents, workflows, and pipelines at [registry.uluops.ai](https://registry.uluops.ai). Pipelines are available via the registry API and MCP tools — they are not installed locally.
 
 ### MCP servers
 

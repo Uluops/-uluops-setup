@@ -7,7 +7,7 @@ interface McpServerConfig {
   env: Record<string, string>;
 }
 
-interface ClaudeConfig {
+export interface ClaudeConfig {
   mcpServers?: Record<string, McpServerConfig>;
   [key: string]: unknown;
 }
