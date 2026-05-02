@@ -36,7 +36,7 @@ npx @uluops/setup --harness opencode
 | Slash commands | 27 | `~/.claude/commands/` |
 | Agent metrics hook | 1 | `~/.claude/tools/agent-metrics/` |
 
-> Destinations vary by harness. Use `--harness <name>` to target a different harness. Commands and metrics hooks are currently Claude Code-only.
+> Paths shown are for Claude Code (default). OpenCode destinations: `~/.config/opencode/opencode.json`, `~/.config/opencode/agents/`. Use `--harness <name>` to target a different harness. Commands and metrics hooks are currently Claude Code-only.
 
 The installer runs five steps in sequence:
 

@@ -1,5 +1,5 @@
 import { homedir, platform } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { access } from "node:fs/promises";
 
@@ -23,7 +23,15 @@ export async function findProjectRoot(): Promise<string> {
   if (projectRootOverride) return projectRootOverride;
 
   const envRoot = process.env["ULUOPS_PROJECT_ROOT"];
-  if (envRoot) return envRoot;
+  if (envRoot) {
+    if (!isAbsolute(envRoot)) {
+      throw new Error(`ULUOPS_PROJECT_ROOT must be an absolute path, got: ${envRoot}`);
+    }
+    if (envRoot.includes("..")) {
+      throw new Error(`ULUOPS_PROJECT_ROOT must not contain traversal sequences: ${envRoot}`);
+    }
+    return envRoot;
+  }
 
   let dir = process.cwd();
   const root = dirname(dir);

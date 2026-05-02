@@ -10,13 +10,8 @@ import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 
 /** Where agent-metrics dist files are installed (derived from profile) */
-export function getMetricsToolDir(profile: HarnessProfile): string | null {
+function getMetricsToolDir(profile: HarnessProfile): string | null {
   return profile.paths.toolsDir;
-}
-
-/** Path to harness settings.json (derived from profile) */
-export function getSettingsPath(profile: HarnessProfile): string | null {
-  return profile.paths.settingsPath;
 }
 
 /** The hook command that runs on SubagentStop */

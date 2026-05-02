@@ -51,6 +51,7 @@ export async function uninstallMcp(
   profile: HarnessProfile,
   configPath: string,
 ): Promise<void> {
+  await backupConfig(profile.name, configPath);
   const config = await profile.mcpConfig.read(configPath);
   const cleaned = profile.mcpConfig.remove(config);
   await profile.mcpConfig.write(configPath, cleaned);

@@ -30,8 +30,8 @@ interface OpenCodeMcpServer {
 }
 
 class OpenCodeMcpConfig implements McpConfigStrategy {
-  /** Tracks the actual path that was successfully read, for write-back. */
-  private resolvedPath: string | null = null;
+  /** Maps requested path → actual resolved path (for .jsonc fallback). */
+  private resolvedPaths = new Map<string, string>();
 
   async read(path: string): Promise<Record<string, unknown>> {
     // Try the given path, then probe for .jsonc variant
@@ -40,14 +40,14 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     for (const p of candidates) {
       try {
         raw = await readFile(p, "utf-8");
-        this.resolvedPath = p;
+        this.resolvedPaths.set(path, p);
         break;
       } catch {
         // Try next
       }
     }
     if (raw === null) {
-      this.resolvedPath = path; // Default to given path for new files
+      this.resolvedPaths.set(path, path);
       return {};
     }
 
@@ -115,7 +115,7 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     config: Record<string, unknown>,
   ): Promise<void> {
     // Write back to the path that was actually read (may be .jsonc)
-    const target = this.resolvedPath ?? path;
+    const target = this.resolvedPaths.get(path) ?? path;
     await atomicWrite(target, JSON.stringify(config, null, 2) + "\n");
   }
 
