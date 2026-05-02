@@ -63,14 +63,16 @@ export function probeHookSupport(): HookProbeResult {
 
 /**
  * Read an existing settings.json, or return empty object if it doesn't exist.
+ * Throws on malformed JSON to prevent silent data loss during merge+write.
  */
 export async function readSettings(path: string): Promise<ClaudeSettings> {
+  let raw: string;
   try {
-    const raw = await readFile(path, "utf-8");
-    return JSON.parse(raw) as ClaudeSettings;
+    raw = await readFile(path, "utf-8");
   } catch {
-    return {};
+    return {}; // File doesn't exist — fresh config
   }
+  return JSON.parse(raw) as ClaudeSettings;
 }
 
 /**

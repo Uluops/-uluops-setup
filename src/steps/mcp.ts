@@ -1,8 +1,9 @@
-import { readFile, writeFile, access, mkdir, copyFile } from "node:fs/promises";
+import { readFile, access, mkdir, copyFile } from "node:fs/promises";
 import { join, basename } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 import { findProjectRoot, getBackupDir } from "../lib/paths.js";
+import { atomicWrite } from "../lib/atomic-write.js";
 
 export interface McpResult {
   configPath: string;
@@ -83,11 +84,11 @@ async function addToGitignore(localConfigFilename: string): Promise<void> {
   try {
     const content = await readFile(gitignorePath, "utf-8");
     if (content.includes(localConfigFilename)) return;
-    await writeFile(
+    await atomicWrite(
       gitignorePath,
       content.trimEnd() + `\n${localConfigFilename}\n`,
     );
   } catch {
-    await writeFile(gitignorePath, `${localConfigFilename}\n`);
+    await atomicWrite(gitignorePath, `${localConfigFilename}\n`);
   }
 }

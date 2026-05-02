@@ -32,14 +32,15 @@ export async function checkMcpPackageAvailability(): Promise<{
     ),
   );
 
-  for (const result of results) {
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i]!;
     if (result.status === "fulfilled" && result.value.ok) {
       available.push(result.value.pkg);
     } else {
       const pkg =
         result.status === "fulfilled"
           ? result.value.pkg
-          : MCP_PACKAGES[missing.length] ?? "unknown";
+          : MCP_PACKAGES[i] ?? "unknown";
       missing.push(pkg);
     }
   }
@@ -49,14 +50,16 @@ export async function checkMcpPackageAvailability(): Promise<{
 
 /**
  * Read an existing config file, or return empty object if it doesn't exist.
+ * Throws on malformed JSON to prevent silent data loss during merge+write.
  */
 export async function readConfig(path: string): Promise<ClaudeConfig> {
+  let raw: string;
   try {
-    const raw = await readFile(path, "utf-8");
-    return JSON.parse(raw) as ClaudeConfig;
+    raw = await readFile(path, "utf-8");
   } catch {
-    return {};
+    return {}; // File doesn't exist — fresh config
   }
+  return JSON.parse(raw) as ClaudeConfig;
 }
 
 /**
@@ -115,5 +118,7 @@ export async function writeConfig(
   path: string,
   config: ClaudeConfig,
 ): Promise<void> {
-  await atomicWrite(path, JSON.stringify(config, null, 2) + "\n");
+  await atomicWrite(path, JSON.stringify(config, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }

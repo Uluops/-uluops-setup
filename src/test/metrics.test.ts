@@ -67,17 +67,9 @@ describe("metrics hook integration", () => {
     expect(hasUluopsHook(result)).toBe(false);
   });
 
-  it("handles malformed settings gracefully", async () => {
+  it("throws on malformed settings to prevent silent data loss", async () => {
     await writeFile(settingsPath, "broken json!!!");
-
-    const settings = await readSettings(settingsPath);
-    expect(settings).toEqual({});
-
-    const merged = mergeUluopsHook(settings, "node ~/.claude/tools/agent-metrics/dist/hook.js");
-    await writeSettings(settingsPath, merged);
-
-    const result = JSON.parse(await readFile(settingsPath, "utf-8"));
-    expect(hasUluopsHook(result)).toBe(true);
+    await expect(readSettings(settingsPath)).rejects.toThrow(SyntaxError);
   });
 
   it("is idempotent — installing hook twice doesn't duplicate", async () => {

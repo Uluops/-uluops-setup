@@ -18,7 +18,8 @@ function getMetricsToolDir(profile: HarnessProfile): string | null {
 function getHookCommand(profile: HarnessProfile): string {
   const toolDir = getMetricsToolDir(profile);
   if (!toolDir) throw new Error("No tool dir for this harness");
-  return `${process.execPath} ${join(toolDir, "dist", "hook.js")}`;
+  return `"${process.execPath}" "${join(toolDir, "dist", "hook.js")}"`;
+
 }
 
 export interface MetricsResult {

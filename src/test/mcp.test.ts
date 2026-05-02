@@ -60,16 +60,8 @@ describe("installMcp integration", () => {
     expect(result.mcpServers["uluops-registry"]).toBeUndefined();
   });
 
-  it("handles malformed config gracefully", async () => {
+  it("throws on malformed config to prevent silent data loss", async () => {
     await writeFile(configPath, "not json{{{");
-
-    const config = await readConfig(configPath);
-    expect(config).toEqual({});
-
-    const merged = mergeUluopsMcp(config, "ulr_test");
-    await writeConfig(configPath, merged);
-
-    const result = JSON.parse(await readFile(configPath, "utf-8"));
-    expect(result.mcpServers["uluops-tracker"]).toBeDefined();
+    await expect(readConfig(configPath)).rejects.toThrow(SyntaxError);
   });
 });

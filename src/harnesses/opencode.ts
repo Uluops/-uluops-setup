@@ -116,7 +116,9 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
   ): Promise<void> {
     // Write back to the path that was actually read (may be .jsonc)
     const target = this.resolvedPaths.get(path) ?? path;
-    await atomicWrite(target, JSON.stringify(config, null, 2) + "\n");
+    await atomicWrite(target, JSON.stringify(config, null, 2) + "\n", {
+      mode: 0o600,
+    });
   }
 
   check(config: Record<string, unknown>): boolean {
