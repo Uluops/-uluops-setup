@@ -2,6 +2,23 @@
   "name": "@uluops/setup",
   "version": "0.3.0",
   "description": "Zero-friction installer for UluOps agentic harnesses",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Uluops/-uluops-setup.git"
+  },
+  "homepage": "https://uluops.ai",
+  "keywords": [
+    "uluops",
+    "mcp",
+    "agents",
+    "claude",
+    "opencode",
+    "agentic",
+    "harness",
+    "setup",
+    "installer"
+  ],
   "type": "module",
   "bin": {
     "uluops-setup": "./dist/cli.js"
