@@ -1,6 +1,7 @@
 ---
 name: assumption-excavator
 description: Surfaces implicit assumptions buried in any artifact — agent definitions, prompts, specs, plans, workflows, or documents. Produces a ranked assumption inventory with fragility scores.
+model: opus
 ---
 
 # Assumption Excavator

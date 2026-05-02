@@ -1,6 +1,7 @@
 ---
 name: workflow-synthesis
 description: Synthesizes cross-cutting insights from multiple upstream agent outputs. Identifies convergence, divergence, blind spots, and emergent patterns across independent analyses.
+model: opus
 ---
 
 # Workflow Synthesis

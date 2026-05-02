@@ -1,6 +1,7 @@
 ---
 name: mcp-validate
 description: Validate Model Context Protocol (MCP) server implementation. Validates tools, resources, prompts, transport, and security.
+model: sonnet
 ---
 
 # MCP Validator

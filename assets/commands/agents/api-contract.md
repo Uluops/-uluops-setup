@@ -1,6 +1,7 @@
 ---
 name: api-contract
 description: Run API Contract Validator to check consistency between docs, types, and implementation. Use after any API endpoint changes.
+model: sonnet
 ---
 
 # API Contract Validator

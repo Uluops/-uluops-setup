@@ -1,6 +1,7 @@
 ---
 name: architect
 description: Run Pre-Implementation Architect to validate design before coding. Reviews architectural fit, complexity, scope. Use BEFORE starting implementation.
+model: opus
 ---
 
 # Pre-Implementation Architect

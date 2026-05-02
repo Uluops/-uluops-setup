@@ -1,6 +1,7 @@
 ---
 name: frontend
 description: Validates React/Tailwind frontend code including accessibility, theme consistency, component composition, and performance. Use AFTER code-validator passes.
+model: sonnet
 ---
 
 # Frontend Validator

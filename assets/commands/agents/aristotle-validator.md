@@ -1,6 +1,7 @@
 ---
 name: aristotle-validator
 description: Performs Aristotelian teleological alignment validation on any artifact. Checks whether means are properly ordered toward ends, whether components fulfill their natural function, and whether category errors exist. Decision: ALIGNED/MISALIGNED.
+model: opus
 ---
 
 # Aristotle Validator

@@ -1,6 +1,7 @@
 ---
 name: test-review
 description: Run Test Architect agent to validate test quality and coverage. Use after implementation passes code validator.
+model: sonnet
 ---
 
 # Test Architect

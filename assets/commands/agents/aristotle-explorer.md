@@ -1,6 +1,7 @@
 ---
 name: aristotle-explorer
 description: Performs Aristotelian categorical mapping on any artifact. Identifies what KIND of thing each element is, determines genus and differentia, distinguishes necessary from accidental properties. Produces a taxonomic map of the problem domain.
+model: opus
 ---
 
 # Aristotle Explorer

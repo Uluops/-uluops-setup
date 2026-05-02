@@ -1,6 +1,7 @@
 ---
 name: type-safety
 description: Run Type Safety Validator on TypeScript projects. Validates beyond tsc—catches any abuse, unsafe assertions, type holes that pass compilation but cause runtime failures.
+model: sonnet
 ---
 
 # Type Safety Validator

@@ -1,6 +1,7 @@
 ---
 name: prompt-validate
 description: Validates AI agent prompts for quality and consistency before deployment. Run before adding new agents to the project.
+model: opus
 ---
 
 # Prompt Validator

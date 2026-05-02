@@ -1,6 +1,7 @@
 ---
 name: public-interface
 description: Validates public-facing quality - README accuracy, unused imports, dead code, export hygiene, error messages. Use AFTER test-architect passes.
+model: sonnet
 ---
 
 # Public Interface Validator

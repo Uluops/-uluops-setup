@@ -1,6 +1,7 @@
 ---
 name: pattern-analyzer
 description: Analyzes ecosystem-wide patterns across all agents, commands, and workflows. Detects conventions, identifies inconsistencies, and learns from validation failures.
+model: sonnet
 ---
 
 # Pattern Analyzer

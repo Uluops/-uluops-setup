@@ -1,6 +1,7 @@
 ---
 name: audit
 description: Deep runtime correctness audit. Catches async bugs, null dereferences, silent failures, and edge cases that pass all other validators. Use as FINAL gate before ship.
+model: opus
 ---
 
 # Code Auditor

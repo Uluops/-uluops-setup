@@ -1,6 +1,7 @@
 ---
 name: prompt-quality
 description: Validates prompts against prompt engineering best practices for clarity, context, structure, and effectiveness.
+model: sonnet
 ---
 
 # Prompt Quality Validator

@@ -1,6 +1,7 @@
 ---
 name: security
 description: Run comprehensive security audit on a project. Use as FINAL gate before deployment. Scans for vulnerabilities, OWASP compliance, and security best practices.
+model: sonnet
 ---
 
 # Security Analyst

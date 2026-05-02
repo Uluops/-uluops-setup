@@ -1,6 +1,7 @@
 ---
 name: docs-validate
 description: Validates comprehensive documentation quality including JSDoc/TSDoc, API specs, changelog, and markdown. Complements public-interface for projects with significant documentation.
+model: sonnet
 ---
 
 # Documentation Validator

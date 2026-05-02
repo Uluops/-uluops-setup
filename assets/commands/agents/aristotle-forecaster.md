@@ -1,6 +1,7 @@
 ---
 name: aristotle-forecaster
 description: Performs Aristotelian potentiality-to-actuality projection on any artifact. Maps trajectory from current state to full actualization, identifies impediments to telos realization. Decision: HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE.
+model: opus
 ---
 
 # Aristotle Forecaster

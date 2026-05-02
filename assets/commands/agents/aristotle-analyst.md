@@ -1,6 +1,7 @@
 ---
 name: aristotle-analyst
 description: Performs Aristotelian four-cause decomposition on any artifact. Identifies material, formal, efficient, and final causes. Distinguishes essential from accidental properties. Assesses telos coherence. Decision: TELEOLOGICAL/ATELEOLOGICAL.
+model: opus
 ---
 
 # Aristotle Analyst

@@ -25,6 +25,7 @@ import {
 import type { HarnessManifest } from "./lib/manifest.js";
 import { ASSETS_DIR, findProjectRoot } from "./lib/paths.js";
 import { getHealthTimeout } from "./lib/health.js";
+import { getAgentCommands, getWorkflowCommands } from "./lib/asset-catalog.js";
 import {
   getProfile,
   resolveHarnessName,
@@ -150,7 +151,7 @@ async function runSetup(opts: {
     await saveManifest(manifest);
   }
 
-  printSetupSummary({
+  await printSetupSummary({
     profile,
     agentCount: agentsResult.files.length,
     commandCount: commandsResult.files.length,
@@ -352,45 +353,17 @@ async function confirmShellWrite(profilePath: string): Promise<boolean> {
   return answer.trim().toLowerCase() === "y";
 }
 
-// MCP tool count across both servers. Update when server toolsets change.
-const TOOL_COUNT = 73;
-
-const AGENT_LIST: [string, string, string][] = [
-  ["/agents:validate", "Code quality", "sonnet"],
-  ["/agents:type-safety", "TypeScript", "sonnet"],
-  ["/agents:test-review", "Test quality", "sonnet"],
-  ["/agents:optimize", "Performance", "sonnet"],
-  ["/agents:frontend", "React/a11y", "sonnet"],
-  ["/agents:mcp-validate", "MCP compliance", "sonnet"],
-  ["/agents:architect", "Design review", "sonnet"],
-  ["/agents:audit", "Runtime bugs", "opus"],
-  ["/agents:security", "OWASP", "sonnet"],
-  ["/agents:api-contract", "API alignment", "sonnet"],
-  ["/agents:release", "Publish ready", "sonnet"],
-  ["/agents:public-interface", "README/exports", "sonnet"],
-  ["/agents:docs-validate", "Documentation", "sonnet"],
-  ["/agents:prompt-validate", "Prompt review", "sonnet"],
-  ["/agents:prompt-quality", "Prompt quality", "sonnet"],
-  ["/agents:pattern-analyzer", "Patterns", "sonnet"],
-  ["/agents:aristotle-explorer", "Categories", "opus"],
-  ["/agents:aristotle-analyst", "Four causes", "opus"],
-  ["/agents:aristotle-validator", "Teleology", "opus"],
-  ["/agents:aristotle-forecaster", "Potentiality", "opus"],
-  ["/agents:assumption-excavator", "Assumptions", "sonnet"],
-  ["/agents:workflow-synthesis", "Cross-agent synthesis", "opus"],
-];
-
-function printSetupSummary(opts: {
+async function printSetupSummary(opts: {
   profile: HarnessProfile;
   agentCount: number;
   commandCount: number;
   apiKey: string;
-}): void {
+}): Promise<void> {
   console.log();
   console.log(`  ${chalk.dim("━".repeat(46))}`);
   console.log();
 
-  const parts = [`${TOOL_COUNT} MCP tools`, `${opts.agentCount} agents`];
+  const parts = [`${opts.agentCount} agents`];
   if (opts.commandCount > 0) parts.push(`${opts.commandCount} slash commands`);
   if (opts.profile.hooks) parts.push("metrics");
   console.log(
@@ -399,7 +372,7 @@ function printSetupSummary(opts: {
   console.log();
 
   if (opts.profile.name === "claude-code") {
-    printAgentList();
+    await printAgentList();
   }
 
   const masked = maskKey(opts.apiKey);
@@ -423,39 +396,43 @@ function maskKey(key: string): string {
   return `${"*".repeat(Math.max(4, key.length - 4))}${last4}`;
 }
 
-function printAgentList(): void {
-  info(chalk.bold("WORKFLOWS"));
-  info(
-    `  ${chalk.cyan("/workflows:pre-implementation")}    Design review before coding`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:post-implementation")}   Iterative validation loop`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:ship")}                  Final gate before shipping`,
-  );
-  info(
-    `  ${chalk.cyan("/workflows:prompt-audit")}          Audit agent prompts`,
-  );
-  console.log();
-  info(
-    `  ${chalk.cyan("/workflows:aristotle")}             Four-cause teleological analysis`,
-  );
-  console.log();
+async function printAgentList(): Promise<void> {
+  const workflows = await getWorkflowCommands();
+  const agents = await getAgentCommands();
 
-  info(
-    `${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`,
-  );
-  for (const [cmd, desc, model] of AGENT_LIST) {
-    info(
-      `  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(model)}`,
-    );
+  if (workflows.length > 0) {
+    info(chalk.bold("WORKFLOWS"));
+    for (const wf of workflows) {
+      const cmd = `/workflows:${wf.name}`;
+      // Truncate description to fit display
+      const desc = wf.description.length > 40
+        ? wf.description.slice(0, 37) + "..."
+        : wf.description;
+      info(`  ${chalk.cyan(cmd.padEnd(34))}${desc}`);
+    }
+    console.log();
   }
 
-  console.log();
+  if (agents.length > 0) {
+    info(
+      `${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`,
+    );
+    for (const agent of agents) {
+      const cmd = `/agents:${agent.name}`;
+      // Truncate description to fit display
+      const desc = agent.description.length > 17
+        ? agent.description.slice(0, 14) + "..."
+        : agent.description;
+      info(
+        `  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(agent.model)}`,
+      );
+    }
+    console.log();
+  }
+
   info(
     chalk.dim(
-      `  This is the starter set. Browse 135+ agents at registry.uluops.ai`,
+      `  This is the starter set. Browse more agents at registry.uluops.ai`,
     ),
   );
   console.log();
@@ -705,7 +682,7 @@ async function main(): Promise<void> {
       `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")} v${version} — available agents and workflows`,
     );
     console.log();
-    printAgentList();
+    await printAgentList();
     info(`Install with: ${chalk.cyan("npx @uluops/setup")}`);
     console.log();
     return;

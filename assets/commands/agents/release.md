@@ -1,6 +1,7 @@
 ---
 name: release
 description: Final release gate for packages and CLI tools. Validates version consistency, CLI --version, package.json, and docs. Detects semantic-release CI/CD vs manual publishing.
+model: sonnet
 ---
 
 # Release Readiness

@@ -1,6 +1,7 @@
 ---
-name: validate
+name: code-validate
 description: Validates code quality, standards compliance, and test coverage. Use after each implementation phase.
+model: sonnet
 ---
 
 # Code Validator
@@ -8,12 +9,12 @@ Validates code quality, standards compliance, and test coverage. Use after each 
 
 ## Arguments
 
-**Usage:** `/agents:validate <directory>`
+**Usage:** `/agents:code-validate <directory>`
 
 **Examples:**
-- `/agents:validate ./services/auth-service`
-- `/agents:validate ./packages/api`
-- `/agents:validate .`
+- `/agents:code-validate ./services/auth-service`
+- `/agents:code-validate ./packages/api`
+- `/agents:code-validate .`
 
 **Target Directory:** $ARGUMENTS
 

@@ -1,6 +1,7 @@
 ---
 name: optimize
 description: Run Optimizer agent on a project/directory. Analyzes structure, performance, bundle hygiene, and maintainability. Reports only - does not auto-apply changes.
+model: sonnet
 ---
 
 # Code Optimizer
