@@ -1,5 +1,5 @@
 import { readFile, writeFile, access, mkdir, copyFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 import { findProjectRoot, getBackupDir } from "../lib/paths.js";
@@ -67,7 +67,7 @@ async function backupConfig(
   }
   const backupDir = getBackupDir(harnessName);
   await mkdir(backupDir, { recursive: true });
-  const filename = configPath.split("/").pop() ?? "config.bak";
+  const filename = basename(configPath);
   await copyFile(configPath, join(backupDir, `${filename}.bak`));
 }
 

@@ -1,7 +1,11 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWrite } from "../lib/atomic-write.js";
 
 const FENCE_START = "# --- UluOps (managed by @uluops/setup) ---";
 const FENCE_END = "# --- /UluOps ---";
+
+/** Characters safe for shell variable values (no metacharacters). */
+const SAFE_KEY_PATTERN = /^[a-zA-Z0-9_\-\.]+$/;
 
 /** Write a fenced ULUOPS_API_KEY export block into the user's shell profile, replacing any existing UluOps block. */
 export async function writeShellExport(
@@ -9,6 +13,12 @@ export async function writeShellExport(
   apiKey: string,
   dryRun: boolean,
 ): Promise<void> {
+  if (!SAFE_KEY_PATTERN.test(apiKey)) {
+    throw new Error(
+      "API key contains characters unsafe for shell export. Only alphanumeric, underscore, hyphen, and dot are allowed.",
+    );
+  }
+
   const block = `${FENCE_START}\nexport ULUOPS_API_KEY="${apiKey}"\n${FENCE_END}`;
 
   let content: string;
@@ -16,7 +26,7 @@ export async function writeShellExport(
     content = await readFile(profilePath, "utf-8");
   } catch {
     if (!dryRun) {
-      await writeFile(profilePath, block + "\n");
+      await atomicWrite(profilePath, block + "\n");
     }
     return;
   }
@@ -25,16 +35,17 @@ export async function writeShellExport(
   const endIdx = content.indexOf(FENCE_END);
 
   if (startIdx !== -1 && endIdx !== -1) {
-    // Replace existing fenced block
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + FENCE_END.length);
     if (!dryRun) {
-      await writeFile(profilePath, before + block + after);
+      await atomicWrite(profilePath, before + block + after);
     }
   } else {
-    // Append
     if (!dryRun) {
-      await writeFile(profilePath, content.trimEnd() + "\n\n" + block + "\n");
+      await atomicWrite(
+        profilePath,
+        content.trimEnd() + "\n\n" + block + "\n",
+      );
     }
   }
 }
@@ -54,6 +65,9 @@ export async function removeShellExport(profilePath: string): Promise<void> {
   if (startIdx !== -1 && endIdx !== -1) {
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + FENCE_END.length);
-    await writeFile(profilePath, (before + after).replace(/\n{3,}/g, "\n\n"));
+    await atomicWrite(
+      profilePath,
+      (before + after).replace(/\n{3,}/g, "\n\n"),
+    );
   }
 }

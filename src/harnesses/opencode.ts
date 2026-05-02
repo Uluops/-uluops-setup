@@ -30,18 +30,26 @@ interface OpenCodeMcpServer {
 }
 
 class OpenCodeMcpConfig implements McpConfigStrategy {
+  /** Tracks the actual path that was successfully read, for write-back. */
+  private resolvedPath: string | null = null;
+
   async read(path: string): Promise<Record<string, unknown>> {
     // Try the given path, then probe for .jsonc variant
     let raw: string | null = null;
-    for (const p of [path, path.replace(/\.json$/, ".jsonc")]) {
+    const candidates = [path, path.replace(/\.json$/, ".jsonc")];
+    for (const p of candidates) {
       try {
         raw = await readFile(p, "utf-8");
+        this.resolvedPath = p;
         break;
       } catch {
         // Try next
       }
     }
-    if (raw === null) return {};
+    if (raw === null) {
+      this.resolvedPath = path; // Default to given path for new files
+      return {};
+    }
 
     try {
       return parseJsonc(raw) as Record<string, unknown>;
@@ -86,9 +94,9 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
   }
 
   remove(config: Record<string, unknown>): Record<string, unknown> {
-    const mcp = { ...(config["mcp"] as Record<string, unknown> | undefined) };
-    if (!mcp) return config;
+    if (!config["mcp"] || typeof config["mcp"] !== "object") return config;
 
+    const mcp = { ...(config["mcp"] as Record<string, unknown>) };
     for (const name of ULUOPS_SERVERS) {
       delete mcp[name];
     }
@@ -106,7 +114,9 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     path: string,
     config: Record<string, unknown>,
   ): Promise<void> {
-    await atomicWrite(path, JSON.stringify(config, null, 2) + "\n");
+    // Write back to the path that was actually read (may be .jsonc)
+    const target = this.resolvedPath ?? path;
+    await atomicWrite(target, JSON.stringify(config, null, 2) + "\n");
   }
 
   check(config: Record<string, unknown>): boolean {

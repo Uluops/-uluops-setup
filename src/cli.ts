@@ -24,6 +24,7 @@ import {
 } from "./lib/manifest.js";
 import type { HarnessManifest } from "./lib/manifest.js";
 import { ASSETS_DIR, findProjectRoot } from "./lib/paths.js";
+import { getHealthTimeout } from "./lib/health.js";
 import {
   getProfile,
   resolveHarnessName,
@@ -631,15 +632,6 @@ async function checkConflicts(
   if (!proceed) {
     process.exit(0);
   }
-}
-
-function getHealthTimeout(): number {
-  const env = process.env["ULUOPS_HEALTH_TIMEOUT"];
-  if (env) {
-    const ms = Number(env);
-    if (Number.isFinite(ms) && ms > 0) return ms;
-  }
-  return 10_000;
 }
 
 async function checkEndpoint(url: string): Promise<boolean> {

@@ -1,16 +1,8 @@
 import { readdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { loadManifest } from "../lib/manifest.js";
+import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
-
-function getHealthTimeout(): number {
-  const env = process.env["ULUOPS_HEALTH_TIMEOUT"];
-  if (env) {
-    const ms = Number(env);
-    if (Number.isFinite(ms) && ms > 0) return ms;
-  }
-  return 10_000;
-}
 
 export interface VerifyResult {
   ok: boolean;

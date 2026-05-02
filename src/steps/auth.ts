@@ -89,6 +89,7 @@ async function validateKey(
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
     });
 
     if (res.status === 401) {

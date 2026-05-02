@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWrite } from "./atomic-write.js";
 
 interface McpServerConfig {
   command: string;
@@ -37,8 +38,8 @@ export async function checkMcpPackageAvailability(): Promise<{
     } else {
       const pkg =
         result.status === "fulfilled"
-          ? (result.value as any).pkg ?? MCP_PACKAGES[missing.length]
-          : MCP_PACKAGES[missing.length];
+          ? result.value.pkg
+          : MCP_PACKAGES[missing.length] ?? "unknown";
       missing.push(pkg);
     }
   }
@@ -114,5 +115,5 @@ export async function writeConfig(
   path: string,
   config: ClaudeConfig,
 ): Promise<void> {
-  await writeFile(path, JSON.stringify(config, null, 2) + "\n");
+  await atomicWrite(path, JSON.stringify(config, null, 2) + "\n");
 }

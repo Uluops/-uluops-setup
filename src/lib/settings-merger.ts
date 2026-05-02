@@ -5,7 +5,8 @@
  * Only touches UluOps-managed hook entries — all other settings preserved.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { atomicWrite } from "./atomic-write.js";
 
 interface HookEntry {
   type: string;
@@ -79,7 +80,7 @@ export async function writeSettings(
   path: string,
   settings: ClaudeSettings,
 ): Promise<void> {
-  await writeFile(path, JSON.stringify(settings, null, 2) + "\n");
+  await atomicWrite(path, JSON.stringify(settings, null, 2) + "\n");
 }
 
 /**
