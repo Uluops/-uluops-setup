@@ -85,10 +85,10 @@ describe("loadManifest", () => {
     expect(result).not.toBeNull();
     expect(result!.harnesses).toBeDefined();
     expect(result!.harnesses["claude-code"]).toBeDefined();
-    expect(result!.harnesses["claude-code"].agents).toEqual([
+    expect(result!.harnesses["claude-code"]!.agents).toEqual([
       "code-validator-agent.md",
     ]);
-    expect(result!.harnesses["claude-code"].hooksInstalled).toBe(true);
+    expect(result!.harnesses["claude-code"]!.hooksInstalled).toBe(true);
   });
 
   it("returns null on malformed JSON", async () => {
@@ -114,7 +114,7 @@ describe("saveManifest", () => {
     await saveManifest(sampleManifest);
     const loaded = await loadManifest();
     expect(loaded).not.toBeNull();
-    expect(loaded!.harnesses["claude-code"].agents).toEqual(
+    expect(loaded!.harnesses["claude-code"]!.agents).toEqual(
       sampleManifest.harnesses["claude-code"].agents,
     );
   });

@@ -44,12 +44,23 @@ interface LegacyManifest {
 function isNewManifest(obj: unknown): obj is Manifest {
   if (typeof obj !== "object" || obj === null) return false;
   const m = obj as Record<string, unknown>;
-  return (
-    typeof m["version"] === "string" &&
-    typeof m["installedAt"] === "string" &&
-    typeof m["harnesses"] === "object" &&
-    m["harnesses"] !== null
-  );
+  if (
+    typeof m["version"] !== "string" ||
+    typeof m["installedAt"] !== "string" ||
+    typeof m["shellModified"] !== "boolean" ||
+    typeof m["harnesses"] !== "object" ||
+    m["harnesses"] === null
+  ) return false;
+
+  // Validate at least one harness entry has required fields
+  const harnesses = m["harnesses"] as Record<string, unknown>;
+  for (const h of Object.values(harnesses)) {
+    if (typeof h !== "object" || h === null) return false;
+    const hm = h as Record<string, unknown>;
+    if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
+    if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
+  }
+  return true;
 }
 
 function isLegacyManifest(obj: unknown): obj is LegacyManifest {
