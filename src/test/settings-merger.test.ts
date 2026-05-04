@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   mergeUluopsHook,
   removeUluopsHook,
   hasUluopsHook,
+  probeHookSupport,
 } from "../lib/settings-merger.js";
 
 describe("settings-merger", () => {
@@ -201,5 +202,35 @@ describe("settings-merger", () => {
       };
       expect(hasUluopsHook(settings)).toBe(false);
     });
+  });
+});
+
+describe("probeHookSupport", () => {
+  afterEach(() => {
+    delete process.env["ULUOPS_HOOK_TYPE"];
+  });
+
+  it("returns supported for default SubagentStop", () => {
+    const result = probeHookSupport();
+    expect(result.hookType).toBe("SubagentStop");
+    expect(result.supported).toBe(true);
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("returns supported for known hook types", () => {
+    for (const t of ["PreToolUse", "PostToolUse", "Notification", "Stop"]) {
+      process.env["ULUOPS_HOOK_TYPE"] = t;
+      const result = probeHookSupport();
+      expect(result.hookType).toBe(t);
+      expect(result.supported).toBe(true);
+    }
+  });
+
+  it("returns unsupported with warning for unknown hook type", () => {
+    process.env["ULUOPS_HOOK_TYPE"] = "FakeHook";
+    const result = probeHookSupport();
+    expect(result.hookType).toBe("FakeHook");
+    expect(result.supported).toBe(false);
+    expect(result.warning).toContain("FakeHook");
   });
 });

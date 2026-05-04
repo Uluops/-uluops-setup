@@ -64,6 +64,9 @@ export async function signup(): Promise<AuthResult> {
     { email, password: pwd },
   );
 
+  if (!registerRes.data?.sessionToken) {
+    throw new Error("Registration succeeded but response missing session token");
+  }
   const sessionToken = registerRes.data.sessionToken;
 
   // Create API key using the session
@@ -74,9 +77,12 @@ export async function signup(): Promise<AuthResult> {
     sessionToken,
   );
 
+  if (!keyRes.data?.key) {
+    throw new Error("API key creation succeeded but response missing key");
+  }
   return {
     apiKey: keyRes.data.key,
-    email: registerRes.data.user.email,
+    email: registerRes.data.user?.email ?? email,
   };
 }
 
@@ -111,7 +117,11 @@ async function callApi<T>(
   }
 
   if (res.ok) {
-    return (await res.json()) as T;
+    const body: unknown = await res.json();
+    if (typeof body !== "object" || body === null) {
+      throw new Error("Unexpected API response shape");
+    }
+    return body as T;
   }
 
   // Handle known error codes

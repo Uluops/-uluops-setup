@@ -24,10 +24,7 @@
     "uluops-setup": "./dist/cli.js"
   },
   "exports": {
-    ".": {
-      "import": "./dist/cli.js",
-      "types": "./dist/cli.d.ts"
-    }
+    "./cli": "./dist/cli.js"
   },
   "files": [
     "dist/cli.js",

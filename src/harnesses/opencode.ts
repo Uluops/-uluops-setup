@@ -62,7 +62,8 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     config: Record<string, unknown>,
     apiKey: string,
   ): Record<string, unknown> {
-    const existing = (config["mcp"] ?? {}) as Record<string, unknown>;
+    const raw = config["mcp"];
+    const existing = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const tracker: OpenCodeMcpServer = {
       type: "local",
       command: ["npx", "-y", "uluops-tracker-mcp-client"],

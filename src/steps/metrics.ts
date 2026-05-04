@@ -51,6 +51,26 @@ async function findMetricsSource(): Promise<string | null> {
  * Copy agent-metrics dist files to the tool directory.
  * Copies all .js files needed for the hook and CLI.
  */
+/** Copy .js files from a source dir to a dest dir, skipping test files. */
+async function copyJsDir(
+  srcDir: string,
+  destDir: string,
+  dryRun: boolean,
+): Promise<number> {
+  let count = 0;
+  try {
+    const files = await readdir(srcDir);
+    for (const file of files) {
+      if (!file.endsWith(".js") || file.includes(".test.") || file === "test-utils.js") continue;
+      if (!dryRun) await copyFile(join(srcDir, file), join(destDir, file));
+      count++;
+    }
+  } catch {
+    // Directory doesn't exist — not critical
+  }
+  return count;
+}
+
 async function copyToolFiles(
   srcRoot: string,
   destRoot: string,
@@ -58,61 +78,18 @@ async function copyToolFiles(
 ): Promise<number> {
   const srcDist = join(srcRoot, "dist");
   const destDist = join(destRoot, "dist");
+  const subDirs = ["commands", "display"];
 
   if (!dryRun) {
     await mkdir(destDist, { recursive: true });
-    await mkdir(join(destDist, "commands"), { recursive: true });
-    await mkdir(join(destDist, "display"), { recursive: true });
+    for (const sub of subDirs) {
+      await mkdir(join(destDist, sub), { recursive: true });
+    }
   }
 
-  let filesCopied = 0;
-
-  // Copy top-level dist files
-  const topFiles = await readdir(srcDist);
-  for (const file of topFiles) {
-    if (!file.endsWith(".js")) continue;
-    if (file.includes(".test.")) continue;
-    if (file === "test-utils.js") continue;
-    if (!dryRun) {
-      await copyFile(join(srcDist, file), join(destDist, file));
-    }
-    filesCopied++;
-  }
-
-  // Copy commands/ subdirectory
-  try {
-    const cmdFiles = await readdir(join(srcDist, "commands"));
-    for (const file of cmdFiles) {
-      if (!file.endsWith(".js")) continue;
-      if (file.includes(".test.")) continue;
-      if (!dryRun) {
-        await copyFile(
-          join(srcDist, "commands", file),
-          join(destDist, "commands", file),
-        );
-      }
-      filesCopied++;
-    }
-  } catch {
-    // commands/ doesn't exist — not critical
-  }
-
-  // Copy display/ subdirectory
-  try {
-    const dispFiles = await readdir(join(srcDist, "display"));
-    for (const file of dispFiles) {
-      if (!file.endsWith(".js")) continue;
-      if (file.includes(".test.")) continue;
-      if (!dryRun) {
-        await copyFile(
-          join(srcDist, "display", file),
-          join(destDist, "display", file),
-        );
-      }
-      filesCopied++;
-    }
-  } catch {
-    // display/ doesn't exist — not critical
+  let filesCopied = await copyJsDir(srcDist, destDist, dryRun);
+  for (const sub of subDirs) {
+    filesCopied += await copyJsDir(join(srcDist, sub), join(destDist, sub), dryRun);
   }
 
   // Copy package.json (needed for CLI bin resolution)

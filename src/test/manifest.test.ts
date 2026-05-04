@@ -17,7 +17,7 @@ vi.mock("../lib/paths.js", async (importOriginal) => {
   };
 });
 
-const { loadManifest, saveManifest, deleteManifest } = await import(
+const { loadManifest, saveManifest, deleteManifest, validateManifest } = await import(
   "../lib/manifest.js"
 );
 
@@ -117,6 +117,79 @@ describe("saveManifest", () => {
     expect(loaded!.harnesses["claude-code"].agents).toEqual(
       sampleManifest.harnesses["claude-code"].agents,
     );
+  });
+});
+
+describe("validateManifest", () => {
+  it("reports errors for missing MCP config and defs paths", async () => {
+    const manifest = {
+      ...sampleManifest,
+      harnesses: {
+        "claude-code": {
+          ...sampleManifest.harnesses["claude-code"],
+          mcpConfigPath: join(tmpDir, "nonexistent-mcp.json"),
+          defsPath: join(tmpDir, "nonexistent-defs"),
+        },
+      },
+    };
+    const result = await validateManifest(manifest);
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThanOrEqual(2);
+    expect(result.errors.some((e) => e.includes("MCP config"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("Defs path"))).toBe(true);
+  });
+
+  it("reports warnings for missing agent files", async () => {
+    // Create the defs path and MCP config so those pass
+    const defsPath = join(tmpDir, "defs");
+    const agentsDir = join(defsPath, "agents");
+    await mkdir(agentsDir, { recursive: true });
+    const mcpPath = join(tmpDir, "mcp.json");
+    await writeFile(mcpPath, "{}");
+
+    const manifest = {
+      ...sampleManifest,
+      harnesses: {
+        "claude-code": {
+          ...sampleManifest.harnesses["claude-code"],
+          mcpConfigPath: mcpPath,
+          defsPath,
+          agents: ["missing-agent.md"],
+          commands: [],
+        },
+      },
+    };
+    const result = await validateManifest(manifest);
+    expect(result.valid).toBe(true); // Missing agents are warnings, not errors
+    expect(result.warnings.some((w) => w.includes("missing-agent.md"))).toBe(true);
+  });
+
+  it("passes validation when all paths exist", async () => {
+    const defsPath = join(tmpDir, "valid-defs");
+    const agentsDir = join(defsPath, "agents");
+    await mkdir(agentsDir, { recursive: true });
+    await writeFile(join(agentsDir, "code-validator-agent.md"), "content");
+    const mcpPath = join(tmpDir, "valid-mcp.json");
+    await writeFile(mcpPath, "{}");
+
+    // Save a manifest so contentHash can be verified
+    const manifest = {
+      ...sampleManifest,
+      harnesses: {
+        "claude-code": {
+          ...sampleManifest.harnesses["claude-code"],
+          mcpConfigPath: mcpPath,
+          defsPath,
+          agents: ["code-validator-agent.md"],
+          commands: [],
+        },
+      },
+    };
+    await saveManifest(manifest);
+    const loaded = await loadManifest();
+    const result = await validateManifest(loaded!);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 });
 
