@@ -145,8 +145,11 @@ export async function validateManifest(
   const manifestPath = getManifestPath();
   try {
     const raw = await readFile(manifestPath, "utf-8");
-    const currentHash = fileHash(raw);
-    if (manifest.contentHash && manifest.contentHash !== currentHash) {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const { contentHash: storedHash, ...withoutHash } = parsed;
+    const canonical = JSON.stringify(withoutHash, null, 2) + "\n";
+    const currentHash = fileHash(canonical);
+    if (storedHash && storedHash !== currentHash) {
       warnings.push(
         "Manifest file has been modified since installation — content hash mismatch",
       );
@@ -212,10 +215,13 @@ export async function saveManifest(manifest: Manifest): Promise<void> {
   const dir = getUluopsDir();
   await mkdir(dir, { recursive: true });
 
-  const withHash = { ...manifest };
-  const raw = JSON.stringify(withHash, null, 2) + "\n";
-  withHash.contentHash = fileHash(raw);
-  const final = JSON.stringify(withHash, null, 2) + "\n";
+  // Serialize without hash, compute hash of that content, embed it.
+  // Validation compares the stored hash against a re-hash of the file
+  // with contentHash stripped, so both sides agree on the input.
+  const { contentHash: _, ...withoutHash } = manifest;
+  const canonical = JSON.stringify(withoutHash, null, 2) + "\n";
+  const hash = fileHash(canonical);
+  const final = JSON.stringify({ ...withoutHash, contentHash: hash }, null, 2) + "\n";
   await atomicWrite(getManifestPath(), final);
 }
 

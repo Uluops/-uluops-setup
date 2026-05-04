@@ -86,7 +86,7 @@ export async function signup(): Promise<AuthResult> {
   };
 }
 
-async function callApi<T>(
+async function callApi<T extends object>(
   url: string,
   method: string,
   body: Record<string, unknown>,

@@ -161,7 +161,7 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, and she
 ## Requirements
 
 - Node.js >= 20
-- At least one supported harness installed (Claude Code, OpenCode, Gemini CLI, or Codex)
+- At least one supported harness installed (Claude Code or OpenCode)
 - UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
 
 > **Global install:** If you install globally with `npm i -g @uluops/setup`, the binary is `uluops-setup`.

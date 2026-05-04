@@ -96,50 +96,6 @@ export function getBackupDir(harnessName: string): string {
   return join(getUluopsDir(), "backups", harnessName);
 }
 
-/** Return the directory where agent .md files should be installed (local or global scope). */
-export async function getAgentsDir(localDefs: boolean): Promise<string> {
-  if (localDefs) return join(await findProjectRoot(), "uluops", "agents");
-  return join(getClaudeHome(), "agents");
-}
-
-/** Return the directory where command .md files should be installed (local or global scope). */
-export async function getCommandsDir(localDefs: boolean): Promise<string> {
-  if (localDefs) return join(await findProjectRoot(), "uluops", "commands");
-  return join(getClaudeHome(), "commands");
-}
-
-export interface PathProbeResult {
-  homeDirExists: boolean;
-  jsonFileExists: boolean;
-  warnings: string[];
-}
-
-/** Probe for Claude Code config paths and report whether they exist. Warnings indicate paths that may have migrated. */
-export async function probeClaudePaths(): Promise<PathProbeResult> {
-  const warnings: string[] = [];
-  let homeDirExists = false;
-  let jsonFileExists = false;
-
-  try {
-    await access(getClaudeHome());
-    homeDirExists = true;
-  } catch {
-    warnings.push(
-      `Claude home directory not found: ${getClaudeHome()}. Claude Code may not be installed or config may have migrated.`,
-    );
-  }
-
-  try {
-    await access(getClaudeJsonPath());
-    jsonFileExists = true;
-  } catch {
-    warnings.push(
-      `Claude config file not found: ${getClaudeJsonPath()}. MCP config will be created fresh.`,
-    );
-  }
-
-  return { homeDirExists, jsonFileExists, warnings };
-}
 
 /** Detect the user's shell and return its name and profile path, or null if unsupported. */
 export function getShellProfile(): { shell: string; path: string } | null {

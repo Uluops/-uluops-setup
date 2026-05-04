@@ -68,18 +68,27 @@ export async function resolveApiKey(options: {
 }
 
 async function readCredentialsFile(): Promise<string | undefined> {
+  const credsPath = join(homedir(), ".uluops", "credentials.json");
+  let raw: string;
   try {
-    const credsPath = join(homedir(), ".uluops", "credentials.json");
-    const raw = await readFile(credsPath, "utf-8");
-    const creds = JSON.parse(raw) as Record<
-      string,
-      { apiKey?: string; api_key?: string }
-    >;
-    const defaultProfile = creds["default"];
-    return defaultProfile?.apiKey ?? defaultProfile?.api_key;
+    raw = await readFile(credsPath, "utf-8");
   } catch {
-    return undefined;
+    return undefined; // File doesn't exist
   }
+
+  let creds: unknown;
+  try {
+    creds = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      `Malformed credentials file at ${credsPath}: ${err instanceof Error ? err.message : "invalid JSON"}`,
+    );
+  }
+
+  if (typeof creds !== "object" || creds === null) return undefined;
+  const profiles = creds as Record<string, { apiKey?: string; api_key?: string }>;
+  const defaultProfile = profiles["default"];
+  return defaultProfile?.apiKey ?? defaultProfile?.api_key;
 }
 
 async function validateKey(
