@@ -102,7 +102,7 @@ Critical issues that trigger immediate FAIL regardless of score:
 agent-metrics buffer list --since 5m -f tracker
 ```
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **2. Verify saved:** Compare `json.summary.total_issues` with saved count.
 

@@ -1,62 +1,84 @@
 ---
 name: aristotle-validator
-description: Performs Aristotelian teleological alignment validation on any artifact. Checks whether means are properly ordered toward ends, whether components fulfill their natural function, and whether category errors exist. Decision: ALIGNED/MISALIGNED.
-model: opus
+description: Performs Aristotelian teleological alignment validation on any artifact. Checks whether means are properly ordered toward ends and whether components fulfill their natural function. Decision ALIGNED/MISALIGNED.
 ---
 
-# Aristotle Validator
-Performs Aristotelian teleological alignment validation on any artifact — code, specs, plans, architectures, or documents. Cognitive lens agent from the Cognitive Lens Library.
+# Aristotle Validator v1
+Performs Aristotelian teleological alignment validation on any artifact. Checks whether means are properly ordered toward ends and whether components fulfill their natural function. Decision ALIGNED/MISALIGNED.
+
+## What's New in v1
+
+| Feature | Description |
+|---------|-------------|
+| **Calibration Examples** | Reference scenarios for consistent scoring |
+| **Failure Code Examples** | Worked examples mapping issues to taxonomy codes |
+| **Token Budget** | Output length guidance |
+| **Display IDs** | Auto-fail conditions have numbered IDs |
 
 ## Arguments
 
-**Usage:** `/agents:aristotle-validator <target>`
+**Usage:** `/agents:aristotle-validator <directory>`
 
 **Examples:**
-- `/agents:aristotle-validator uluops-registry-api/`
 - `/agents:aristotle-validator udl/adl/v3/code-validator.agent.yaml`
-- `/agents:aristotle-validator docs/specs/cognitive-lens-library-spec.md`
-- `/agents:aristotle-validator packages/cli/`
+- `/agents:aristotle-validator docs/architecture.md`
+- `/agents:aristotle-validator specs/api-spec.md`
+- `/agents:aristotle-validator agents/my-agent.md`
 
-**Target:** $ARGUMENTS
+**Target Directory:** $ARGUMENTS
+
 
 ---
 
 ## Pre-Flight
 
-Verify the target exists:
+```bash
+echo "Running Aristotelian teleological alignment validation on $ARGUMENTS..."
+echo "======================================================================="
+```
+
+Verify the target directory exists:
+
+```bash
+test -d "$ARGUMENTS" && echo "✓ Directory exists: $ARGUMENTS" || echo "ERROR: Directory '$ARGUMENTS' not found"
+```
+
+Enter and confirm location:
+
+```bash
+cd "$ARGUMENTS" && pwd
+```
+
+Check path exists:
 
 ```bash
 [ -e "$ARGUMENTS" ] && echo "✓ $ARGUMENTS exists" || echo "Target file or directory does not exist"
 ```
 
+
 ---
 
 ## Agent Invocation
 
-Run the Aristotle Validator agent on the target:
+Run the Aristotle Validator agent on the validated target directory:
 
 **Agent:** aristotle-validator-agent.md
 **Model:** Opus
 **Target:** $ARGUMENTS
 
-The agent performs Aristotelian teleological alignment across 5 categories (100 points total):
 
-| Category | Points | Focus |
-|----------|--------|-------|
-| Teleological Coherence | 25 | Telos identified, means-end chain traced, misalignment surfaced |
-| Categorical Correctness | 25 | Category errors detected, natural function assessed |
-| Essential/Accidental Distinction | 20 | Essential properties preserved, accidentals not treated as essential |
-| Four-Cause Completeness | 15 | Causal grounding, efficient/final causes distinguished |
-| Potentiality Assessment | 15 | Actualization trajectory, impediments identified |
+---
 
 ## Auto-Fail Conditions
 
-| ID | Condition | Severity |
-|----|-----------|----------|
-| AF-001 | No genuine teleological alignment assessment performed | Critical |
-| AF-002 | Telos assumed rather than identified and defended | Critical |
-| AF-003 | Technical quality evaluation substituted for teleological alignment | Critical |
-| AF-004 | No category error detection performed | Critical |
+Critical issues that trigger immediate FAIL regardless of score:
+
+| ID | Condition |
+|----|-----------|
+| **AF-001** | No genuine teleological alignment assessment performed |
+| **AF-002** | Telos assumed rather than identified and defended |
+| **AF-003** | Technical quality evaluation substituted for teleological alignment |
+| **AF-004** | No category error detection performed |
 
 ---
 
@@ -64,17 +86,38 @@ The agent performs Aristotelian teleological alignment across 5 categories (100 
 
 | Score | Decision | Meaning |
 |-------|----------|---------|
-| **>=70** | ALIGNED | Artifact's components are coherently ordered toward an identifiable telos |
-| **<70** | MISALIGNED | Components serve unclear or contradictory purposes, or analysis is incomplete |
+| **>=70** | ✅ PASS | Validation passed, proceed to next phase |
+| **<70** | ❌ FAIL | Validation failed, fix issues before proceeding |
 
-**Note:** This is an advisory decision, not a deployment gate. ALIGNED means the artifact's parts serve a coherent purpose — not that the artifact is correct or desirable.
+**Note:** Any critical issue triggers FAIL regardless of score.
 
 ---
 
+## Post-Flight Actions
+
+### On Success
+
+Artifact ALIGNED — teleological coherence confirmed
+
+```bash
+exit 0
+```
+
+### On Failure
+
+Artifact MISALIGNED — category errors or teleological incoherence detected
+
+```bash
+exit 1
+```
+
+
+---
+
+
 ## PERSIST TO TRACKER (Required)
 
-> **IMPORTANT:** Save to tracker IMMEDIATELY after agent completes, BEFORE presenting the summary to the user.
-
+> **IMPORTANT:** Save to tracker IMMEDIATELY after agent completes, BEFORE presenting the summary to the user. The workflow is not complete until results are persisted.
 **1. Get token metrics from buffer:**
 ```bash
 agent-metrics buffer list --since 5m -f tracker
@@ -82,7 +125,7 @@ agent-metrics buffer list --since 5m -f tracker
 
 **2. Save to tracker (DO THIS FIRST):**
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **3. Verify saved:** Compare `json.summary.total_issues` with saved count.
 
@@ -90,11 +133,18 @@ mcp__uluops-tracker__save_features_list
 
 ### Field Mappings
 
+**Definition identity (REQUIRED for execution tracking):**
+| Tracker Field | Value | Notes |
+|---------------|-------|-------|
+| `definition_type` | `command` | From CDL interface |
+| `definition_name` | `aristotle-validator` | From CDL interface |
+| `definition_version` | `1.0.2` | From CDL interface |
+
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
 |--------|---------------|-------|
-| `json.result.score` | `validators[].score` | Total score |
-| `json.result.decision` | `validators[].status` | ALIGNED/MISALIGNED |
+| `json.result.score` | `agents[].score` | Total score |
+| `json.result.decision` | `agents[].decision` | PASS/FAIL |
 | `buffer.model` | `validators[].model` | From agent-metrics buffer |
 | `buffer.tokens.input_tokens` | `input_tokens` | Raw input tokens |
 | `buffer.tokens.output_tokens` | `output_tokens` | Output tokens |
@@ -102,14 +152,19 @@ mcp__uluops-tracker__save_features_list
 | `buffer.tokens.cache_read_tokens` | `cache_read_tokens` | Cache reads |
 | `buffer.tokens.total_effective_tokens` | `total_effective_tokens` | Effective total |
 | `json.categories[].findings[].issues[]` | `recommendations[]` | Flatten nested structure |
+| `json.analysis.records[]` | `analysis_records[]` | Structured analysis records (v1.4.0) |
+| `json.analysis.system_metrics` | `analysis_summary.system_metrics` | Agent-type-specific metrics |
+| `json.analysis.category_scores[]` | `analysis_summary.category_scores[]` | Category score breakdown |
+| `json.analysis.epistemic_assessment` | `analysis_summary.epistemic_assessment` | Failure signature risk ratings |
+| `json.analysis.audit_implications[]` | `analysis_summary.audit_implications[]` | Trajectory projections |
 
 **Note:** `json` = agent's JSON OUTPUT, `buffer` = `agent-metrics buffer list -f tracker`
+**Note:** `analysis_records` and `analysis_summary` are optional (v1.4.0). Omit if agent output has no `analysis` section.
 
 ---
 
 ## Source
 
-**ADL Schema:** `udl/definition-languages/adl-schema-v1.10.0.json`
-**ADL Source:** `udl/adl/v3/aristotle-validator.agent.yaml`
-**Agent:** `agents/v3/aristotle-validator-agent.md`
-**Spec:** `docs/specs/cognitive-lens-library-spec.md`
+**CDL Schema:** `udl/definition-languages/cdl-schema-v1_3_0.json`
+**CDL Source:** `/Users/aself/uluops/uluops-agent-workflows/udl/cdl/v1/aristotle-validator.command.yaml`
+**Agent:** `agents/aristotle-validator-agent.md`

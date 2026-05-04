@@ -98,7 +98,7 @@ explore (Categorical Mapping)
 
 ### Tracker Persistence
 
-After all stages complete, save results to the tracker using `save_features_list`:
+After all stages complete, save results to the tracker using `save_run`:
 
 - **definition_type:** `pipeline`
 - **definition_name:** `aristotle-pipeline`
@@ -109,7 +109,7 @@ After all stages complete, save results to the tracker using `save_features_list
 - **recommendations:** Collect ALL issues from ALL stages into a single recommendations array with validator, title, priority, severity, failure_code, file_path, line_number, description, and type
 - **summary:** `{ all_gates_passed: <true if all abort-gates passed>, average_score: <mean of all validator scores> }`
 
-This MUST be a single bulk call — do NOT create individual issues. The `save_features_list` tool auto-increments the run number and detects regressions from prior runs.
+This MUST be a single bulk call — do NOT create individual issues. The `save_run` tool auto-increments the run number and detects regressions from prior runs.
 
 **Token Metrics:**
 

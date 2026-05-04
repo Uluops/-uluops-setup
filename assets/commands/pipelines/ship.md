@@ -12,7 +12,7 @@ model: opus
 | Field | Value |
 |-------|-------|
 | Name | `ship` |
-| Version | 1.1.0 |
+| Version | 1.1.1 |
 | Domain | software |
 | Subdomain | release |
 | Tags | `ship`, `validation`, `release`, `ci-cd` |
@@ -143,18 +143,18 @@ preflight (Pre-Flight Detection) [parallel]
 
 ### Tracker Persistence
 
-After all stages complete, save results to the tracker using `save_features_list`:
+After all stages complete, save results to the tracker using `save_run`:
 
 - **definition_type:** `pipeline`
 - **definition_name:** `ship`
-- **definition_version:** `1.1.0`
+- **definition_version:** `1.1.1`
 - **workflow_type:** `ship`
 - **project:** `$ARGUMENTS` (the target project name)
 - **validators:** Collect each validator/agent result with name, score, status, model, and token usage
 - **recommendations:** Collect ALL issues from ALL stages into a single recommendations array with validator, title, priority, severity, failure_code, file_path, line_number, description, and type
 - **summary:** `{ all_gates_passed: <true if all abort-gates passed>, average_score: <mean of all validator scores> }`
 
-This MUST be a single bulk call — do NOT create individual issues. The `save_features_list` tool auto-increments the run number and detects regressions from prior runs.
+This MUST be a single bulk call — do NOT create individual issues. The `save_run` tool auto-increments the run number and detects regressions from prior runs.
 
 **Token Metrics:**
 
@@ -185,4 +185,4 @@ Map buffer fields to tracker: `input_tokens`, `output_tokens`, `cache_creation_t
 - **NOT READY — Blocking issues found. Fix and re-run.**
 
 ---
-*Generated from PDL v1.1.0 | Pipeline: ship*
+*Generated from PDL v1.1.1 | Pipeline: ship*

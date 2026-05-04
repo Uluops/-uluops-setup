@@ -1,61 +1,83 @@
 ---
 name: aristotle-forecaster
-description: Performs Aristotelian potentiality-to-actuality projection on any artifact. Maps trajectory from current state to full actualization, identifies impediments to telos realization. Decision: HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE.
-model: opus
+description: Performs Aristotelian potentiality-to-actuality projection on any artifact. Maps trajectory from current state to full actualization and identifies impediments to telos realization. Decision HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE.
 ---
 
-# Aristotle Forecaster
-Performs Aristotelian potentiality-to-actuality projection on any artifact — code, specs, plans, architectures, or documents. Cognitive lens agent from the Cognitive Lens Library.
+# Aristotle Forecaster v1
+Performs Aristotelian potentiality-to-actuality projection on any artifact. Maps trajectory from current state to full actualization and identifies impediments to telos realization. Decision HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE.
+
+## What's New in v1
+
+| Feature | Description |
+|---------|-------------|
+| **Calibration Examples** | Reference scenarios for consistent scoring |
+| **Failure Code Examples** | Worked examples mapping issues to taxonomy codes |
+| **Token Budget** | Output length guidance |
+| **Display IDs** | Auto-fail conditions have numbered IDs |
 
 ## Arguments
 
-**Usage:** `/agents:aristotle-forecaster <target>`
+**Usage:** `/agents:aristotle-forecaster <directory>`
 
 **Examples:**
-- `/agents:aristotle-forecaster uluops-registry-api/`
 - `/agents:aristotle-forecaster udl/adl/v3/code-validator.agent.yaml`
-- `/agents:aristotle-forecaster docs/specs/cognitive-lens-library-spec.md`
-- `/agents:aristotle-forecaster packages/cli/`
+- `/agents:aristotle-forecaster docs/recursive-appreciation-hypothesis-v1.3.0.md`
+- `/agents:aristotle-forecaster packages/cli/src/commands/exec/agent.ts`
+- `/agents:aristotle-forecaster specs/api-spec.md`
 
-**Target:** $ARGUMENTS
+**Target Directory:** $ARGUMENTS
+
 
 ---
 
 ## Pre-Flight
 
-Verify the target exists:
+```bash
+echo "Running Aristotelian potentiality-to-actuality projection on $ARGUMENTS..."
+echo "=========================================================================="
+```
+
+Verify the target directory exists:
+
+```bash
+test -d "$ARGUMENTS" && echo "✓ Directory exists: $ARGUMENTS" || echo "ERROR: Directory '$ARGUMENTS' not found"
+```
+
+Enter and confirm location:
+
+```bash
+cd "$ARGUMENTS" && pwd
+```
+
+Check path exists:
 
 ```bash
 [ -e "$ARGUMENTS" ] && echo "✓ $ARGUMENTS exists" || echo "Target file or directory does not exist"
 ```
 
+
 ---
 
 ## Agent Invocation
 
-Run the Aristotle Forecaster agent on the target:
+Run the Aristotle Forecaster agent on the validated target directory:
 
 **Agent:** aristotle-forecaster-agent.md
 **Model:** Opus
 **Target:** $ARGUMENTS
 
-The agent performs Aristotelian potentiality-to-actuality projection across 5 categories (100 points total):
 
-| Category | Points | Focus |
-|----------|--------|-------|
-| Potentiality Identification | 25 | Latent capabilities, structural grounding, potentiality vs possibility |
-| Actualization Pathways | 25 | Pathway specificity, natural ordering, form alignment |
-| Impediment Analysis | 20 | Structural impediments (not resource constraints), actionable specificity |
-| Teleological Trajectory | 15 | Movement toward/away from telos, potentiality-telos connection |
-| Temporal Precision | 15 | Actualization stages, current position on trajectory |
+---
 
 ## Auto-Fail Conditions
 
-| ID | Condition | Severity |
-|----|-----------|----------|
-| AF-001 | Feature requests presented as potentiality analysis | Critical |
-| AF-002 | Impediments listed as resource constraints rather than structural barriers | Critical |
-| AF-003 | No connection between potentialities and artifact's telos | Critical |
+Critical issues that trigger immediate FAIL regardless of score:
+
+| ID | Condition |
+|----|-----------|
+| **AF-001** | Feature requests presented as potentiality analysis |
+| **AF-002** | Impediments listed as resource constraints rather than structural barriers |
+| **AF-003** | No connection between potentialities and artifact's telos |
 
 ---
 
@@ -63,18 +85,38 @@ The agent performs Aristotelian potentiality-to-actuality projection across 5 ca
 
 | Score | Decision | Meaning |
 |-------|----------|---------|
-| **>=75** | HIGH_CONFIDENCE | Trajectory is clear, potentialities well-mapped, impediments specific |
-| **50-74** | MODERATE_CONFIDENCE | Trajectory partially clear, some potentialities uncertain |
-| **<50** | LOW_CONFIDENCE | Trajectory unclear, insufficient structural evidence for projection |
+| **>=70** | ✅ PASS | Validation passed, proceed to next phase |
+| **<70** | ❌ FAIL | Validation failed, fix issues before proceeding |
 
-**Note:** This is an advisory decision. HIGH_CONFIDENCE means the artifact's trajectory is well-understood — not that the trajectory is desirable.
+**Note:** Any critical issue triggers FAIL regardless of score.
 
 ---
 
+## Post-Flight Actions
+
+### On Success
+
+Actualization trajectory projected — developmental path mapped
+
+```bash
+exit 0
+```
+
+### On Failure
+
+Trajectory projection incomplete — impediments to actualization may be underestimated
+
+```bash
+exit 1
+```
+
+
+---
+
+
 ## PERSIST TO TRACKER (Required)
 
-> **IMPORTANT:** Save to tracker IMMEDIATELY after agent completes, BEFORE presenting the summary to the user.
-
+> **IMPORTANT:** Save to tracker IMMEDIATELY after agent completes, BEFORE presenting the summary to the user. The workflow is not complete until results are persisted.
 **1. Get token metrics from buffer:**
 ```bash
 agent-metrics buffer list --since 5m -f tracker
@@ -82,7 +124,7 @@ agent-metrics buffer list --since 5m -f tracker
 
 **2. Save to tracker (DO THIS FIRST):**
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **3. Verify saved:** Compare `json.summary.total_issues` with saved count.
 
@@ -90,11 +132,18 @@ mcp__uluops-tracker__save_features_list
 
 ### Field Mappings
 
+**Definition identity (REQUIRED for execution tracking):**
+| Tracker Field | Value | Notes |
+|---------------|-------|-------|
+| `definition_type` | `command` | From CDL interface |
+| `definition_name` | `aristotle-forecaster` | From CDL interface |
+| `definition_version` | `1.0.2` | From CDL interface |
+
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
 |--------|---------------|-------|
-| `json.result.score` | `validators[].score` | Total score |
-| `json.result.decision` | `validators[].status` | HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE |
+| `json.result.score` | `agents[].score` | Total score |
+| `json.result.decision` | `agents[].decision` | PASS/FAIL |
 | `buffer.model` | `validators[].model` | From agent-metrics buffer |
 | `buffer.tokens.input_tokens` | `input_tokens` | Raw input tokens |
 | `buffer.tokens.output_tokens` | `output_tokens` | Output tokens |
@@ -102,14 +151,19 @@ mcp__uluops-tracker__save_features_list
 | `buffer.tokens.cache_read_tokens` | `cache_read_tokens` | Cache reads |
 | `buffer.tokens.total_effective_tokens` | `total_effective_tokens` | Effective total |
 | `json.categories[].findings[].issues[]` | `recommendations[]` | Flatten nested structure |
+| `json.analysis.records[]` | `analysis_records[]` | Structured analysis records (v1.4.0) |
+| `json.analysis.system_metrics` | `analysis_summary.system_metrics` | Agent-type-specific metrics |
+| `json.analysis.category_scores[]` | `analysis_summary.category_scores[]` | Category score breakdown |
+| `json.analysis.epistemic_assessment` | `analysis_summary.epistemic_assessment` | Failure signature risk ratings |
+| `json.analysis.audit_implications[]` | `analysis_summary.audit_implications[]` | Trajectory projections |
 
 **Note:** `json` = agent's JSON OUTPUT, `buffer` = `agent-metrics buffer list -f tracker`
+**Note:** `analysis_records` and `analysis_summary` are optional (v1.4.0). Omit if agent output has no `analysis` section.
 
 ---
 
 ## Source
 
-**ADL Schema:** `udl/definition-languages/adl-schema-v1.10.0.json`
-**ADL Source:** `udl/adl/v3/aristotle-forecaster.agent.yaml`
-**Agent:** `agents/v3/aristotle-forecaster-agent.md`
-**Spec:** `docs/specs/cognitive-lens-library-spec.md`
+**CDL Schema:** `udl/definition-languages/cdl-schema-v1_3_0.json`
+**CDL Source:** `/Users/aself/uluops/uluops-agent-workflows/udl/cdl/v1/aristotle-forecaster.command.yaml`
+**Agent:** `agents/aristotle-forecaster-agent.md`

@@ -3,8 +3,17 @@ name: anxiety-reader
 description: Reads from the position of someone afraid of the artifact's failure modes. Surfaces concerns hiding beneath confident language — classified by anxiety register (tactical/structural/epistemic). Decision CONFIDENCE_WARRANTED/FRAGILITY_MASKED.
 ---
 
-# Anxiety Reader
+# Anxiety Reader v1
 Reads from the position of someone afraid of the artifact's failure modes. Surfaces concerns hiding beneath confident language — classified by anxiety register (tactical/structural/epistemic). Decision CONFIDENCE_WARRANTED/FRAGILITY_MASKED.
+
+## What's New in v1
+
+| Feature | Description |
+|---------|-------------|
+| **Calibration Examples** | Reference scenarios for consistent scoring |
+| **Failure Code Examples** | Worked examples mapping issues to taxonomy codes |
+| **Token Budget** | Output length guidance |
+| **Display IDs** | Auto-fail conditions have numbered IDs |
 
 ## Arguments
 
@@ -115,7 +124,7 @@ agent-metrics buffer list --since 5m -f tracker
 
 **2. Save to tracker (DO THIS FIRST):**
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **3. Verify saved:** Compare `json.summary.total_issues` with saved count.
 
@@ -128,7 +137,7 @@ mcp__uluops-tracker__save_features_list
 |---------------|-------|-------|
 | `definition_type` | `command` | From CDL interface |
 | `definition_name` | `anxiety-reader` | From CDL interface |
-| `definition_version` | `1.0.0` | From CDL interface |
+| `definition_version` | `1.0.2` | From CDL interface |
 
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |

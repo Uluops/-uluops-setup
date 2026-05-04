@@ -1,29 +1,40 @@
 ---
 name: workflow-synthesis
-description: Synthesizes cross-cutting insights from multiple upstream agent outputs. Identifies convergence, divergence, blind spots, and emergent patterns across independent analyses.
-model: opus
+description: Synthesizes cross-cutting insights from multiple upstream agent outputs. Identifies convergence, divergence, blind spots, and emergent patterns. Use at the end of any multi-agent workflow for integrated meta-analysis.
 ---
 
-# Workflow Synthesis
-Synthesizes cross-cutting insights from multiple upstream agent outputs in any workflow. Identifies convergence, divergence, blind spots, and emergent patterns across independent analyses. Produces meta-insights absent from any individual output.
+# Workflow Synthesis v1
+Synthesizes cross-cutting insights from multiple upstream agent outputs. Identifies convergence, divergence, blind spots, and emergent patterns. Use at the end of any multi-agent workflow for integrated meta-analysis.
+
+## What's New in v1
+
+| Feature | Description |
+|---------|-------------|
+| **Calibration Examples** | Reference scenarios for consistent scoring |
+| **Failure Code Examples** | Worked examples mapping issues to taxonomy codes |
+| **Token Budget** | Output length guidance |
+| **Display IDs** | Auto-fail conditions have numbered IDs |
 
 ## Arguments
 
 **Usage:** `/agents:workflow-synthesis <directory>`
 
 **Examples:**
-- `/agents:workflow-synthesis .`
-- `/agents:workflow-synthesis src/`
+- `/agents:workflow-synthesis uluops-registry-api/`
+- `/agents:workflow-synthesis ops-uluops-api/`
+- `/agents:workflow-synthesis udl/adl/v3/code-validator.agent.yaml`
+- `/agents:workflow-synthesis docs/specs/cognitive-lens-library-spec.md`
 
 **Target Directory:** $ARGUMENTS
+
 
 ---
 
 ## Pre-Flight
 
 ```bash
-echo "Running workflow synthesis on $ARGUMENTS..."
-echo "============================================"
+echo "Synthesizing cross-cutting insights from upstream agent outputs for $ARGUMENTS..."
+echo "================================================================================="
 ```
 
 Verify the target directory exists:
@@ -38,6 +49,13 @@ Enter and confirm location:
 cd "$ARGUMENTS" && pwd
 ```
 
+Check path exists:
+
+```bash
+[ -e "$ARGUMENTS" ] && echo "✓ $ARGUMENTS exists" || echo "Target file or directory does not exist"
+```
+
+
 ---
 
 ## Agent Invocation
@@ -48,7 +66,20 @@ Run the Workflow Synthesis agent on the validated target directory:
 **Model:** Opus
 **Target:** $ARGUMENTS
 
-The agent synthesizes cross-cutting insights from multiple upstream analyses.
+
+---
+
+## Auto-Fail Conditions
+
+Critical issues that trigger immediate FAIL regardless of score:
+
+| ID | Condition |
+|----|-----------|
+| **AF-001** | Mere summarization — synthesis restates individual findings without cross-referencing |
+| **AF-002** | Missing composition test — no assessment of emergent insights |
+| **AF-003** | Synthesis claims not traced to specific upstream agents |
+| **AF-004** | Convergence analyzed but divergence section empty or perfunctory |
+| **AF-005** | Claiming agents agree when findings are about different aspects |
 
 ---
 
@@ -56,8 +87,31 @@ The agent synthesizes cross-cutting insights from multiple upstream analyses.
 
 | Score | Decision | Meaning |
 |-------|----------|---------|
-| **INTEGRATED** | Analyses converge on consistent picture | |
-| **FRAGMENTED** | Significant divergence or blind spots found | |
+| **>=55** | ✅ PASS | Validation passed, proceed to next phase |
+| **<55** | ❌ FAIL | Validation failed, fix issues before proceeding |
+
+**Note:** Any critical issue triggers FAIL regardless of score.
+
+---
+
+## Post-Flight Actions
+
+### On Success
+
+Synthesis INTEGRATED — cross-cutting insights produced from upstream agent outputs
+
+```bash
+exit 0
+```
+
+### On Failure
+
+Synthesis FRAGMENTED — upstream findings do not compose into emergent insights for this artifact
+
+```bash
+exit 1
+```
+
 
 ---
 
@@ -72,7 +126,7 @@ agent-metrics buffer list --since 5m -f tracker
 
 **2. Save to tracker (DO THIS FIRST):**
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **3. Verify saved:** Compare `json.summary.total_issues` with saved count.
 
@@ -80,11 +134,18 @@ mcp__uluops-tracker__save_features_list
 
 ### Field Mappings
 
+**Definition identity (REQUIRED for execution tracking):**
+| Tracker Field | Value | Notes |
+|---------------|-------|-------|
+| `definition_type` | `command` | From CDL interface |
+| `definition_name` | `workflow-synthesis` | From CDL interface |
+| `definition_version` | `1.0.2` | From CDL interface |
+
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
 |--------|---------------|-------|
-| `json.result.score` | `validators[].score` | Total score |
-| `json.result.decision` | `validators[].status` | INTEGRATED/FRAGMENTED |
+| `json.result.score` | `agents[].score` | Total score |
+| `json.result.decision` | `agents[].decision` | PASS/FAIL |
 | `buffer.model` | `validators[].model` | From agent-metrics buffer |
 | `buffer.tokens.input_tokens` | `input_tokens` | Raw input tokens |
 | `buffer.tokens.output_tokens` | `output_tokens` | Output tokens |
@@ -92,11 +153,19 @@ mcp__uluops-tracker__save_features_list
 | `buffer.tokens.cache_read_tokens` | `cache_read_tokens` | Cache reads |
 | `buffer.tokens.total_effective_tokens` | `total_effective_tokens` | Effective total |
 | `json.categories[].findings[].issues[]` | `recommendations[]` | Flatten nested structure |
+| `json.analysis.records[]` | `analysis_records[]` | Structured analysis records (v1.4.0) |
+| `json.analysis.system_metrics` | `analysis_summary.system_metrics` | Agent-type-specific metrics |
+| `json.analysis.category_scores[]` | `analysis_summary.category_scores[]` | Category score breakdown |
+| `json.analysis.epistemic_assessment` | `analysis_summary.epistemic_assessment` | Failure signature risk ratings |
+| `json.analysis.audit_implications[]` | `analysis_summary.audit_implications[]` | Trajectory projections |
 
 **Note:** `json` = agent's JSON OUTPUT, `buffer` = `agent-metrics buffer list -f tracker`
+**Note:** `analysis_records` and `analysis_summary` are optional (v1.4.0). Omit if agent output has no `analysis` section.
 
 ---
 
 ## Source
 
+**CDL Schema:** `udl/definition-languages/cdl-schema-v1_3_0.json`
+**CDL Source:** `/Users/aself/uluops/uluops-agent-workflows/udl/cdl/v1/workflow-synthesis.command.yaml`
 **Agent:** `agents/workflow-synthesis-agent.md`

@@ -1,11 +1,19 @@
 ---
 name: frontend
 description: Validates React/Tailwind frontend code including accessibility, theme consistency, component composition, and performance. Use AFTER code-validator passes.
-model: sonnet
 ---
 
-# Frontend Validator
+# Frontend Validator v1
 Validates React/Tailwind frontend code including accessibility, theme consistency, component composition, and performance. Use AFTER code-validator passes.
+
+## What's New in v1
+
+| Feature | Description |
+|---------|-------------|
+| **Calibration Examples** | Reference scenarios for consistent scoring |
+| **Failure Code Examples** | Worked examples mapping issues to taxonomy codes |
+| **Token Budget** | Output length guidance |
+| **Display IDs** | Auto-fail conditions have numbered IDs |
 
 ## Arguments
 
@@ -17,6 +25,7 @@ Validates React/Tailwind frontend code including accessibility, theme consistenc
 - `/agents:frontend .`
 
 **Target Directory:** $ARGUMENTS
+
 
 ---
 
@@ -56,15 +65,6 @@ Run the Frontend Validator agent on the validated target directory:
 **Model:** Sonnet
 **Target:** $ARGUMENTS
 
-The agent performs code quality validation across 5 categories (100 points total):
-
-| Category | Points | Focus |
-|----------|--------|-------|
-| Component Quality | 25 | Validates single responsibility, typed props, hooks rules, composition patterns |
-| Accessibility | 25 | Validates semantic HTML, ARIA labels, keyboard navigation, and focus management |
-| Styling & Theme Consistency | 20 | Validates theme-aware patterns, consistent spacing, and responsive design |
-| Performance Patterns | 20 | Validates memoization, re-renders, key props, and lazy loading |
-| React Best Practices | 10 | Validates useEffect dependencies, cleanup, and error boundaries |
 
 ---
 
@@ -93,6 +93,27 @@ Critical issues that trigger immediate FAIL regardless of score:
 
 ---
 
+## Post-Flight Actions
+
+### On Success
+
+Frontend validation passed with score >= 85
+
+```bash
+exit 0
+```
+
+### On Failure
+
+Frontend validation failed. Review issues above.
+
+```bash
+exit 1
+```
+
+
+---
+
 
 ## PERSIST TO TRACKER (Required)
 
@@ -104,7 +125,7 @@ agent-metrics buffer list --since 5m -f tracker
 
 **2. Save to tracker (DO THIS FIRST):**
 
-mcp__uluops-tracker__save_features_list
+mcp__uluops-tracker__save_run
 
 **3. Verify saved:** Compare `json.summary.total_issues` with saved count.
 
@@ -112,11 +133,18 @@ mcp__uluops-tracker__save_features_list
 
 ### Field Mappings
 
+**Definition identity (REQUIRED for execution tracking):**
+| Tracker Field | Value | Notes |
+|---------------|-------|-------|
+| `definition_type` | `command` | From CDL interface |
+| `definition_name` | `frontend` | From CDL interface |
+| `definition_version` | `1.0.2` | From CDL interface |
+
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
 |--------|---------------|-------|
-| `json.result.score` | `validators[].score` | Total score |
-| `json.result.decision` | `validators[].status` | PASS/FAIL |
+| `json.result.score` | `agents[].score` | Total score |
+| `json.result.decision` | `agents[].decision` | PASS/FAIL |
 | `buffer.model` | `validators[].model` | From agent-metrics buffer |
 | `buffer.tokens.input_tokens` | `input_tokens` | Raw input tokens |
 | `buffer.tokens.output_tokens` | `output_tokens` | Output tokens |
@@ -124,13 +152,19 @@ mcp__uluops-tracker__save_features_list
 | `buffer.tokens.cache_read_tokens` | `cache_read_tokens` | Cache reads |
 | `buffer.tokens.total_effective_tokens` | `total_effective_tokens` | Effective total |
 | `json.categories[].findings[].issues[]` | `recommendations[]` | Flatten nested structure |
+| `json.analysis.records[]` | `analysis_records[]` | Structured analysis records (v1.4.0) |
+| `json.analysis.system_metrics` | `analysis_summary.system_metrics` | Agent-type-specific metrics |
+| `json.analysis.category_scores[]` | `analysis_summary.category_scores[]` | Category score breakdown |
+| `json.analysis.epistemic_assessment` | `analysis_summary.epistemic_assessment` | Failure signature risk ratings |
+| `json.analysis.audit_implications[]` | `analysis_summary.audit_implications[]` | Trajectory projections |
 
 **Note:** `json` = agent's JSON OUTPUT, `buffer` = `agent-metrics buffer list -f tracker`
+**Note:** `analysis_records` and `analysis_summary` are optional (v1.4.0). Omit if agent output has no `analysis` section.
 
 ---
 
 ## Source
 
-**CDL Schema:** `udl/definition-languages/cdl-schema-v1.1.0.json`
-**CDL Source:** `/home/alexs/uluops/uluops-agent-workflows/udl/cdl/v1/frontend.command.yaml`
+**CDL Schema:** `udl/definition-languages/cdl-schema-v1_3_0.json`
+**CDL Source:** `/Users/aself/uluops/uluops-agent-workflows/udl/cdl/v1/frontend.command.yaml`
 **Agent:** `agents/frontend-validator-agent.md`
