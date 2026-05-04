@@ -90,6 +90,7 @@ function buildGeminiFrontmatter(fm: Record<string, string>): string {
   lines.push("model: gemini-3-preview");
   lines.push("temperature: 0.2");
   lines.push("max_turns: 30");
+  lines.push("timeout_mins: 10");
 
   return lines.join("\n");
 }
