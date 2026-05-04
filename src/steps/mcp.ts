@@ -70,7 +70,8 @@ async function backupConfig(
   const backupDir = getBackupDir(harnessName);
   await mkdir(backupDir, { recursive: true });
   const filename = basename(configPath);
-  await copyFile(configPath, join(backupDir, `${filename}.bak`));
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  await copyFile(configPath, join(backupDir, `${filename}.${timestamp}.bak`));
 }
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {

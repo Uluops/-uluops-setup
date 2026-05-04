@@ -80,7 +80,10 @@ async function verifyHarness(
     if (hookPresent && hookFilePresent) {
       checks.push({ label: `[${profile.displayName}] Agent metrics hook configured`, passed: true });
     } else {
-      const missing = [!hookPresent && "hook not in settings", !hookFilePresent && "hook.js not found"].filter(Boolean).join(", ");
+      const missing = [
+        ...(!hookPresent ? ["hook not in settings"] : []),
+        ...(!hookFilePresent ? ["hook.js not found"] : []),
+      ].join(", ");
       checks.push({ label: `[${profile.displayName}] Agent metrics`, passed: false, detail: missing });
       allOk = false;
     }

@@ -14,8 +14,11 @@ function getMetricsToolDir(profile: HarnessProfile): string | null {
   return profile.paths.toolsDir;
 }
 
-/** The hook command that runs on SubagentStop */
-function getHookCommand(profile: HarnessProfile): string {
+/**
+ * The hook command that runs on SubagentStop.
+ * @internal Exported for testing only — not part of the public API.
+ */
+export function getHookCommand(profile: HarnessProfile): string {
   const toolDir = getMetricsToolDir(profile);
   if (!toolDir) throw new Error("No tool dir for this harness");
   return `"${process.execPath}" "${join(toolDir, "dist", "hook.js")}"`;

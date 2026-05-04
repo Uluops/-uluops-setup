@@ -55,7 +55,7 @@ export async function resolveApiKey(options: {
 
   const prefix = getKeyPrefix();
   if (!apiKey.startsWith(prefix) && !options.skipValidation) {
-    console.warn(`  ⚠ Key does not start with expected prefix "${prefix}" — proceeding with server validation`);
+    process.stderr.write(`  ⚠ Key does not start with expected prefix "${prefix}" — proceeding with server validation\n`);
   }
 
   // Validate against server

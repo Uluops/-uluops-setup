@@ -21,6 +21,17 @@ afterEach(async () => {
 });
 
 describe("writeShellExport", () => {
+  it("rejects keys with shell metacharacters", async () => {
+    await expect(writeShellExport(profilePath, "key;rm -rf /", false)).rejects.toThrow("unsafe");
+    await expect(writeShellExport(profilePath, "key$(cmd)", false)).rejects.toThrow("unsafe");
+    await expect(writeShellExport(profilePath, "key`cmd`", false)).rejects.toThrow("unsafe");
+    await expect(writeShellExport(profilePath, "key with spaces", false)).rejects.toThrow("unsafe");
+  });
+
+  it("accepts keys with safe characters", async () => {
+    await expect(writeShellExport(profilePath, "ulr_abc-123.key", false)).resolves.toBeUndefined();
+  });
+
   it("creates profile with fenced block if file does not exist", async () => {
     await writeShellExport(profilePath, "ulr_abc123", false);
     const content = await readFile(profilePath, "utf-8");

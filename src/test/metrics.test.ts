@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { readSettings, writeSettings, mergeUluopsHook, removeUluopsHook, hasUluopsHook } from "../lib/settings-merger.js";
+import { getHookCommand } from "../steps/metrics.js";
+import type { HarnessProfile } from "../harnesses/index.js";
 
 let tmpDir: string;
 let settingsPath: string;
@@ -11,6 +13,25 @@ let settingsPath: string;
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-metrics-"));
   settingsPath = join(tmpDir, "settings.json");
+});
+
+describe("getHookCommand quoting", () => {
+  it("quotes both the node path and the hook.js path", () => {
+    const profile = {
+      paths: { toolsDir: "/path with spaces/tools/agent-metrics" },
+    } as unknown as HarnessProfile;
+    const cmd = getHookCommand(profile);
+    // Both paths must be quoted to handle spaces
+    expect(cmd).toMatch(/^"[^"]+"\s+"[^"]+"$/);
+    expect(cmd).toContain("dist/hook.js");
+  });
+
+  it("throws if toolsDir is null", () => {
+    const profile = {
+      paths: { toolsDir: null },
+    } as unknown as HarnessProfile;
+    expect(() => getHookCommand(profile)).toThrow("No tool dir");
+  });
 });
 
 describe("metrics hook integration", () => {

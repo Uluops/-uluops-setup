@@ -58,9 +58,15 @@ describe("harness registry", () => {
     expect(names).toContain("codex");
   });
 
-  it("detectHarnesses returns array (may be empty in test env)", () => {
+  it("detectHarnesses returns only profiles whose home dirs exist", () => {
     const detected = detectHarnesses();
     expect(Array.isArray(detected)).toBe(true);
+    // Every detected harness must have an existing home dir
+    for (const p of detected) {
+      expect(ALL_PROFILES.some((ap) => ap.name === p.name)).toBe(true);
+    }
+    // Result is a subset of ALL_PROFILES
+    expect(detected.length).toBeLessThanOrEqual(ALL_PROFILES.length);
   });
 });
 

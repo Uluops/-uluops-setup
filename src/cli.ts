@@ -157,6 +157,7 @@ async function runSetup(opts: {
 
 // --- extracted helpers ---
 
+/** Resolve API key via flag, env, file, signup, or interactive prompt. Returns env detection + key. */
 async function initContext(opts: {
   apiKey?: string;
   signup: boolean;
@@ -191,6 +192,7 @@ async function initContext(opts: {
   return { env, apiKey };
 }
 
+/** Write MCP server entries to harness config and report warnings. */
 async function configureMcpStep(
   profile: HarnessProfile,
   apiKey: string,
@@ -202,6 +204,7 @@ async function configureMcpStep(
   return res;
 }
 
+/** Copy agent definitions from assets to harness directory. */
 async function installAgentsDefs(
   profile: HarnessProfile,
   opts: { localDefs: boolean; dryRun: boolean },
@@ -221,6 +224,7 @@ async function installAgentsDefs(
   return res;
 }
 
+/** Copy slash-command definitions from assets (Claude Code only). */
 async function installCommandsDefs(
   profile: HarnessProfile,
   opts: { localDefs: boolean; dryRun: boolean },
@@ -254,6 +258,7 @@ async function installCommandsDefs(
   return res;
 }
 
+/** Install agent-metrics hook and tool files (Claude Code only). */
 async function configureMetricsStep(
   profile: HarnessProfile,
   opts: { dryRun: boolean },
@@ -286,6 +291,7 @@ async function configureMetricsStep(
   return res;
 }
 
+/** Ping tracker and registry health endpoints. */
 async function runHealthCheck(opts: {
   skipValidation: boolean;
   dryRun: boolean;
@@ -308,6 +314,7 @@ async function runHealthCheck(opts: {
   }
 }
 
+/** Optionally write ULUOPS_API_KEY export to shell profile. */
 async function configureShell(
   env: { shellProfile: string | null },
   apiKey: string,
@@ -336,6 +343,7 @@ async function configureShell(
   return modified;
 }
 
+/** Interactive y/N confirmation before writing API key to shell profile. */
 async function confirmShellWrite(profilePath: string): Promise<boolean> {
   const readline = await import("node:readline/promises");
   const rl = readline.createInterface({
@@ -482,6 +490,7 @@ async function runVerify(): Promise<void> {
   process.exit(result.ok ? 0 : 1);
 }
 
+/** Warn if existing agent files will be overwritten and prompt for confirmation. */
 async function checkConflicts(
   profile: HarnessProfile,
   localDefs: boolean,
@@ -523,6 +532,7 @@ async function checkConflicts(
   }
 }
 
+/** Fetch a URL and return true if the response is OK, false on any failure. */
 async function checkEndpoint(url: string): Promise<boolean> {
   try {
     const res = await fetch(url, {
