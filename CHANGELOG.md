@@ -2,6 +2,34 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.4.0] - 2026-05-04
+
+### Added
+
+- **Gemini CLI command support**: Commands, workflows, and pipelines now install as `.toml` files for Gemini CLI via transform-at-install (no per-harness asset duplication)
+- **Pipelines namespace**: New `pipelines/` subdirectory for pipeline commands (ship, aristotle)
+- **Agent transform-at-install**: Single source of truth for agent assets — frontmatter is transformed per harness at install time (Claude Code passthrough, Gemini CLI tool name mapping + envelope, OpenCode permission mapping)
+- `anxiety-reader` agent added to starter pack (required by ship pipeline)
+
+### Changed
+
+- Agent assets flattened from `assets/agents/{harness}/` to `assets/agents/` (single source, -19K lines)
+- `ship` pipeline moved from `workflows/` to `pipelines/` (correctly classified as PDL)
+- `aristotle` pipeline moved from `workflows/` to `pipelines/` and regenerated from PDL source
+- Pipeline assets regenerated from actual PDL sources (were incorrectly WDL-rendered)
+- Commands install expanded to 3 subdirs: `agents/`, `workflows/`, `pipelines/`
+- Starter pack: 23 agents, 23 agent commands, 3 workflows, 2 pipelines
+
+### Fixed
+
+- 30 validation issues resolved across 4 commits (type safety, test coverage, dead code, security)
+- Manifest contentHash self-referential bug fixed
+- `readCredentialsFile` now throws on malformed JSON instead of swallowing
+- Dev dependency vulnerabilities resolved (picomatch, postcss, vite)
+- Shell profile fence marker ordering guard added
+- MCP config backups now timestamped to prevent overwrites
+- Strict unused checks enabled in test tsconfig
+
 ## [0.3.0] - 2026-04-30
 
 ### Added

@@ -16,7 +16,7 @@ npx @uluops/setup
 |---------|--------|-------|--------|
 | Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
 | OpenCode | Fully supported | `oc` | `~/.config/opencode/opencode.json` |
-| Gemini CLI | Coming soon | `gemini` | `~/.gemini/settings.json` |
+| Gemini CLI | Agents + Commands | `gemini` | `~/.gemini/settings.json` |
 | Codex | Coming soon | — | `~/.codex/config.toml` |
 
 ```bash
@@ -25,6 +25,9 @@ npx @uluops/setup
 
 # Install for OpenCode
 npx @uluops/setup --harness opencode
+
+# Install for Gemini CLI
+npx @uluops/setup --harness gemini-cli
 ```
 
 ## What it does
@@ -32,11 +35,13 @@ npx @uluops/setup --harness opencode
 | Artifact | Count | Destination (Claude Code) |
 |----------|-------|---------------------------|
 | MCP servers | 2 | `~/.claude.json` |
-| Agent definitions | 22 | `~/.claude/agents/` |
-| Slash commands | 27 | `~/.claude/commands/` |
+| Agent definitions | 23 | `~/.claude/agents/` |
+| Agent commands | 23 | `~/.claude/commands/agents/` |
+| Workflow commands | 3 | `~/.claude/commands/workflows/` |
+| Pipeline commands | 2 | `~/.claude/commands/pipelines/` |
 | Agent metrics hook | 1 | `~/.claude/tools/agent-metrics/` |
 
-> Paths shown are for Claude Code (default). OpenCode destinations: `~/.config/opencode/opencode.json`, `~/.config/opencode/agents/`. Use `--harness <name>` to target a different harness. Commands and metrics hooks are currently Claude Code-only.
+> Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Agent definitions and commands are transformed to the target harness format at install time from a single source.
 
 The installer runs five steps in sequence:
 
