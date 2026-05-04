@@ -244,7 +244,7 @@ async function installCommandsDefs(
     );
     return res;
   }
-  const total = res.agentCommands + res.workflowCommands;
+  const total = res.agentCommands + res.workflowCommands + res.pipelineCommands;
   const parts: string[] = [];
   if (total > 0) parts.push(`${total} copied`);
   if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);

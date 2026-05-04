@@ -29,6 +29,32 @@ export async function copyIfChanged(
 }
 
 /**
+ * Write content to a file if it differs from the current content (hash comparison).
+ * Returns "copied" or "skipped".
+ */
+export async function writeIfChanged(
+  destPath: string,
+  content: string,
+  dryRun: boolean,
+): Promise<"copied" | "skipped"> {
+  const newHash = fileHash(content);
+
+  try {
+    const existing = await readFile(destPath, "utf-8");
+    if (newHash === fileHash(existing)) {
+      return "skipped";
+    }
+  } catch {
+    // File doesn't exist yet
+  }
+
+  if (!dryRun) {
+    await writeFile(destPath, content);
+  }
+  return "copied";
+}
+
+/**
  * Remove files from a directory. Returns count of successfully removed files.
  */
 export async function unlinkFiles(
