@@ -70,8 +70,8 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
       enabled: true,
       timeout: 30000,
       environment: {
-        ULUOPS_TRACKER_API_URL: "https://api.uluops.ai/api/v1",
-        ULUOPS_TRACKER_API_KEY: apiKey,
+        ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
+        ULUOPS_API_KEY: apiKey,
       },
     };
     const registry: OpenCodeMcpServer = {

@@ -5,6 +5,7 @@ interface McpServerConfig {
   command: string;
   args: string[];
   env: Record<string, string>;
+  trust?: boolean;
 }
 
 export interface ClaudeConfig {
@@ -68,8 +69,11 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
 export function mergeUluopsMcp(
   config: ClaudeConfig,
   apiKey: string,
+  trust = false,
 ): ClaudeConfig {
   const existing = config.mcpServers ?? {};
+  const trustField = trust ? { trust: true } : {};
+
   return {
     ...config,
     mcpServers: {
@@ -78,9 +82,10 @@ export function mergeUluopsMcp(
         command: "npx",
         args: ["-y", "uluops-tracker-mcp-client"],
         env: {
-          ULUOPS_TRACKER_API_URL: "https://api.uluops.ai/api/v1",
-          ULUOPS_TRACKER_API_KEY: apiKey,
+          ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
+          ULUOPS_API_KEY: apiKey,
         },
+        ...trustField,
       },
       "uluops-registry": {
         command: "npx",
@@ -89,6 +94,7 @@ export function mergeUluopsMcp(
           ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
           ULUOPS_API_KEY: apiKey,
         },
+        ...trustField,
       },
     },
   };

@@ -9,8 +9,8 @@ describe("mergeUluopsMcp", () => {
       command: "npx",
       args: ["-y", "uluops-tracker-mcp-client"],
       env: {
-        ULUOPS_TRACKER_API_URL: "https://api.uluops.ai/api/v1",
-        ULUOPS_TRACKER_API_KEY: "ulr_test123",
+        ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
+        ULUOPS_API_KEY: "ulr_test123",
       },
     });
     expect(result.mcpServers!["uluops-registry"]).toMatchObject({
