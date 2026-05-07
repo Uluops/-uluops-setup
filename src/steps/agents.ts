@@ -1,9 +1,8 @@
-import { readFile, readdir, mkdir, unlink } from "node:fs/promises";
+import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged, writeIfChanged, unlinkFiles } from "../lib/file-ops.js";
-import { transformAgent } from "../lib/agent-transform.js";
+import { copyIfChanged, unlinkFiles } from "../lib/file-ops.js";
 
 export interface AgentsResult {
   copied: number;
@@ -12,17 +11,14 @@ export interface AgentsResult {
   files: string[];
 }
 
-/** Source directory for agent assets (single set, Claude Code format). */
-const AGENTS_SRC = join(ASSETS_DIR, "agents");
-
-/** Copy agent definition files from assets to the harness agents directory,
- *  transforming frontmatter to match the target harness format. */
+/** Copy pre-rendered agent definitions from harness-specific assets to the target directory. */
 export async function installAgents(
   profile: HarnessProfile,
   localDefs: boolean,
   dryRun: boolean,
   existingManifestAgents?: string[],
 ): Promise<AgentsResult> {
+  const srcDir = join(ASSETS_DIR, profile.name, "agents");
   const destDir = localDefs
     ? join(await findProjectRoot(), "uluops", "agents")
     : profile.paths.agentsDir;
@@ -31,11 +27,10 @@ export async function installAgents(
     await mkdir(destDir, { recursive: true });
   }
 
-  const needsTransform = profile.name !== "claude-code";
-
+  const ext = profile.agentExtension;
   let files: string[];
   try {
-    files = (await readdir(AGENTS_SRC)).filter((f) => f.endsWith(".md"));
+    files = (await readdir(srcDir)).filter((f) => f.endsWith(ext));
   } catch {
     return { copied: 0, skipped: 0, removed: 0, files: [] };
   }
@@ -44,19 +39,11 @@ export async function installAgents(
   let skipped = 0;
 
   for (const file of files) {
-    let result: "copied" | "skipped";
-
-    if (needsTransform) {
-      const markdown = await readFile(join(AGENTS_SRC, file), "utf-8");
-      const transformed = transformAgent(markdown, profile.name);
-      result = await writeIfChanged(join(destDir, file), transformed, dryRun);
-    } else {
-      result = await copyIfChanged(
-        join(AGENTS_SRC, file),
-        join(destDir, file),
-        dryRun,
-      );
-    }
+    const result = await copyIfChanged(
+      join(srcDir, file),
+      join(destDir, file),
+      dryRun,
+    );
 
     if (result === "copied") copied++;
     else skipped++;

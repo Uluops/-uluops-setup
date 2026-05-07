@@ -105,7 +105,7 @@ describe("installCommands", () => {
     expect(result.removed).toBe(1);
   });
 
-  it("transforms markdown to TOML for gemini-cli harness", async () => {
+  it("copies pre-rendered TOML for gemini-cli harness", async () => {
     const destDir = join(tmpDir, "dest-gemini-commands");
     const profile = {
       name: "gemini-cli",
@@ -115,20 +115,20 @@ describe("installCommands", () => {
     const result = await installCommands(profile, false, false);
 
     expect(result.files.length).toBeGreaterThan(0);
-    // All files should be .toml
+    // Gemini commands include .toml (workflows/pipelines) and .md (agent commands)
     for (const f of result.files) {
-      expect(f).toMatch(/\.toml$/);
+      expect(f).toMatch(/\.(toml|md)$/);
     }
 
-    // Verify TOML structure of an installed file
-    const agentFiles = result.files.filter((f) => f.startsWith("agents/"));
-    if (agentFiles.length > 0) {
+    // Verify TOML structure of an installed workflow file
+    const wfFiles = result.files.filter((f) => f.startsWith("workflows/"));
+    if (wfFiles.length > 0) {
       const tomlContent = await readFile(
-        join(destDir, agentFiles[0]!),
+        join(destDir, wfFiles[0]!),
         "utf-8",
       );
       expect(tomlContent).toContain('description = "');
-      expect(tomlContent).toContain('prompt = """');
+      expect(tomlContent).toContain("prompt = '''");
       // Should not contain $ARGUMENTS — should be {{args}}
       expect(tomlContent).not.toContain("$ARGUMENTS");
     }

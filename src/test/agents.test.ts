@@ -3,13 +3,36 @@ import { writeFile, mkdir, mkdtemp, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { uninstallAgents } from "../steps/agents.js";
+import { uninstallAgents, installAgents } from "../steps/agents.js";
 import { syncAssets } from "../lib/file-ops.js";
+import type { HarnessProfile } from "../harnesses/index.js";
 
 let tmpDir: string;
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-agents-"));
+});
+
+describe("installAgents integration", () => {
+  it("orchestrates agent installation for a profile", async () => {
+    const agentsDir = join(tmpDir, "harness-agents");
+    const profile = {
+      name: "claude-code",
+      displayName: "Claude Code",
+      agentExtension: ".md",
+      paths: {
+        agentsDir,
+      }
+    } as unknown as HarnessProfile;
+
+    // We can't easily point AGENTS_SRC to a temp dir without mocking the module,
+    // but we can verify it attempts to create the directory and returns a result.
+    const result = await installAgents(profile, false, false);
+
+    expect(result.files.length).toBeGreaterThan(0);
+    const created = await readdir(agentsDir);
+    expect(created.length).toBeGreaterThan(0);
+  });
 });
 
 describe("uninstallAgents", () => {
@@ -55,9 +78,8 @@ describe("uninstallAgents", () => {
   });
 });
 
-describe("installAgents (via syncAssets)", () => {
-  // installAgents is a thin wrapper that resolves paths then calls syncAssets.
-  // We test the core behavior directly via syncAssets to avoid fs mock complexity.
+describe("syncAssets", () => {
+  // syncAssets is the underlying library function for agent installation.
 
   it("copies new agent files from source to destination", async () => {
     const srcDir = join(tmpDir, "src-agents");

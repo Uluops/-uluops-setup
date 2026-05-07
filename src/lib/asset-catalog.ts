@@ -55,10 +55,10 @@ async function scanCommandDir(dir: string): Promise<CommandEntry[]> {
 
 /** Get all agent command entries from assets. */
 export async function getAgentCommands(): Promise<CommandEntry[]> {
-  return scanCommandDir(join(ASSETS_DIR, "commands", "agents"));
+  return scanCommandDir(join(ASSETS_DIR, "claude-code", "commands", "agents"));
 }
 
 /** Get all workflow command entries from assets. */
 export async function getWorkflowCommands(): Promise<CommandEntry[]> {
-  return scanCommandDir(join(ASSETS_DIR, "commands", "workflows"));
+  return scanCommandDir(join(ASSETS_DIR, "claude-code", "commands", "workflows"));
 }

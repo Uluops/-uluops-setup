@@ -1,8 +1,8 @@
-import { readFile, readdir, mkdir, unlink } from "node:fs/promises";
+import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged, writeIfChanged } from "../lib/file-ops.js";
+import { copyIfChanged } from "../lib/file-ops.js";
 
 export interface CommandsResult {
   agentCommands: number;
@@ -16,67 +16,28 @@ export interface CommandsResult {
 
 const SUBDIRS = ["agents", "workflows", "pipelines"] as const;
 
-/** Harnesses that support command installation. */
-const SUPPORTED_HARNESSES = new Set(["claude-code", "gemini-cli"]);
-
-// --- Gemini CLI transform ---
-
-/**
- * Strip YAML frontmatter from rendered markdown, returning just the body.
- */
-function stripFrontmatter(markdown: string): string {
-  const first = markdown.indexOf("---");
-  if (first === -1) return markdown;
-  const second = markdown.indexOf("---", first + 3);
-  if (second === -1) return markdown;
-  return markdown.substring(second + 3);
-}
-
-/**
- * Escape a string for use in a TOML basic string (double-quoted).
- */
-function escapeToml(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
-}
-
-/**
- * Transform a Claude Code markdown command to a Gemini CLI TOML command.
- * Strips frontmatter, substitutes $ARGUMENTS → {{args}}, wraps in TOML.
- */
-function transformToGeminiToml(markdown: string, description: string): string {
-  const body = stripFrontmatter(markdown)
-    .replace(/\$ARGUMENTS/g, "{{args}}")
-    .trim();
-
-  // Escape """ in body for TOML multi-line strings
-  const escaped = body.replace(/"""/g, '""\\"');
-
-  return `description = "${escapeToml(description)}"\nprompt = """\n${escaped}\n"""\n`;
-}
-
-/**
- * Extract the description from a markdown command's YAML frontmatter.
- */
-function extractDescription(markdown: string): string {
-  const match = markdown.match(/^description:\s*(.+)$/m);
-  return match?.[1]?.trim() ?? "";
-}
-
-// --- Install ---
-
-/** Install slash-command files, transforming to target format as needed. */
+/** Install pre-rendered command files from harness-specific assets. */
 export async function installCommands(
   profile: HarnessProfile,
   localDefs: boolean,
   dryRun: boolean,
   existingManifestCommands?: string[],
 ): Promise<CommandsResult> {
-  if (!SUPPORTED_HARNESSES.has(profile.name)) {
+  const srcBase = join(ASSETS_DIR, profile.name, "commands");
+  const destBase = localDefs
+    ? join(await findProjectRoot(), "uluops", "commands")
+    : profile.paths.commandsDir;
+
+  // If no commands directory exists for this harness, skip gracefully
+  let hasSrcDir: boolean;
+  try {
+    await readdir(srcBase);
+    hasSrcDir = true;
+  } catch {
+    hasSrcDir = false;
+  }
+
+  if (!hasSrcDir) {
     return {
       agentCommands: 0,
       workflowCommands: 0,
@@ -87,13 +48,6 @@ export async function installCommands(
       skippedReason: "not-supported",
     };
   }
-
-  const srcBase = join(ASSETS_DIR, "commands");
-  const destBase = localDefs
-    ? join(await findProjectRoot(), "uluops", "commands")
-    : profile.paths.commandsDir;
-
-  const needsTransform = profile.name === "gemini-cli";
 
   let agentCommands = 0;
   let workflowCommands = 0;
@@ -111,30 +65,20 @@ export async function installCommands(
 
     let files: string[];
     try {
-      files = (await readdir(srcDir)).filter((f) => f.endsWith(".md"));
+      files = (await readdir(srcDir)).filter(
+        (f) => f.endsWith(".md") || f.endsWith(".toml"),
+      );
     } catch {
       continue;
     }
 
     for (const file of files) {
-      const destFile = needsTransform
-        ? file.replace(/\.md$/, ".toml")
-        : file;
-      const relativePath = `${subdir}/${destFile}`;
-
-      let result: "copied" | "skipped";
-      if (needsTransform) {
-        const markdown = await readFile(join(srcDir, file), "utf-8");
-        const description = extractDescription(markdown);
-        const toml = transformToGeminiToml(markdown, description);
-        result = await writeIfChanged(join(destDir, destFile), toml, dryRun);
-      } else {
-        result = await copyIfChanged(
-          join(srcDir, file),
-          join(destDir, destFile),
-          dryRun,
-        );
-      }
+      const relativePath = `${subdir}/${file}`;
+      const result = await copyIfChanged(
+        join(srcDir, file),
+        join(destDir, file),
+        dryRun,
+      );
 
       if (result === "copied") {
         if (subdir === "agents") agentCommands++;
