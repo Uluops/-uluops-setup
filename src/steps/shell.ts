@@ -29,7 +29,7 @@ export async function writeShellExport(
     content = await readFile(profilePath, "utf-8");
   } catch {
     if (!dryRun) {
-      await atomicWrite(profilePath, block + "\n");
+      await atomicWrite(profilePath, block + "\n", { mode: 0o600 });
     }
     return;
   }

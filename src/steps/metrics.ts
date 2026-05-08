@@ -54,10 +54,6 @@ async function findMetricsSource(): Promise<string | null> {
   return null;
 }
 
-/**
- * Copy agent-metrics dist files to the tool directory.
- * Copies all .js files needed for the hook and CLI.
- */
 /** Copy .js files from a source dir to a dest dir, skipping test files. */
 async function copyJsDir(
   srcDir: string,

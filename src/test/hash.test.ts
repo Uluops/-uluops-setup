@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { fileHash } from "../lib/hash.js";
 
 describe("fileHash", () => {
-  it("returns a 12-character hex string", () => {
+  it("returns a 64-character hex string (full SHA-256)", () => {
     const hash = fileHash("hello world");
-    expect(hash).toMatch(/^[0-9a-f]{12}$/);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("returns same hash for same content", () => {

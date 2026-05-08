@@ -47,10 +47,12 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^7.0.0",
-    "@uluops/agent-metrics": "^0.2.0",
     "chalk": "^5.0.0",
     "commander": "^12.0.0",
     "jsonc-parser": "^3.3.1"
+  },
+  "optionalDependencies": {
+    "@uluops/agent-metrics": "^0.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
