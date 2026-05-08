@@ -96,6 +96,9 @@ export interface HookStrategy {
   check(settingsPath: string): Promise<boolean>;
 }
 
+/** MCP server names installed by UluOps setup. Shared across all harnesses. */
+export const ULUOPS_SERVERS = ["uluops-tracker", "uluops-registry"] as const;
+
 /** Thrown when a harness config file cannot be parsed. */
 export class ConfigParseError extends Error {
   constructor(

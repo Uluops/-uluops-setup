@@ -15,11 +15,8 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, isAbsolute } from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
-import type { HarnessProfile, McpConfigStrategy } from "./types.js";
-import { ConfigParseError } from "./types.js";
+import { ULUOPS_SERVERS, ConfigParseError, type HarnessProfile, type McpConfigStrategy } from "./types.js";
 import { atomicWrite } from "../lib/atomic-write.js";
-
-const ULUOPS_SERVERS = ["uluops-tracker", "uluops-registry"];
 
 interface OpenCodeMcpServer {
   type: string;

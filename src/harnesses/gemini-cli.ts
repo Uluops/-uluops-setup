@@ -11,10 +11,11 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type {
-  HarnessProfile,
-  McpConfigStrategy,
-  HookStrategy,
+import {
+  ULUOPS_SERVERS,
+  type HarnessProfile,
+  type McpConfigStrategy,
+  type HookStrategy,
 } from "./types.js";
 import {
   readConfig,
@@ -29,8 +30,6 @@ import {
   removeUluopsHook,
   hasUluopsHook,
 } from "../lib/settings-merger.js";
-
-const ULUOPS_SERVERS = ["uluops-tracker", "uluops-registry"];
 
 class GeminiMcpConfig implements McpConfigStrategy {
   async read(path: string): Promise<Record<string, unknown>> {

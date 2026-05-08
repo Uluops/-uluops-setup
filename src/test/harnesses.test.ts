@@ -293,8 +293,11 @@ describe("scaffold profiles", () => {
     );
   });
 
-  it("scaffold check() returns false without throwing", () => {
+  it("gemini-cli check() returns false when servers not present", () => {
     expect(geminiCliProfile.mcpConfig.check({})).toBe(false);
-    expect(codexProfile.mcpConfig.check({})).toBe(false);
+  });
+
+  it("codex check() throws HarnessNotTestedError", () => {
+    expect(() => codexProfile.mcpConfig.check({})).toThrow(HarnessNotTestedError);
   });
 });

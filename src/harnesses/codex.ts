@@ -31,7 +31,7 @@ class CodexMcpConfig implements McpConfigStrategy {
     throw new HarnessNotTestedError("Codex (agent format compatibility under review)");
   }
   check(): boolean {
-    return false;
+    throw new HarnessNotTestedError("Codex (MCP config check not supported)");
   }
 }
 

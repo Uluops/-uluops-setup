@@ -63,7 +63,7 @@ describe("resolveApiKey", () => {
 });
 
 describe("credentials file fallback", () => {
-  it("reads API key from credentials.json when env/flag absent", async () => {
+  it("reads apiKey from credentials.json when env/flag absent", async () => {
     const credsDir = join(tmpDir, ".uluops");
     await mkdir(credsDir, { recursive: true });
     await writeFile(
@@ -71,26 +71,45 @@ describe("credentials file fallback", () => {
       JSON.stringify({ default: { apiKey: "ulr_fromfile" } }),
     );
 
-    // Mock homedir to point to our tmpDir
-    vi.stubGlobal("process", {
-      ...process,
-      env: { ...process.env, ULUOPS_API_KEY: "" },
+    // Mock homedir to point to our tmpDir so readCredentialsFile finds our fixture
+    vi.mock("node:os", async (importOriginal) => {
+      const original = await importOriginal<typeof import("node:os")>();
+      return { ...original, homedir: () => tmpDir };
     });
 
-    // Since readCredentialsFile uses homedir() directly, we need to
-    // test via the module. Instead, test the priority chain works:
-    // flag > env > file. We already test flag and env above.
-    // Here we verify the error message when all sources fail.
+    // Re-import to pick up the mocked homedir
+    const { resolveApiKey: resolve } = await import("../steps/auth.js");
+
     vi.stubEnv("ULUOPS_API_KEY", "");
-    await expect(
-      resolveApiKey({ interactive: false, skipValidation: true }),
-    ).rejects.toThrow("No API key found");
+    const result = await resolve({ interactive: false, skipValidation: true });
+    expect(result.apiKey).toBe("ulr_fromfile");
+
+    vi.restoreAllMocks();
   });
 
   it("reads api_key (snake_case) from credentials.json", async () => {
-    // This tests the readCredentialsFile shape — it accepts both apiKey and api_key.
-    // Since we can't easily mock homedir in the module, we verify the
-    // error surfaces correctly for malformed files via the thrown error path.
+    const credsDir = join(tmpDir, ".uluops");
+    await mkdir(credsDir, { recursive: true });
+    await writeFile(
+      join(credsDir, "credentials.json"),
+      JSON.stringify({ default: { api_key: "ulr_snakecase" } }),
+    );
+
+    vi.mock("node:os", async (importOriginal) => {
+      const original = await importOriginal<typeof import("node:os")>();
+      return { ...original, homedir: () => tmpDir };
+    });
+
+    const { resolveApiKey: resolve } = await import("../steps/auth.js");
+
+    vi.stubEnv("ULUOPS_API_KEY", "");
+    const result = await resolve({ interactive: false, skipValidation: true });
+    expect(result.apiKey).toBe("ulr_snakecase");
+
+    vi.restoreAllMocks();
+  });
+
+  it("throws when all sources fail", async () => {
     vi.stubEnv("ULUOPS_API_KEY", "");
     await expect(
       resolveApiKey({ interactive: false, skipValidation: true }),

@@ -21,8 +21,12 @@ function getMetricsToolDir(profile: HarnessProfile): string | null {
 export function getHookCommand(profile: HarnessProfile): string {
   const toolDir = getMetricsToolDir(profile);
   if (!toolDir) throw new Error("No tool dir for this harness");
-  return `"${process.execPath}" "${join(toolDir, "dist", "hook.js")}"`;
-
+  const nodePath = process.execPath;
+  const hookPath = join(toolDir, "dist", "hook.js");
+  if (nodePath.includes('"') || hookPath.includes('"')) {
+    throw new Error("Hook command paths must not contain double-quote characters");
+  }
+  return `"${nodePath}" "${hookPath}"`;
 }
 
 export interface MetricsResult {
