@@ -1,9 +1,10 @@
-import { readFile, access, mkdir, copyFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { readFile, access } from "node:fs/promises";
+import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 import { findProjectRoot, getBackupDir } from "../lib/paths.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { backupFile } from "../lib/file-ops.js";
 
 export interface McpResult {
   configPath: string;
@@ -62,16 +63,7 @@ async function backupConfig(
   harnessName: string,
   configPath: string,
 ): Promise<void> {
-  try {
-    await access(configPath);
-  } catch {
-    return; // Nothing to back up
-  }
-  const backupDir = getBackupDir(harnessName);
-  await mkdir(backupDir, { recursive: true });
-  const filename = basename(configPath);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await copyFile(configPath, join(backupDir, `${filename}.${timestamp}.bak`));
+  await backupFile(configPath, getBackupDir(harnessName));
 }
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {

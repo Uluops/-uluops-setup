@@ -1,6 +1,7 @@
-import { readFile, access, mkdir, copyFile } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { backupFile } from "../lib/file-ops.js";
 import { getUluopsDir } from "../lib/paths.js";
 
 const FENCE_START = "# --- UluOps (managed by @uluops/setup) ---";
@@ -81,14 +82,5 @@ export async function removeShellExport(profilePath: string): Promise<void> {
 }
 
 async function backupProfile(profilePath: string): Promise<void> {
-  try {
-    await access(profilePath);
-  } catch {
-    return; // Nothing to back up
-  }
-  const backupDir = join(getUluopsDir(), "backups", "shell");
-  await mkdir(backupDir, { recursive: true });
-  const filename = basename(profilePath);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await copyFile(profilePath, join(backupDir, `${filename}.${timestamp}.bak`));
+  await backupFile(profilePath, join(getUluopsDir(), "backups", "shell"));
 }

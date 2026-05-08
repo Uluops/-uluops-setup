@@ -218,7 +218,7 @@ describe("probeHookSupport", () => {
   });
 
   it("returns supported for known hook types", () => {
-    for (const t of ["PreToolUse", "PostToolUse", "Notification", "Stop"]) {
+    for (const t of ["PreToolUse", "PostToolUse", "Notification", "Stop", "AfterTool"]) {
       process.env["ULUOPS_HOOK_TYPE"] = t;
       const result = probeHookSupport();
       expect(result.hookType).toBe(t);

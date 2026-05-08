@@ -90,7 +90,7 @@ describe("metrics hook integration", () => {
 
   it("throws on malformed settings to prevent silent data loss", async () => {
     await writeFile(settingsPath, "broken json!!!");
-    await expect(readSettings(settingsPath)).rejects.toThrow(SyntaxError);
+    await expect(readSettings(settingsPath)).rejects.toThrow("invalid JSON");
   });
 
   it("is idempotent — installing hook twice doesn't duplicate", async () => {

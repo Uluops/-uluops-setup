@@ -119,11 +119,10 @@ async function callApi<T extends object>(
     if (typeof body !== "object" || body === null) {
       throw new Error("Unexpected API response shape");
     }
-    const validatedBody = body as T;
-    if (validate && !validate(validatedBody)) {
+    if (validate && !validate(body as T)) {
       throw new Error("API response failed structural validation");
     }
-    return validatedBody;
+    return body as T;
   }
 
   // Handle known error codes

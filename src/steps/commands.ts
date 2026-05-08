@@ -2,7 +2,7 @@ import { readdir, mkdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged } from "../lib/file-ops.js";
+import { copyIfChanged, unlinkFiles } from "../lib/file-ops.js";
 
 export interface CommandsResult {
   agentCommands: number;
@@ -124,6 +124,5 @@ export async function uninstallCommands(
   files: string[],
   defsPath: string,
 ): Promise<number> {
-  const { unlinkFiles } = await import("../lib/file-ops.js");
   return unlinkFiles(join(defsPath, "commands"), files);
 }

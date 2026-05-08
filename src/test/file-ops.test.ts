@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { writeFile, readFile, mkdir, mkdtemp, readdir } from "node:fs/promises";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { writeFile, readFile, mkdir, mkdtemp, readdir, access, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { copyIfChanged, unlinkFiles, syncAssets } from "../lib/file-ops.js";
+import { copyIfChanged, unlinkFiles, syncAssets, writeIfChanged, backupFile } from "../lib/file-ops.js";
+import { atomicWrite } from "../lib/atomic-write.js";
 
 let tmpDir: string;
 let srcDir: string;
@@ -128,5 +129,67 @@ describe("syncAssets", () => {
     });
     expect(result.copied).toBe(1);
     expect(await readdir(newDest)).toContain("a.md");
+  });
+});
+
+describe("writeIfChanged", () => {
+  it("writes file when destination does not exist", async () => {
+    const dest = join(destDir, "new.md");
+    const result = await writeIfChanged(dest, "hello", false);
+    expect(result).toBe("copied");
+    expect(await readFile(dest, "utf-8")).toBe("hello");
+  });
+
+  it("skips when content is identical", async () => {
+    const dest = join(destDir, "same.md");
+    await writeFile(dest, "unchanged");
+    const result = await writeIfChanged(dest, "unchanged", false);
+    expect(result).toBe("skipped");
+  });
+
+  it("writes when content differs", async () => {
+    const dest = join(destDir, "diff.md");
+    await writeFile(dest, "old");
+    const result = await writeIfChanged(dest, "new", false);
+    expect(result).toBe("copied");
+    expect(await readFile(dest, "utf-8")).toBe("new");
+  });
+
+  it("does not write in dry-run mode", async () => {
+    const dest = join(destDir, "dryrun.md");
+    const result = await writeIfChanged(dest, "content", true);
+    expect(result).toBe("copied");
+    await expect(access(dest)).rejects.toThrow();
+  });
+});
+
+describe("backupFile", () => {
+  it("creates backup with timestamp suffix", async () => {
+    const src = join(srcDir, "config.json");
+    await writeFile(src, '{"key": "value"}');
+    const backupDir = join(tmpDir, "backups");
+
+    await backupFile(src, backupDir);
+
+    const files = await readdir(backupDir);
+    expect(files.length).toBe(1);
+    expect(files[0]).toMatch(/^config\.json\.\d{4}-\d{2}-\d{2}T.*\.bak$/);
+  });
+
+  it("no-ops when source does not exist", async () => {
+    const backupDir = join(tmpDir, "backups");
+    await backupFile(join(srcDir, "missing.json"), backupDir);
+    await expect(access(backupDir)).rejects.toThrow();
+  });
+});
+
+describe("atomicWrite", () => {
+  it("cleans up temp file on rename failure", async () => {
+    const dest = join(tmpDir, "nodir", "nested", "file.json");
+    // rename will fail because parent directory doesn't exist
+    await expect(atomicWrite(dest, "content")).rejects.toThrow();
+    // Temp file should not remain
+    const files = await readdir(tmpDir);
+    expect(files.every((f) => !f.includes(".uluops-tmp"))).toBe(true);
   });
 });

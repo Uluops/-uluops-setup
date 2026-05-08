@@ -114,6 +114,6 @@ describe("mergeUluopsMcp logic", () => {
 
   it("throws on malformed config to prevent silent data loss", async () => {
     await writeFile(configPath, "not json{{{");
-    await expect(readConfig(configPath)).rejects.toThrow(SyntaxError);
+    await expect(readConfig(configPath)).rejects.toThrow("invalid JSON");
   });
 });

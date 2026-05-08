@@ -30,7 +30,7 @@ describe("readConfig", () => {
   it("throws on malformed JSON to prevent silent data loss", async () => {
     const path = join(tmpDir, "bad.json");
     await writeFile(path, "{ invalid }");
-    await expect(readConfig(path)).rejects.toThrow(SyntaxError);
+    await expect(readConfig(path)).rejects.toThrow("invalid JSON");
   });
 
   it("parses valid JSON correctly", async () => {

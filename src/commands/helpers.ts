@@ -5,9 +5,13 @@ import { detect } from "../steps/detect.js";
 import { signup } from "../steps/signup.js";
 import { resolveApiKey } from "../steps/auth.js";
 import { installMcp } from "../steps/mcp.js";
+import type { McpResult } from "../steps/mcp.js";
 import { installAgents } from "../steps/agents.js";
+import type { AgentsResult } from "../steps/agents.js";
 import { installCommands } from "../steps/commands.js";
+import type { CommandsResult } from "../steps/commands.js";
 import { installMetrics } from "../steps/metrics.js";
+import type { MetricsResult } from "../steps/metrics.js";
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
 import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
@@ -21,7 +25,7 @@ export async function initContext(opts: {
   signup: boolean;
   skipValidation: boolean;
   yes: boolean;
-}) {
+}): Promise<{ env: Awaited<ReturnType<typeof detect>>; apiKey: string }> {
   const env = await detect();
   let apiKey: string;
   try {
@@ -55,7 +59,7 @@ export async function configureMcpStep(
   profile: HarnessProfile,
   apiKey: string,
   opts: { scope: "global" | "local"; dryRun: boolean },
-) {
+): Promise<McpResult> {
   const res = await installMcp(profile, apiKey, opts.scope, opts.dryRun);
   ok(`MCP config → ${res.configPath} (2 servers)`);
   for (const w of res.packageWarnings) warn(w);
@@ -67,7 +71,7 @@ export async function installAgentsDefs(
   profile: HarnessProfile,
   opts: { localDefs: boolean; dryRun: boolean },
   prev?: string[],
-) {
+): Promise<AgentsResult> {
   const res = await installAgents(profile, opts.localDefs, opts.dryRun, prev);
   const parts: string[] = [];
   if (res.copied > 0) parts.push(`${res.copied} copied`);
@@ -87,7 +91,7 @@ export async function installCommandsDefs(
   profile: HarnessProfile,
   opts: { localDefs: boolean; dryRun: boolean },
   prev?: string[],
-) {
+): Promise<CommandsResult> {
   const res = await installCommands(
     profile,
     opts.localDefs,
@@ -120,7 +124,7 @@ export async function installCommandsDefs(
 export async function configureMetricsStep(
   profile: HarnessProfile,
   opts: { dryRun: boolean },
-) {
+): Promise<MetricsResult> {
   if (!profile.hooks) {
     info(
       chalk.dim(
@@ -177,7 +181,7 @@ export async function configureShell(
   env: { shellProfile: string | null },
   apiKey: string,
   opts: { shell: boolean; yes: boolean; dryRun: boolean },
-) {
+): Promise<boolean> {
   let modified = false;
   if (opts.shell && env.shellProfile) {
     if (!opts.yes && !opts.dryRun) {

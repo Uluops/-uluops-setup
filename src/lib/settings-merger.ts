@@ -72,7 +72,11 @@ export async function readSettings(path: string): Promise<HarnessSettings> {
   } catch {
     return {}; // File doesn't exist — fresh config
   }
-  return JSON.parse(raw) as HarnessSettings;
+  try {
+    return JSON.parse(raw) as HarnessSettings;
+  } catch {
+    throw new Error(`Failed to parse settings at ${path} — file contains invalid JSON`);
+  }
 }
 
 /**

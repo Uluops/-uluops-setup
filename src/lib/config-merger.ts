@@ -60,7 +60,11 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
   } catch {
     return {}; // File doesn't exist — fresh config
   }
-  return JSON.parse(raw) as ClaudeConfig;
+  try {
+    return JSON.parse(raw) as ClaudeConfig;
+  } catch {
+    throw new Error(`Failed to parse config at ${path} — file contains invalid JSON`);
+  }
 }
 
 /**
