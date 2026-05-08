@@ -68,6 +68,7 @@ class ClaudeCodeHooks implements HookStrategy {
   ): Promise<boolean> {
     if (dryRun) return true;
     const settings = await readSettings(settingsPath);
+    // Claude Code uses SubagentStop as the default event for auto-save
     const merged = mergeUluopsHook(settings, hookCommand);
     await writeSettings(settingsPath, merged);
     return true;

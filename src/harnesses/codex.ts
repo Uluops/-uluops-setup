@@ -19,16 +19,16 @@ import { HarnessNotTestedError } from "./types.js";
 
 class CodexMcpConfig implements McpConfigStrategy {
   async read(): Promise<Record<string, unknown>> {
-    throw new HarnessNotTestedError("Codex");
+    throw new HarnessNotTestedError("Codex (agent format compatibility under review)");
   }
   merge(): Record<string, unknown> {
-    throw new HarnessNotTestedError("Codex");
+    throw new HarnessNotTestedError("Codex (agent format compatibility under review)");
   }
   remove(): Record<string, unknown> {
-    throw new HarnessNotTestedError("Codex");
+    throw new HarnessNotTestedError("Codex (agent format compatibility under review)");
   }
   async write(): Promise<void> {
-    throw new HarnessNotTestedError("Codex");
+    throw new HarnessNotTestedError("Codex (agent format compatibility under review)");
   }
   check(): boolean {
     return false;

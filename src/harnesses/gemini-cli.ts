@@ -1,38 +1,101 @@
 /**
- * Gemini CLI Harness Profile (Scaffold)
+ * Gemini CLI Harness Profile
  *
  * Paths and metadata are verified from vendor docs.
  * MCP config uses `mcpServers` key (same shape as Claude Code)
  * but at a different file path (~/.gemini/settings.json).
  *
- * NOT YET TESTED with UluOps agents. McpConfigStrategy throws
- * until integration testing is complete.
- *
- * Note: Gemini CLI cannot have underscores in MCP server names
- * (FQN format mcp_serverName_toolName uses underscore as delimiter).
- * Our names use hyphens — safe.
+ * Gemini CLI requires `trust: true` in MCP server config to
+ * allow automatic tool execution without confirmation prompts.
  */
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { HarnessProfile, McpConfigStrategy } from "./types.js";
-import { HarnessNotTestedError } from "./types.js";
+import type {
+  HarnessProfile,
+  McpConfigStrategy,
+  HookStrategy,
+} from "./types.js";
+import {
+  readConfig,
+  mergeUluopsMcp,
+  removeUluopsMcp,
+  writeConfig,
+} from "../lib/config-merger.js";
+import {
+  readSettings,
+  writeSettings,
+  mergeUluopsHook,
+  removeUluopsHook,
+  hasUluopsHook,
+} from "../lib/settings-merger.js";
+
+const ULUOPS_SERVERS = ["uluops-tracker", "uluops-registry"];
 
 class GeminiMcpConfig implements McpConfigStrategy {
-  async read(): Promise<Record<string, unknown>> {
-    throw new HarnessNotTestedError("Gemini CLI");
+  async read(path: string): Promise<Record<string, unknown>> {
+    return readConfig(path);
   }
-  merge(): Record<string, unknown> {
-    throw new HarnessNotTestedError("Gemini CLI");
+
+  merge(
+    config: Record<string, unknown>,
+    apiKey: string,
+  ): Record<string, unknown> {
+    // Gemini CLI requires trust: true for a smooth experience
+    return mergeUluopsMcp(config, apiKey, true);
   }
-  remove(): Record<string, unknown> {
-    throw new HarnessNotTestedError("Gemini CLI");
+
+  remove(config: Record<string, unknown>): Record<string, unknown> {
+    return removeUluopsMcp(config);
   }
-  async write(): Promise<void> {
-    throw new HarnessNotTestedError("Gemini CLI");
+
+  async write(
+    path: string,
+    config: Record<string, unknown>,
+  ): Promise<void> {
+    await writeConfig(path, config);
   }
-  check(): boolean {
-    return false;
+
+  check(config: Record<string, unknown>): boolean {
+    const servers = config["mcpServers"] as
+      | Record<string, unknown>
+      | undefined;
+    if (!servers) return false;
+    return ULUOPS_SERVERS.every((name) => name in servers);
+  }
+}
+
+class GeminiHooks implements HookStrategy {
+  private static readonly HOOK_TYPE = "AfterTool";
+  private static readonly MATCHER = "invoke_agent";
+
+  async install(
+    settingsPath: string,
+    hookCommand: string,
+    dryRun: boolean,
+  ): Promise<boolean> {
+    if (dryRun) return true;
+    const settings = await readSettings(settingsPath);
+    const merged = mergeUluopsHook(
+      settings,
+      hookCommand,
+      GeminiHooks.HOOK_TYPE,
+      GeminiHooks.MATCHER,
+    );
+    await writeSettings(settingsPath, merged);
+    return true;
+  }
+
+  async remove(settingsPath: string, dryRun: boolean): Promise<void> {
+    if (dryRun) return;
+    const settings = await readSettings(settingsPath);
+    const cleaned = removeUluopsHook(settings, GeminiHooks.HOOK_TYPE);
+    await writeSettings(settingsPath, cleaned);
+  }
+
+  async check(settingsPath: string): Promise<boolean> {
+    const settings = await readSettings(settingsPath);
+    return hasUluopsHook(settings, GeminiHooks.HOOK_TYPE);
   }
 }
 
@@ -51,9 +114,9 @@ export const geminiCliProfile: HarnessProfile = {
     localMcpConfig: ".gemini/settings.json",
     agentsDir: join(home, "agents"),
     commandsDir: join(home, "commands"),
-    settingsPath: null,
-    toolsDir: null,
+    settingsPath: join(home, "settings.json"),
+    toolsDir: join(home, "tools", "agent-metrics"),
   },
   mcpConfig: new GeminiMcpConfig(),
-  hooks: null,
+  hooks: new GeminiHooks(),
 };

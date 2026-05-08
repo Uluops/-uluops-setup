@@ -59,15 +59,28 @@ async function isProjectMarker(dir: string): Promise<boolean> {
   return false;
 }
 
+/** Validate an env-var-supplied path: must be absolute and contain no traversal sequences. */
+function validateEnvPath(value: string, varName: string): string {
+  if (!isAbsolute(value)) {
+    throw new Error(`${varName} must be an absolute path, got: ${value}`);
+  }
+  if (value.includes("..")) {
+    throw new Error(`${varName} must not contain traversal sequences: ${value}`);
+  }
+  return value;
+}
+
 /** Return the Claude config home directory (~/.claude by default, or CLAUDE_HOME env override). */
 export function getClaudeHome(): string {
-  return process.env["CLAUDE_HOME"] ?? join(homedir(), ".claude");
+  const envHome = process.env["CLAUDE_HOME"];
+  if (envHome) return validateEnvPath(envHome, "CLAUDE_HOME");
+  return join(homedir(), ".claude");
 }
 
 /** Return the path to Claude's global config file (~/.claude.json by default, or CLAUDE_JSON_PATH env override). */
 export function getClaudeJsonPath(): string {
   const envPath = process.env["CLAUDE_JSON_PATH"];
-  if (envPath) return envPath;
+  if (envPath) return validateEnvPath(envPath, "CLAUDE_JSON_PATH");
   return join(homedir(), ".claude.json");
 }
 

@@ -34,6 +34,13 @@ export async function detect(): Promise<Environment> {
     os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;
+  const majorVersion = parseInt(nodeVersion.slice(1).split(".")[0] ?? "0", 10);
+
+  if (majorVersion < 20) {
+    throw new Error(
+      `Unsupported Node.js version: ${nodeVersion}. @uluops/setup requires Node.js 20 or higher.`,
+    );
+  }
 
   let claudeHomeExists = false;
   try {

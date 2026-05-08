@@ -1,4 +1,4 @@
-import { readdir, access } from "node:fs/promises";
+import { readdir, access, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { loadManifest, type HarnessManifest } from "../lib/manifest.js";
 import { getHealthTimeout } from "../lib/health.js";
@@ -25,7 +25,26 @@ async function verifyHarness(
     return false;
   }
 
-  // MCP config
+  // 1. Readiness Check (Harness Restart)
+  try {
+    const configStat = await stat(hm.mcpConfigPath);
+    const installedTime = new Date(hm.installedAt).getTime();
+    const configTime = configStat.mtimeMs;
+
+    // If config was modified AFTER install, it's a proxy for the harness having read it.
+    // We add a 100ms buffer to handle near-simultaneous writes.
+    const isReady = configTime > (installedTime + 100);
+
+    checks.push({
+      label: `[${profile.displayName}] Readiness`,
+      passed: true,
+      detail: isReady ? "Active (loaded)" : "Waiting for restart",
+    });
+  } catch {
+    // If we can't stat it, we'll catch the error in the MCP config check below.
+  }
+
+  // 2. MCP config
   try {
     const config = await profile.mcpConfig.read(hm.mcpConfigPath);
     if (profile.mcpConfig.check(config)) {

@@ -19,7 +19,7 @@ interface HookMatcher {
   hooks: HookEntry[];
 }
 
-export interface ClaudeSettings {
+export interface HarnessSettings {
   permissions?: Record<string, unknown>;
   hooks?: Record<string, HookMatcher[]>;
   [key: string]: unknown;
@@ -29,7 +29,7 @@ export interface ClaudeSettings {
 const ULUOPS_HOOK_MARKER = "tools/agent-metrics";
 
 /** Supported hook event types in Claude Code. Update when Claude Code adds/renames types. */
-const SUPPORTED_HOOK_TYPES = new Set([
+const CLAUDE_HOOK_TYPES = new Set([
   "SubagentStop",
   "PreToolUse",
   "PostToolUse",
@@ -38,7 +38,7 @@ const SUPPORTED_HOOK_TYPES = new Set([
 ]);
 
 /** Configurable hook type via env var. Falls back to SubagentStop. */
-function getHookEventType(): string {
+function getDefaultHookEventType(): string {
   return process.env["ULUOPS_HOOK_TYPE"] ?? "SubagentStop";
 }
 
@@ -49,15 +49,15 @@ export interface HookProbeResult {
 }
 
 /** Check whether the configured hook event type is in the known supported set. Returns the resolved hook type and a warning if unsupported. */
-export function probeHookSupport(): HookProbeResult {
-  const hookType = getHookEventType();
-  if (SUPPORTED_HOOK_TYPES.has(hookType)) {
+export function probeHookSupport(hookTypeOverride?: string): HookProbeResult {
+  const hookType = hookTypeOverride ?? getDefaultHookEventType();
+  if (CLAUDE_HOOK_TYPES.has(hookType) || hookType === "AfterTool") {
     return { hookType, supported: true };
   }
   return {
     hookType,
     supported: false,
-    warning: `Hook type "${hookType}" is not in the known supported set {${[...SUPPORTED_HOOK_TYPES].join(", ")}}. Metrics may silently fail if this hook type does not exist in Claude Code.`,
+    warning: `Hook type "${hookType}" is not in the known supported set {${[...CLAUDE_HOOK_TYPES].join(", ")}, AfterTool}. Metrics may silently fail if this hook type does not exist in the harness.`,
   };
 }
 
@@ -65,14 +65,14 @@ export function probeHookSupport(): HookProbeResult {
  * Read an existing settings.json, or return empty object if it doesn't exist.
  * Throws on malformed JSON to prevent silent data loss during merge+write.
  */
-export async function readSettings(path: string): Promise<ClaudeSettings> {
+export async function readSettings(path: string): Promise<HarnessSettings> {
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
   } catch {
     return {}; // File doesn't exist — fresh config
   }
-  return JSON.parse(raw) as ClaudeSettings;
+  return JSON.parse(raw) as HarnessSettings;
 }
 
 /**
@@ -80,20 +80,22 @@ export async function readSettings(path: string): Promise<ClaudeSettings> {
  */
 export async function writeSettings(
   path: string,
-  settings: ClaudeSettings,
+  settings: HarnessSettings,
 ): Promise<void> {
   await atomicWrite(path, JSON.stringify(settings, null, 2) + "\n");
 }
 
 /**
- * Merge the UluOps SubagentStop hook into settings, preserving all other
+ * Merge the UluOps hook into settings, preserving all other
  * hooks and settings. If a UluOps hook already exists, it is replaced.
  */
 export function mergeUluopsHook(
-  settings: ClaudeSettings,
+  settings: HarnessSettings,
   hookCommand: string,
-): ClaudeSettings {
-  const hookType = getHookEventType();
+  hookTypeOverride?: string,
+  matcher?: string,
+): HarnessSettings {
+  const hookType = hookTypeOverride ?? getDefaultHookEventType();
   const hooks = settings.hooks ?? {};
   const existing = hooks[hookType] ?? [];
 
@@ -111,6 +113,10 @@ export function mergeUluopsHook(
     ],
   };
 
+  if (matcher) {
+    uluopsHook.matcher = matcher;
+  }
+
   return {
     ...settings,
     hooks: {
@@ -121,11 +127,14 @@ export function mergeUluopsHook(
 }
 
 /**
- * Remove UluOps hook entries from settings. If SubagentStop becomes empty,
+ * Remove UluOps hook entries from settings. If a hook type becomes empty,
  * the key is removed. If hooks becomes empty, the key is removed.
  */
-export function removeUluopsHook(settings: ClaudeSettings): ClaudeSettings {
-  const hookType = getHookEventType();
+export function removeUluopsHook(
+  settings: HarnessSettings,
+  hookTypeOverride?: string,
+): HarnessSettings {
+  const hookType = hookTypeOverride ?? getDefaultHookEventType();
   const hooks = settings.hooks;
   if (!hooks) return settings;
 
@@ -156,8 +165,11 @@ export function removeUluopsHook(settings: ClaudeSettings): ClaudeSettings {
 /**
  * Check if a UluOps hook is configured in settings.
  */
-export function hasUluopsHook(settings: ClaudeSettings): boolean {
-  const hookType = getHookEventType();
+export function hasUluopsHook(
+  settings: HarnessSettings,
+  hookTypeOverride?: string,
+): boolean {
+  const hookType = hookTypeOverride ?? getDefaultHookEventType();
   const hookEntries = settings.hooks?.[hookType];
   if (!hookEntries) return false;
   return hookEntries.some((m) =>

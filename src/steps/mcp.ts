@@ -75,9 +75,10 @@ async function backupConfig(
 }
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {
-  const gitignorePath = join(process.cwd(), ".gitignore");
+  const root = await findProjectRoot();
+  const gitignorePath = join(root, ".gitignore");
   try {
-    await access(join(process.cwd(), ".git"));
+    await access(join(root, ".git"));
   } catch {
     return;
   }

@@ -16,8 +16,60 @@ beforeEach(async () => {
 // but also test installMcp/uninstallMcp integration with real files.
 
 import { mergeUluopsMcp, removeUluopsMcp, readConfig, writeConfig } from "../lib/config-merger.js";
+import { installMcp, uninstallMcp } from "../steps/mcp.js";
+import type { HarnessProfile } from "../harnesses/index.js";
 
 describe("installMcp integration", () => {
+  it("orchestrates MCP installation for a profile", async () => {
+    const profile = {
+      name: "claude-code",
+      displayName: "Claude Code",
+      paths: {
+        globalMcpConfig: configPath,
+      },
+      mcpConfig: {
+        read: readConfig,
+        merge: mergeUluopsMcp,
+        write: writeConfig,
+      }
+    } as unknown as HarnessProfile;
+
+    const result = await installMcp(profile, "ulr_test123", "global", false);
+
+    expect(result.configPath).toBe(configPath);
+    const written = JSON.parse(await readFile(configPath, "utf-8"));
+    expect(written.mcpServers["uluops-tracker"]).toBeDefined();
+  });
+});
+
+describe("uninstallMcp integration", () => {
+  it("orchestrates MCP removal for a profile", async () => {
+    const profile = {
+      name: "claude-code",
+      displayName: "Claude Code",
+      paths: {
+        globalMcpConfig: configPath,
+      },
+      mcpConfig: {
+        read: readConfig,
+        merge: mergeUluopsMcp,
+        remove: removeUluopsMcp,
+        write: writeConfig,
+      }
+    } as unknown as HarnessProfile;
+
+    // First install
+    await installMcp(profile, "ulr_test123", "global", false);
+
+    // Then uninstall
+    await uninstallMcp(profile, configPath);
+
+    const written = JSON.parse(await readFile(configPath, "utf-8"));
+    expect(written.mcpServers?.["uluops-tracker"]).toBeUndefined();
+  });
+});
+
+describe("mergeUluopsMcp logic", () => {
   it("creates config file from scratch", async () => {
     const config = await readConfig(configPath);
     expect(config).toEqual({});
@@ -28,7 +80,7 @@ describe("installMcp integration", () => {
     const written = JSON.parse(await readFile(configPath, "utf-8"));
     expect(written.mcpServers["uluops-tracker"]).toBeDefined();
     expect(written.mcpServers["uluops-registry"]).toBeDefined();
-    expect(written.mcpServers["uluops-tracker"].env.ULUOPS_TRACKER_API_KEY).toBe("ulr_test123");
+    expect(written.mcpServers["uluops-tracker"].env.ULUOPS_API_KEY).toBe("ulr_test123");
   });
 
   it("preserves existing config keys through install/uninstall cycle", async () => {

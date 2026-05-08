@@ -62,11 +62,10 @@ export async function signup(): Promise<AuthResult> {
     `${API_BASE}/auth/register`,
     "POST",
     { email, password: pwd },
+    undefined,
+    (res) => !!res.data?.sessionToken && typeof res.data.user?.email === "string",
   );
 
-  if (!registerRes.data?.sessionToken) {
-    throw new Error("Registration succeeded but response missing session token");
-  }
   const sessionToken = registerRes.data.sessionToken;
 
   // Create API key using the session
@@ -75,11 +74,9 @@ export async function signup(): Promise<AuthResult> {
     "POST",
     { name: "Setup CLI" },
     sessionToken,
+    (res) => !!res.data?.key,
   );
 
-  if (!keyRes.data?.key) {
-    throw new Error("API key creation succeeded but response missing key");
-  }
   return {
     apiKey: keyRes.data.key,
     email: registerRes.data.user?.email ?? email,
@@ -91,6 +88,7 @@ async function callApi<T extends object>(
   method: string,
   body: Record<string, unknown>,
   bearerToken?: string,
+  validate?: (res: T) => boolean,
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -121,7 +119,11 @@ async function callApi<T extends object>(
     if (typeof body !== "object" || body === null) {
       throw new Error("Unexpected API response shape");
     }
-    return body as T;
+    const validatedBody = body as T;
+    if (validate && !validate(validatedBody)) {
+      throw new Error("API response failed structural validation");
+    }
+    return validatedBody;
   }
 
   // Handle known error codes

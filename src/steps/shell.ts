@@ -1,5 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, access, mkdir, copyFile } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { getUluopsDir } from "../lib/paths.js";
 
 const FENCE_START = "# --- UluOps (managed by @uluops/setup) ---";
 const FENCE_END = "# --- /UluOps ---";
@@ -34,6 +36,10 @@ export async function writeShellExport(
   const startIdx = content.indexOf(FENCE_START);
   const endIdx = content.indexOf(FENCE_END);
 
+  if (!dryRun) {
+    await backupProfile(profilePath);
+  }
+
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     // Replace existing fenced block (use last FENCE_END after FENCE_START to handle duplicates)
     const before = content.slice(0, startIdx);
@@ -64,6 +70,7 @@ export async function removeShellExport(profilePath: string): Promise<void> {
   const endIdx = content.indexOf(FENCE_END);
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    await backupProfile(profilePath);
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + FENCE_END.length);
     await atomicWrite(
@@ -71,4 +78,17 @@ export async function removeShellExport(profilePath: string): Promise<void> {
       (before + after).replace(/\n{3,}/g, "\n\n"),
     );
   }
+}
+
+async function backupProfile(profilePath: string): Promise<void> {
+  try {
+    await access(profilePath);
+  } catch {
+    return; // Nothing to back up
+  }
+  const backupDir = join(getUluopsDir(), "backups", "shell");
+  await mkdir(backupDir, { recursive: true });
+  const filename = basename(profilePath);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  await copyFile(profilePath, join(backupDir, `${filename}.${timestamp}.bak`));
 }

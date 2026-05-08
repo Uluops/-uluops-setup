@@ -13,7 +13,7 @@
 
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { HarnessProfile, McpConfigStrategy } from "./types.js";
 import { ConfigParseError } from "./types.js";
@@ -129,8 +129,18 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
   }
 }
 
-const xdgConfig =
-  process.env["XDG_CONFIG_HOME"] ?? join(homedir(), ".config");
+const xdgConfig = (() => {
+  const env = process.env["XDG_CONFIG_HOME"];
+  if (env) {
+    if (!isAbsolute(env) || env.includes("..")) {
+      throw new Error(
+        `XDG_CONFIG_HOME must be an absolute path without traversal: ${env}`,
+      );
+    }
+    return env;
+  }
+  return join(homedir(), ".config");
+})();
 const home = join(xdgConfig, "opencode");
 
 export const opencodeProfile: HarnessProfile = {

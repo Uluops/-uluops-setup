@@ -10,13 +10,15 @@ Zero-friction installer for [UluOps](https://uluops.ai) agentic harnesses. One c
 npx @uluops/setup
 ```
 
+> **⚠️ Windows Users:** Native Windows is not yet supported. Please use **WSL2 (Ubuntu)** and run the setup inside your WSL environment.
+
 ## Supported harnesses
 
 | Harness | Status | Alias | Config |
 |---------|--------|-------|--------|
 | Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
 | OpenCode | Fully supported | `oc` | `~/.config/opencode/opencode.json` |
-| Gemini CLI | Agents + Commands | `gemini` | `~/.gemini/settings.json` |
+| Gemini CLI | Fully supported | `gemini` | `~/.gemini/settings.json` |
 | Codex | Coming soon | — | `~/.codex/config.toml` |
 
 ```bash
@@ -48,7 +50,7 @@ The installer runs five steps in sequence:
 1. **Authenticate** — Validates your API key (or creates an account with `--signup`)
 2. **MCP config** — Writes tracker and registry server entries to the harness config
 3. **Definitions** — Copies pre-rendered agent definition files
-4. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code only)
+4. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
 5. **Health check** — Verifies both API endpoints are reachable
 
 ## Usage
@@ -67,16 +69,7 @@ npx @uluops/setup --signup
 
 You'll be prompted for email and password. Account + API key are created automatically.
 
-**Restart your harness after setup to load agents.**
-
-### API key resolution
-
-The installer checks these sources in order:
-
-1. `--api-key <key>` flag
-2. `ULUOPS_API_KEY` environment variable
-3. `~/.uluops/credentials.json` (existing CLI auth)
-4. Interactive prompt
+> **🛑 IMPORTANT:** You must restart your harness (e.g., restart Claude Code) after setup to load the new agents and commands.
 
 ### Options
 
@@ -96,6 +89,42 @@ npx @uluops/setup [options]
   --uninstall          Remove all UluOps-managed artifacts
   --dry-run            Show what would happen without making changes
   -y, --yes            Skip confirmations
+```
+
+### Advanced Commands
+
+#### Preview available agents (`--list`)
+Displays all agents and workflows included in the current version of the setup tool.
+
+```text
+  ⟨u⟩ ulu·ops v0.4.0 — available agents and workflows
+
+  WORKFLOWS
+  /workflows:post-implementation   Iterative validation after coding
+  /workflows:pre-implementation    Design validation before implementation
+  /workflows:prompt-audit          Strategic prompt quality audit
+
+  AGENTS (run individually)                          MODEL
+  /agents:code-validator           Validate cod...  sonnet
+  /agents:type-safety              Deep TypeScr...  sonnet
+  /agents:security-analyst         Comprehensiv...  sonnet
+  /agents:test-architect           Validate tes...  sonnet
+  ...
+```
+
+#### Check installation health (`--verify`)
+Validates your current installation against the local manifest and checks API connectivity.
+
+```text
+  ⟨u⟩ ulu·ops Installation Check v0.4.0
+
+  ✓ Manifest found (~/.uluops/manifest.json)
+  ✓ All 23 agents present in ~/.claude/agents/
+  ✓ MCP servers configured in ~/.claude.json
+  ✓ API connectivity: Tracker (Online)
+  ✓ API connectivity: Registry (Online)
+
+  All checks passed.
 ```
 
 ### Examples
@@ -118,31 +147,7 @@ npx @uluops/setup --dry-run --api-key ulr_abc123
 
 # Persist API key in shell profile (~/.zshrc, ~/.bashrc, etc.)
 npx @uluops/setup --shell
-
-# Preview what's included without installing
-npx @uluops/setup --list
-
-# Check existing installation (manifest + file presence + API connectivity)
-npx @uluops/setup --verify
-
-# Clean removal
-npx @uluops/setup --uninstall
 ```
-
-## What's included
-
-### Agents & Workflows
-
-Setup installs the starter set of agent and workflow slash commands. Run `npx @uluops/setup --list` to see what's included.
-
-> Browse more agents, workflows, and pipelines at [registry.uluops.ai](https://registry.uluops.ai). Pipelines are available via the registry API and MCP tools — they are not installed locally.
-
-### MCP servers
-
-Both servers use `npx -y` so there's no global install required:
-
-- **uluops-tracker** — Validation run tracking, issue management, analytics
-- **uluops-registry** — Agent definition registry, versioning, rendering
 
 ## How updates work
 
@@ -155,6 +160,13 @@ Re-running `npx @uluops/setup` is safe and idempotent:
 
 Setup manages four surfaces: agent files, command files, MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can cleanly reverse all changes. The manifest supports multiple harnesses — each gets its own installation state.
 
+## Troubleshooting
+
+- **Agents not appearing:** Ensure you have restarted your harness (Claude Code, etc.) after running setup. For Claude Code, simply exit and restart the CLI.
+- **MCP errors:** If the harness fails to start the MCP servers, ensure `npx` is available in your PATH. You can check your config at `~/.claude.json` or `~/.config/opencode/opencode.json`.
+- **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). If you are behind a corporate proxy, you may need to set `HTTPS_PROXY`.
+- **Windows issues:** Remember that native Windows is not supported; you must run the installer and your harness within **WSL2**.
+
 ## Uninstall
 
 ```
@@ -165,17 +177,10 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, and she
 
 ## Requirements
 
-- Node.js >= 20
-- At least one supported harness installed (Claude Code or OpenCode)
-- UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
+- **Node.js:** >= 20.0.0
+- **Platform:** Linux, macOS, or WSL2 (native Windows not supported)
+- **Harness:** Claude Code, OpenCode, or Gemini CLI
+- **Auth:** UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
 
-> **Global install:** If you install globally with `npm i -g @uluops/setup`, the binary is `uluops-setup`.
-
-## Platform support
-
-| Platform | Status |
-|----------|--------|
-| Linux | Supported |
-| macOS | Supported |
-| WSL2 | Supported |
-| Windows (native) | Not yet supported |
+---
+**Global install:** If you prefer, install once with `npm i -g @uluops/setup` then run `uluops-setup`.

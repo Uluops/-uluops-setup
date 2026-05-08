@@ -148,7 +148,7 @@ describe("verify", () => {
       configPath,
       JSON.stringify({
         mcpServers: {
-          "uluops-tracker": { command: "npx", args: [], env: { ULUOPS_TRACKER_API_KEY: "ulr_test" } },
+          "uluops-tracker": { command: "npx", args: [], env: { ULUOPS_API_KEY: "ulr_test" } },
           "uluops-registry": { command: "npx", args: [], env: { ULUOPS_API_KEY: "ulr_test" } },
         },
       }),

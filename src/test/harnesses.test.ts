@@ -146,7 +146,7 @@ describe("OpenCodeMcpConfig", () => {
 
     // Uses 'environment' not 'env'
     const env = tracker["environment"] as Record<string, string>;
-    expect(env["ULUOPS_TRACKER_API_KEY"]).toBe("ulr_test123");
+    expect(env["ULUOPS_API_KEY"]).toBe("ulr_test123");
   });
 
   it("merge preserves existing mcp servers", () => {
@@ -253,7 +253,7 @@ describe("OpenCodeMcpConfig", () => {
       "uluops-tracker"
     ] as Record<string, unknown>;
     const env = tracker["environment"] as Record<string, string>;
-    expect(env["ULUOPS_TRACKER_API_KEY"]).toBe("ulr_roundtrip");
+    expect(env["ULUOPS_API_KEY"]).toBe("ulr_roundtrip");
   });
 });
 
@@ -264,7 +264,7 @@ describe("scaffold profiles", () => {
       join(homedir(), ".gemini", "settings.json"),
     );
     expect(geminiCliProfile.agentFormat).toBe("markdown");
-    expect(geminiCliProfile.hooks).toBeNull();
+    expect(geminiCliProfile.hooks).not.toBeNull();
   });
 
   it("codex has correct paths and toml format", () => {
@@ -277,13 +277,14 @@ describe("scaffold profiles", () => {
     expect(codexProfile.hooks).toBeNull();
   });
 
-  it("gemini-cli mcpConfig.merge throws HarnessNotTestedError", () => {
-    expect(() => geminiCliProfile.mcpConfig.merge({}, "key")).toThrow(
-      HarnessNotTestedError,
-    );
-    expect(() => geminiCliProfile.mcpConfig.merge({}, "key")).toThrow(
-      "not yet tested",
-    );
+  it("gemini-cli mcpConfig.merge returns config with mcpServers", () => {
+    const result = geminiCliProfile.mcpConfig.merge({}, "ulr_test123");
+    expect(result).toHaveProperty("mcpServers");
+    const servers = (result as Record<string, Record<string, unknown>>)[
+      "mcpServers"
+    ];
+    expect(servers).toHaveProperty("uluops-tracker");
+    expect(servers).toHaveProperty("uluops-registry");
   });
 
   it("codex mcpConfig.merge throws HarnessNotTestedError", () => {
