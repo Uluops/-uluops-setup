@@ -2,6 +2,12 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.4.1] - 2026-05-29
+
+### Fixed
+
+- **agent-metrics dependency stuck at `^0.2.0`** — bumped to `^0.4.0` so `npx @uluops/setup` installs the v0.4.0 hook (slug-drop fix + explicit-tag-only detection). Previously, the caret range resolved to `>=0.2.0 <0.3.0`, silently excluding both v0.3.x and v0.4.x. Setup users were receiving a hook two minor versions behind npm. Closes the declarative form of the install.sh "stuck at v0.1.0" trap surfaced by Confucius analyst/forecaster runs on this package.
+
 ## [0.4.0] - 2026-05-04
 
 ### Added

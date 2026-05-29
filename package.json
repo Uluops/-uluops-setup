@@ -1,6 +1,6 @@
 {
   "name": "@uluops/setup",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Zero-friction installer for UluOps agentic harnesses",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
@@ -52,7 +52,7 @@
     "jsonc-parser": "^3.3.1"
   },
   "optionalDependencies": {
-    "@uluops/agent-metrics": "^0.2.0"
+    "@uluops/agent-metrics": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
