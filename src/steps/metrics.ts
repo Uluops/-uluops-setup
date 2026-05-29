@@ -5,7 +5,7 @@
  * Only active for harnesses that support hooks (currently Claude Code only).
  */
 
-import { mkdir, readdir, copyFile, rm, access } from "node:fs/promises";
+import { mkdir, readdir, copyFile, rm, access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 
@@ -32,26 +32,61 @@ export function getHookCommand(profile: HarnessProfile): string {
 export interface MetricsResult {
   toolFilesCopied: number;
   hookConfigured: boolean;
+  /**
+   * Version of @uluops/agent-metrics whose dist was installed into the
+   * harness tree. Null when the metrics step was skipped or the source
+   * package.json could not be read.
+   */
+  hooksInstalledVersion: string | null;
   skippedReason?: string;
+}
+
+/** Source package info returned by findMetricsSource. */
+interface MetricsSource {
+  /** Absolute path to the package root (parent of dist/) */
+  pkgRoot: string;
+  /** Version string from the package's package.json, or null if unreadable */
+  version: string | null;
 }
 
 /**
  * Find the agent-metrics package source directory.
  * Looks for it as a sibling package in the monorepo or as an npm dependency.
+ *
+ * Also reads the source package.json's version so the manifest can record
+ * which agent-metrics version was actually copied — the shared version
+ * ledger across the setup↔agent-metrics seam.
  */
-async function findMetricsSource(): Promise<string | null> {
-  // Try to find the package via Node.js module resolution
+async function findMetricsSource(): Promise<MetricsSource | null> {
   try {
     const resolved = import.meta.resolve("@uluops/agent-metrics");
     // resolved is like file:///path/to/dist/index.js — get the package root
     const distDir = new URL(".", resolved).pathname;
     const pkgRoot = join(distDir, "..");
-    return pkgRoot;
+    const version = await readSourceVersion(pkgRoot);
+    return { pkgRoot, version };
   } catch {
-    // Not installed as dependency
+    return null;
   }
+}
 
-  return null;
+async function readSourceVersion(pkgRoot: string): Promise<string | null> {
+  try {
+    const raw = await readFile(join(pkgRoot, "package.json"), "utf-8");
+    const parsed = JSON.parse(raw) as { version?: unknown };
+    return typeof parsed.version === "string" ? parsed.version : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the installed agent-metrics version from the harness tree.
+ * Returns null when the file is missing or unparseable.
+ * Exported so verify.ts can detect drift between installed and source.
+ */
+export async function readInstalledMetricsVersion(toolDir: string): Promise<string | null> {
+  return readSourceVersion(toolDir);
 }
 
 /** Copy .js files from a source dir to a dest dir, skipping test files. */
@@ -83,7 +118,13 @@ async function copyToolFiles(
   const destDist = join(destRoot, "dist");
   const subDirs = ["commands", "display"];
 
+  // Replace, don't merge. The previous behavior copied new files over old
+  // ones without removing stale entries — if agent-metrics renames or
+  // removes a file in a future version, the stale file would persist on
+  // disk and shadow the new one. Wipe dist/ before repopulating so the
+  // installed tree matches the source tree exactly.
   if (!dryRun) {
+    await rm(destDist, { recursive: true, force: true });
     await mkdir(destDist, { recursive: true });
     for (const sub of subDirs) {
       await mkdir(join(destDist, sub), { recursive: true });
@@ -95,7 +136,7 @@ async function copyToolFiles(
     filesCopied += await copyJsDir(join(srcDist, sub), join(destDist, sub), dryRun);
   }
 
-  // Copy package.json (needed for CLI bin resolution)
+  // Copy package.json (needed for CLI bin resolution and version detection)
   try {
     if (!dryRun) {
       await copyFile(join(srcRoot, "package.json"), join(destRoot, "package.json"));
@@ -117,26 +158,25 @@ export async function installMetrics(
   dryRun: boolean,
 ): Promise<MetricsResult> {
   if (!profile.hooks || !profile.paths.toolsDir || !profile.paths.settingsPath) {
-    return { toolFilesCopied: 0, hookConfigured: false, skippedReason: "no-hook-support" };
+    return {
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-hook-support",
+    };
   }
 
   const toolDir = profile.paths.toolsDir;
   const settingsPath = profile.paths.settingsPath;
 
-  const srcRoot = await findMetricsSource();
+  const source = await findMetricsSource();
 
   let toolFilesCopied = 0;
-  if (srcRoot) {
+  if (source) {
     if (!dryRun) {
       await mkdir(toolDir, { recursive: true });
     }
-    toolFilesCopied = await copyToolFiles(srcRoot, toolDir, dryRun);
-  } else {
-    try {
-      await access(join(toolDir, "dist", "hook.js"));
-    } catch {
-      // Not found anywhere
-    }
+    toolFilesCopied = await copyToolFiles(source.pkgRoot, toolDir, dryRun);
   }
 
   let hookConfigured = false;
@@ -153,7 +193,14 @@ export async function installMetrics(
     hookConfigured = true;
   }
 
-  return { toolFilesCopied, hookConfigured };
+  // Prefer the source version (from import.meta.resolve); fall back to reading
+  // the just-copied package.json from the harness tree so the manifest still
+  // records something useful when the source resolution returned null but a
+  // prior install left files behind.
+  const hooksInstalledVersion =
+    source?.version ?? (hookJsExists ? await readInstalledMetricsVersion(toolDir) : null);
+
+  return { toolFilesCopied, hookConfigured, hooksInstalledVersion };
 }
 
 /**

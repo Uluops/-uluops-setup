@@ -54,9 +54,18 @@ export function getProfile(name: string): HarnessProfile {
   return profile;
 }
 
-/** Detect which harnesses are installed by probing home directories. */
+/**
+ * Detect which harnesses are installed by probing home directories.
+ *
+ * Excludes experimental profiles even when their home dir is present:
+ * auto-detection should never return a profile that will throw
+ * HarnessNotTestedError on use. Users can still opt in with
+ * `--harness <name>`, which goes through getProfile() and surfaces the
+ * explicit error message — the relational promise "in the detected
+ * list = safe to install" is preserved.
+ */
 export function detectHarnesses(): HarnessProfile[] {
-  return ALL_PROFILES.filter((p) => existsSync(p.paths.home));
+  return ALL_PROFILES.filter((p) => p.status === "stable" && existsSync(p.paths.home));
 }
 
 /** List all available harness names (not aliases). */

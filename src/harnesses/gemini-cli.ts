@@ -103,6 +103,7 @@ const home = join(homedir(), ".gemini");
 export const geminiCliProfile: HarnessProfile = {
   name: "gemini-cli",
   displayName: "Gemini CLI",
+  status: "stable",
   homeDir: home,
   agentFormat: "markdown",
   factoryTarget: "gemini-cli",

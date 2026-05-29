@@ -131,7 +131,7 @@ export async function configureMetricsStep(
         `Metrics hooks not supported for ${profile.displayName}`,
       ),
     );
-    return { toolFilesCopied: 0, hookConfigured: false };
+    return { toolFilesCopied: 0, hookConfigured: false, hooksInstalledVersion: null };
   }
 
   const probe = probeHookSupport();

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { loadManifest, type HarnessManifest } from "../lib/manifest.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
+import { readInstalledMetricsVersion } from "./metrics.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -77,10 +78,12 @@ async function verifyHarness(
   // Command files
   if (hm.commands.length > 0) {
     const commandsDir = join(hm.defsPath, "commands");
-    let found = 0;
-    for (const cmd of hm.commands) {
-      try { await access(join(commandsDir, cmd)); found++; } catch { /* Missing */ }
-    }
+    const cmdResults = await Promise.all(
+      hm.commands.map(async (cmd) => {
+        try { await access(join(commandsDir, cmd)); return true; } catch { return false; }
+      }),
+    );
+    const found = cmdResults.filter(Boolean).length;
     checks.push({
       label: `[${profile.displayName}] ${found}/${hm.commands.length} commands`,
       passed: found === hm.commands.length,
@@ -97,7 +100,26 @@ async function verifyHarness(
       try { await access(join(profile.paths.toolsDir, "dist", "hook.js")); hookFilePresent = true; } catch { /* Missing */ }
     }
     if (hookPresent && hookFilePresent) {
-      checks.push({ label: `[${profile.displayName}] Agent metrics hook configured`, passed: true });
+      // Existence is necessary but not sufficient — check version drift against the
+      // currently-resolvable agent-metrics. Without this, verify cannot detect that
+      // a fresh setup release is shipping while the installed hook is stale.
+      const installedVersion = profile.paths.toolsDir
+        ? await readInstalledMetricsVersion(profile.paths.toolsDir)
+        : null;
+      const recordedVersion = hm.hooksInstalledVersion ?? null;
+      const detail = installedVersion
+        ? `v${installedVersion}${recordedVersion && recordedVersion !== installedVersion ? ` (manifest records v${recordedVersion} — out of sync)` : ""}`
+        : "version unknown";
+      checks.push({
+        label: `[${profile.displayName}] Agent metrics hook configured`,
+        passed: true,
+        detail,
+      });
+      if (recordedVersion && installedVersion && recordedVersion !== installedVersion) {
+        // Drift between manifest record and on-disk hook copy — not a hard failure
+        // because verify is read-only, but surface it so the user re-runs setup.
+        allOk = false;
+      }
     } else {
       const missing = [
         ...(!hookPresent ? ["hook not in settings"] : []),

@@ -2,6 +2,27 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.5.0] - 2026-05-29
+
+### Added
+
+- **`hooksInstalledVersion` field on `HarnessManifest`** — records the agent-metrics version copied into the harness tree. The shared version ledger across the setup↔agent-metrics seam that the Confucius forecaster named as the missing piece.
+- **`HarnessInstanceKey` type alias on `Manifest.harnesses`** — documents that today's `{profile.name}` keying assumes one install per profile, and names where future multi-instance support would extend.
+- **`HarnessStatus` field on `HarnessProfile` (`"stable" | "experimental"`)** — `detectHarnesses()` now excludes experimental profiles so auto-detection never returns a profile that throws `HarnessNotTestedError`. Codex marked experimental; Claude Code, Gemini CLI, OpenCode marked stable. `getProfile()` still resolves experimental profiles so `--harness <name>` surfaces the explicit error.
+- **`CLAUDE_HOOK_TYPES` and `DEFAULT_CLAUDE_HOOK_TYPE` exported** with anchor tests that surface drift in PR review. When Claude Code's hook schema evolves, the snapshot tests fail and point at downstream surfaces needing re-evaluation.
+
+### Changed
+
+- **`@uluops/agent-metrics` moved from `optionalDependencies` to `dependencies`** — it was always required for the headline metrics-hook feature; the optionality was a runtime-level skip for harnesses without hook support, not a declaration-level optionality. `installMetrics` still gracefully skips for OpenCode/Codex.
+- **`copyToolFiles` now `rm -rf`s `dist/` before copying** — replaces instead of merges. Stale files from a previous agent-metrics version no longer persist on disk to shadow new files.
+- **`verify` now reads the installed agent-metrics version** and compares it to the manifest's `hooksInstalledVersion`. Existence-only check is gone; drift surfaces as a verify failure with the version delta in the detail string.
+- **`ULUOPS_HOOK_MARKER` renamed to `HOOK_OWNERSHIP_SIGNATURE`** and its value changed from `"tools/agent-metrics"` (path-coupled) to `"agent-metrics/dist/hook.js"` (suffix-based, path-independent). Existing hook commands match the new signature because all real commands end with this suffix; the rename makes the path/sentinel separation explicit in the type.
+- **`getBackupDir` JSDoc** now discloses that backups cover config files only, not tool files in `~/.claude/tools/agent-metrics/`.
+
+### Tracker
+
+- Closes 11 of 12 Confucius-pair findings on this package. The remaining one (metrics-terminology overspecialization) is deferred — speculative rename pending the SubagentStop hook actually gaining non-metric responsibilities.
+
 ## [0.4.1] - 2026-05-29
 
 ### Fixed

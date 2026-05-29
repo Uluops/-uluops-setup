@@ -40,6 +40,7 @@ const home = join(homedir(), ".codex");
 export const codexProfile: HarnessProfile = {
   name: "codex",
   displayName: "Codex",
+  status: "experimental",
   homeDir: home,
   agentFormat: "toml",
   factoryTarget: "codex",

@@ -106,6 +106,7 @@ export async function runSetup(opts: {
       agents: agentsResult.files,
       commands: commandsResult.files,
       hooksInstalled: metricsResult.hookConfigured,
+      hooksInstalledVersion: metricsResult.hooksInstalledVersion,
     };
 
     const manifest = existingManifest ?? {

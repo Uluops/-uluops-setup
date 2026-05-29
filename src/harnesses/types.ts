@@ -6,6 +6,18 @@
  * these interfaces to encapsulate its config format, paths, and capabilities.
  */
 
+/**
+ * Maturity status of a harness profile.
+ *
+ * - `"stable"` — implementation is tested end-to-end and safe to auto-detect.
+ *   detectHarnesses() returns these.
+ * - `"experimental"` — scaffold only; throws HarnessNotTestedError on most
+ *   operations. getProfile() still resolves these (so `--harness <name>`
+ *   surfaces the explicit error), but detectHarnesses() filters them out so
+ *   automatic install never picks an unusable profile.
+ */
+export type HarnessStatus = "stable" | "experimental";
+
 /** Static definition of a harness — no runtime state. */
 export interface HarnessProfile {
   /** Canonical name (e.g., 'claude-code', 'opencode', 'codex', 'gemini-cli') */
@@ -13,6 +25,13 @@ export interface HarnessProfile {
 
   /** Display name for CLI output (e.g., 'Claude Code', 'OpenCode') */
   readonly displayName: string;
+
+  /**
+   * Maturity status. Experimental profiles are excluded from auto-detection
+   * but still accept an explicit `--harness` flag so users can opt in to
+   * the not-yet-tested error surface.
+   */
+  readonly status: HarnessStatus;
 
   /** Home directory for this harness */
   readonly homeDir: string;

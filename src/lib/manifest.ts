@@ -4,6 +4,20 @@ import { getManifestPath, getLegacyManifestPath, getUluopsDir } from "./paths.js
 import { fileHash } from "./hash.js";
 import { atomicWrite } from "./atomic-write.js";
 
+/**
+ * Identifier for a single harness installation in the manifest.
+ *
+ * Today this is the profile name (e.g. `"claude-code"`), assuming a
+ * one-to-one mapping between profiles and installations. The day that
+ * assumption breaks — multiple Claude Code installs (project vs global,
+ * NVM versions, parallel beta channels) — this becomes the seam where
+ * fracture surfaces. When that happens, the right migration is to extend
+ * keys to `{profile.name}@{stable-instance-id}` (e.g. a hash of toolsDir)
+ * rather than overwriting silently. The type alias exists so the
+ * assumption is documented in the schema, not the comments.
+ */
+export type HarnessInstanceKey = string;
+
 /** Per-harness installation state. */
 export interface HarnessManifest {
   installedAt: string;
@@ -15,6 +29,13 @@ export interface HarnessManifest {
   agents: string[];
   commands: string[];
   hooksInstalled: boolean;
+  /**
+   * Version of @uluops/agent-metrics whose dist/ was copied into the harness tree.
+   * Null when hooks are not installed or when the manifest predates this field.
+   * Verify uses this to detect drift between installed and currently-resolvable versions —
+   * the shared version ledger across the setup↔agent-metrics seam.
+   */
+  hooksInstalledVersion?: string | null;
 }
 
 /** Top-level manifest with per-harness entries. */
@@ -22,7 +43,7 @@ export interface Manifest {
   version: string;
   installedAt: string;
   shellModified: boolean;
-  harnesses: Record<string, HarnessManifest>;
+  harnesses: Record<HarnessInstanceKey, HarnessManifest>;
   contentHash?: string;
 }
 
@@ -186,13 +207,13 @@ async function findMissingFiles(
   subDir: string,
   files: string[],
 ): Promise<string[]> {
-  const missing: string[] = [];
-  for (const file of files) {
-    if (!(await pathExists(join(baseDir, subDir, file)))) {
-      missing.push(file);
-    }
-  }
-  return missing;
+  const results = await Promise.all(
+    files.map(async (file) => ({
+      file,
+      exists: await pathExists(join(baseDir, subDir, file)),
+    })),
+  );
+  return results.filter((r) => !r.exists).map((r) => r.file);
 }
 
 async function readManifestFile(path: string): Promise<unknown | null> {

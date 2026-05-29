@@ -143,6 +143,7 @@ const home = join(xdgConfig, "opencode");
 export const opencodeProfile: HarnessProfile = {
   name: "opencode",
   displayName: "OpenCode",
+  status: "stable",
   homeDir: home,
   agentFormat: "markdown",
   factoryTarget: "opencode",

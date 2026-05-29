@@ -91,6 +91,7 @@ const home = getClaudeHome();
 export const claudeCodeProfile: HarnessProfile = {
   name: "claude-code",
   displayName: "Claude Code",
+  status: "stable",
   homeDir: home,
   agentFormat: "markdown",
   factoryTarget: "claude-code",

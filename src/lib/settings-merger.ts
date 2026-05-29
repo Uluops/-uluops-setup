@@ -25,11 +25,36 @@ export interface HarnessSettings {
   [key: string]: unknown;
 }
 
-/** Marker embedded in hook commands to identify UluOps-managed entries */
-const ULUOPS_HOOK_MARKER = "tools/agent-metrics";
+/**
+ * Substring used purely as an *ownership sentinel* — present in every hook
+ * command we install, so we can identify our own entries in `settings.json`
+ * without false-positives on the user's hooks.
+ *
+ * This is intentionally NOT a path constant. The path where the hook lives
+ * is derived from each profile's `paths.toolsDir`; if those move (a harness
+ * restructure, a custom toolsDir, a future per-instance layout), the
+ * signature must remain stable so existing user settings.json entries
+ * keep being recognized as UluOps-managed.
+ *
+ * The current value `agent-metrics/dist/hook.js` is the suffix of every
+ * hook command we emit — discriminating enough to avoid colliding with
+ * user-named tools while surviving moves of the parent directory.
+ */
+const HOOK_OWNERSHIP_SIGNATURE = "agent-metrics/dist/hook.js";
 
-/** Supported hook event types in Claude Code. Update when Claude Code adds/renames types. */
-const CLAUDE_HOOK_TYPES = new Set([
+/**
+ * Supported hook event types in Claude Code's settings.json schema.
+ *
+ * This set is a snapshot of the harness's vocabulary. When Claude Code
+ * adds, renames, or removes hook types, this set rots — the `probeHookSupport`
+ * warning will fire on legitimate user configs and (worse) train users to
+ * ignore it. The snapshot test in `settings-merger.test.ts` exists to make
+ * any change to the set visible in PR review so the warning logic can be
+ * re-evaluated.
+ *
+ * Exported for that test only — runtime callers should use `probeHookSupport`.
+ */
+export const CLAUDE_HOOK_TYPES = new Set([
   "SubagentStop",
   "PreToolUse",
   "PostToolUse",
@@ -37,9 +62,12 @@ const CLAUDE_HOOK_TYPES = new Set([
   "Stop",
 ]);
 
+/** Default Claude Code hook event used when no override is configured. */
+export const DEFAULT_CLAUDE_HOOK_TYPE = "SubagentStop";
+
 /** Configurable hook type via env var. Falls back to SubagentStop. */
 function getDefaultHookEventType(): string {
-  return process.env["ULUOPS_HOOK_TYPE"] ?? "SubagentStop";
+  return process.env["ULUOPS_HOOK_TYPE"] ?? DEFAULT_CLAUDE_HOOK_TYPE;
 }
 
 export interface HookProbeResult {
@@ -104,7 +132,7 @@ export function mergeUluopsHook(
   const existing = hooks[hookType] ?? [];
 
   const filtered = existing.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
+    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
   );
 
   const uluopsHook: HookMatcher = {
@@ -146,7 +174,7 @@ export function removeUluopsHook(
   if (!hookEntries) return settings;
 
   const filtered = hookEntries.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
+    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
   );
 
   const updatedHooks = { ...hooks };
@@ -177,6 +205,6 @@ export function hasUluopsHook(
   const hookEntries = settings.hooks?.[hookType];
   if (!hookEntries) return false;
   return hookEntries.some((m) =>
-    m.hooks.some((h) => h.command.includes(ULUOPS_HOOK_MARKER)),
+    m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
   );
 }

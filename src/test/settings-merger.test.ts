@@ -4,6 +4,8 @@ import {
   removeUluopsHook,
   hasUluopsHook,
   probeHookSupport,
+  CLAUDE_HOOK_TYPES,
+  DEFAULT_CLAUDE_HOOK_TYPE,
 } from "../lib/settings-merger.js";
 
 describe("settings-merger", () => {
@@ -13,7 +15,7 @@ describe("settings-merger", () => {
       expect(result.hooks).toBeDefined();
       expect(result.hooks!["SubagentStop"]).toHaveLength(1);
       expect(result.hooks!["SubagentStop"]![0]!.hooks[0]!.command).toContain(
-        "tools/agent-metrics",
+        "agent-metrics/dist/hook.js",
       );
       expect(result.hooks!["SubagentStop"]![0]!.hooks[0]!.timeout).toBe(30);
     });
@@ -52,7 +54,7 @@ describe("settings-merger", () => {
         "echo custom-hook",
       );
       expect(result.hooks!["SubagentStop"]![1]!.hooks[0]!.command).toContain(
-        "tools/agent-metrics",
+        "agent-metrics/dist/hook.js",
       );
     });
 
@@ -78,7 +80,7 @@ describe("settings-merger", () => {
       // Should replace, not duplicate
       expect(result.hooks!["SubagentStop"]).toHaveLength(1);
       expect(result.hooks!["SubagentStop"]![0]!.hooks[0]!.command).toContain(
-        "~/.claude/tools/agent-metrics",
+        "~/.claude/tools/agent-metrics/dist/hook.js",
       );
     });
 
@@ -157,7 +159,7 @@ describe("settings-merger", () => {
               hooks: [
                 {
                   type: "command",
-                  command: "node /some/tools/agent-metrics/hook.js",
+                  command: "node /some/tools/agent-metrics/dist/hook.js",
                 },
               ],
             },
@@ -232,5 +234,46 @@ describe("probeHookSupport", () => {
     expect(result.hookType).toBe("FakeHook");
     expect(result.supported).toBe(false);
     expect(result.warning).toContain("FakeHook");
+  });
+});
+
+/**
+ * Anchor tests for the CLAUDE_HOOK_TYPES snapshot.
+ *
+ * These don't prevent the set from drifting — Claude Code can change its hook
+ * vocabulary any time. They make drift VISIBLE in PR review: when someone
+ * edits the set, these tests fail, and the failure message points them at
+ * the rotted-snapshot risk (probeHookSupport warning becomes noise) and the
+ * downstream surfaces that need re-evaluation (README, ADRs, this comment).
+ *
+ * See tracker issue STR-EVO/M ("CLAUDE_HOOK_TYPES hardcoded set will rot
+ * under harness schema evolution").
+ */
+describe("CLAUDE_HOOK_TYPES anchor", () => {
+  it("must contain the default hook type so probeHookSupport's default returns supported=true", () => {
+    expect(CLAUDE_HOOK_TYPES.has(DEFAULT_CLAUDE_HOOK_TYPE)).toBe(true);
+  });
+
+  it("snapshot — exact membership", () => {
+    // If this assertion fails, the set has drifted. Before silencing the failure,
+    // confirm: (1) the new set matches Claude Code's current schema, (2) the
+    // probeHookSupport warning logic still distinguishes drift from legitimate
+    // hook types, (3) README/ADR mentions of hook-type vocabulary still match.
+    expect([...CLAUDE_HOOK_TYPES].sort()).toEqual(
+      ["Notification", "PostToolUse", "PreToolUse", "Stop", "SubagentStop"].sort(),
+    );
+  });
+
+  it("snapshot — size", () => {
+    // Paired with the membership snapshot to catch adds/removes that happen to
+    // preserve alphabetic ordering of stringified contents.
+    expect(CLAUDE_HOOK_TYPES.size).toBe(5);
+  });
+
+  it("DEFAULT_CLAUDE_HOOK_TYPE is SubagentStop", () => {
+    // The default appears in user docs and in the install summary string;
+    // changing it is a user-visible breaking change. Anchor it here so the
+    // change has to be deliberate.
+    expect(DEFAULT_CLAUDE_HOOK_TYPE).toBe("SubagentStop");
   });
 });
