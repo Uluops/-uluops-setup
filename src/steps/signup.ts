@@ -7,7 +7,7 @@ const API_BASE = "https://api.uluops.ai/api/v1";
  * but all are non-blocking — server validation is the authority.
  * @internal Exported for testing only — not part of the public API.
  */
-function validatePassword(password: string): true {
+function hintPassword(password: string): true {
   if (password.length < 8) console.warn("  ⚠ Hint: server may require at least 8 characters");
   else if (password.length > 128) console.warn("  ⚠ Hint: server may reject passwords over 128 characters");
   else if (!/[a-z]/.test(password)) console.warn("  ⚠ Hint: server may require a lowercase letter");
@@ -54,7 +54,7 @@ export async function signup(): Promise<AuthResult> {
   const pwd = await password({
     message: "Password",
     mask: "*",
-    validate: validatePassword,
+    validate: hintPassword,
   });
 
   // Register
@@ -153,4 +153,4 @@ async function callApi<T extends object>(
 }
 
 /** @internal Exported for testing only — not part of the public API. */
-export { validatePassword, validateEmail };
+export { hintPassword, validateEmail };

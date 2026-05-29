@@ -44,6 +44,7 @@ function makeManifest(
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.stubEnv("ULUOPS_API_KEY", "");
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-verify-"));
 });
 
