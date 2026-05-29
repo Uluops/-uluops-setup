@@ -14,7 +14,7 @@ Duration: 6-15 minutes
 ## Pre-Flight Detection
 
 - **is_agent_definition**: `grep -rqE --include='{{ file }}'  '^(name|description|type):' . 2>/dev/null`
-- **is_agent_command**: `grep -rqE --include='{{ file }}'  'subagent_type|\[validator:' . 2>/dev/null`
+- **is_agent_command**: `grep -rqE --include='{{ file }}'  'subagent_type|\[agent:' . 2>/dev/null`
 ## Execution
 
 ```
