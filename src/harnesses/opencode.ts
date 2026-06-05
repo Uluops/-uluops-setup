@@ -63,7 +63,7 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     const existing = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
     const tracker: OpenCodeMcpServer = {
       type: "local",
-      command: ["npx", "-y", "uluops-tracker-mcp-client"],
+      command: ["npx", "-y", "@uluops/ops-mcp"],
       enabled: true,
       timeout: 30000,
       environment: {
@@ -73,7 +73,7 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     };
     const registry: OpenCodeMcpServer = {
       type: "local",
-      command: ["npx", "-y", "uluops-registry-mcp-client"],
+      command: ["npx", "-y", "@uluops/registry-mcp"],
       enabled: true,
       timeout: 30000,
       environment: {

@@ -7,7 +7,7 @@ describe("mergeUluopsMcp", () => {
     expect(result.mcpServers).toBeDefined();
     expect(result.mcpServers!["uluops-tracker"]).toMatchObject({
       command: "npx",
-      args: ["-y", "uluops-tracker-mcp-client"],
+      args: ["-y", "@uluops/ops-mcp"],
       env: {
         ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
         ULUOPS_API_KEY: "ulr_test123",
@@ -15,7 +15,7 @@ describe("mergeUluopsMcp", () => {
     });
     expect(result.mcpServers!["uluops-registry"]).toMatchObject({
       command: "npx",
-      args: ["-y", "uluops-registry-mcp-client"],
+      args: ["-y", "@uluops/registry-mcp"],
       env: {
         ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
         ULUOPS_API_KEY: "ulr_test123",
@@ -50,7 +50,7 @@ describe("mergeUluopsMcp", () => {
       mcpServers: {
         "uluops-registry": {
           command: "npx",
-          args: ["-y", "uluops-registry-mcp-client"],
+          args: ["-y", "@uluops/registry-mcp"],
           env: { ULUOPS_API_KEY: "ulr_old", ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry" },
         },
       },

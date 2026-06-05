@@ -13,7 +13,7 @@ export interface ClaudeConfig {
   [key: string]: unknown;
 }
 
-const MCP_PACKAGES = ["uluops-tracker-mcp-client", "uluops-registry-mcp-client"];
+const MCP_PACKAGES = ["@uluops/ops-mcp", "@uluops/registry-mcp"];
 
 /** Check whether the UluOps MCP client packages exist on the npm registry. Returns lists of available and missing packages. */
 export async function checkMcpPackageAvailability(): Promise<{
@@ -84,7 +84,7 @@ export function mergeUluopsMcp(
       ...existing,
       "uluops-tracker": {
         command: "npx",
-        args: ["-y", "uluops-tracker-mcp-client"],
+        args: ["-y", "@uluops/ops-mcp"],
         env: {
           ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
           ULUOPS_API_KEY: apiKey,
@@ -93,7 +93,7 @@ export function mergeUluopsMcp(
       },
       "uluops-registry": {
         command: "npx",
-        args: ["-y", "uluops-registry-mcp-client"],
+        args: ["-y", "@uluops/registry-mcp"],
         env: {
           ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
           ULUOPS_API_KEY: apiKey,

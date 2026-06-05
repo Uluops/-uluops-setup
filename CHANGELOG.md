@@ -2,6 +2,13 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.6.1] - 2026-06-05
+
+### Changed
+
+- **MCP package names switched to scoped `@uluops/*` form.** Setup now writes `npx -y @uluops/ops-mcp` and `npx -y @uluops/registry-mcp` into harness configs (Claude Code, Gemini CLI, OpenCode) instead of the legacy `uluops-tracker-mcp-client` / `uluops-registry-mcp-client` names. The MCP server names in config (`uluops-tracker`, `uluops-registry`) are unchanged — every `mcp__uluops-tracker__*` reference across the agent corpus keeps working. Only the npm package resolved by `npx` differs.
+- **`checkMcpPackageAvailability` updated** to probe the new package names against the npm registry. Users who run setup before the two MCP packages are published will see the warning name the actual missing packages.
+
 ## [0.6.0] - 2026-06-05
 
 ### Added
