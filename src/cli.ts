@@ -42,6 +42,14 @@ async function main(): Promise<void> {
       false,
     )
     .option("--shell", "Write API key export to shell profile", false)
+    .option(
+      "--with-cli",
+      "Install @uluops/cli globally without prompting",
+    )
+    .option(
+      "--no-cli",
+      "Skip @uluops/cli install without prompting (takes precedence over --with-cli)",
+    )
     .option("--skip-validation", "Accept API key without verifying", false)
     .option(
       "--list",
@@ -60,6 +68,8 @@ async function main(): Promise<void> {
     scope: string;
     localDefs: boolean;
     shell: boolean;
+    withCli?: boolean;
+    cli: boolean;
     skipValidation: boolean;
     list: boolean;
     verify: boolean;
@@ -109,6 +119,8 @@ async function main(): Promise<void> {
     scope,
     localDefs: opts.localDefs,
     shell: opts.shell,
+    withCli: opts.withCli,
+    cli: opts.cli,
     skipValidation: opts.skipValidation,
     dryRun: opts.dryRun,
     yes: opts.yes,

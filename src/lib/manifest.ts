@@ -44,6 +44,15 @@ export interface Manifest {
   installedAt: string;
   shellModified: boolean;
   harnesses: Record<HarnessInstanceKey, HarnessManifest>;
+  /**
+   * Tracks whether `@uluops/cli` was installed globally by this setup run.
+   * Null/false when not installed by setup (user-installed or never installed).
+   * Uninstall only removes the global package when this is true — we don't
+   * remove what we didn't install.
+   */
+  cliInstalled?: boolean;
+  /** Version reported by `ulu --version` at install time, for drift detection. */
+  cliInstalledVersion?: string | null;
   contentHash?: string;
 }
 

@@ -2,6 +2,21 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.6.0] - 2026-06-04
+
+### Added
+
+- **Optional global `@uluops/cli` install during setup.** New `--with-cli` flag forces install without prompting; `--no-cli` forces skip. With neither flag, interactive runs prompt (default Y) and non-interactive runs (`--yes`, `--api-key`, no TTY) skip silently. The install step is best-effort — if `npm install -g` fails (permissions, nvm prefix surprise, network), setup surfaces a warning with the one-line cause and a manual install command, but the overall flow does not abort. If `ulu` is already on PATH, the step detects it and makes no changes. `manifest.cliInstalled` records ownership, so `--uninstall` removes the global package only when this setup installed it.
+- **LICENSE file (MIT).** Aligns the setup package with the open-tooling stance for SDKs/CLIs/installers (proprietary surfaces remain in analytics/platform/tier-gate). `package.json` license field updated to `"MIT"` to match.
+
+### Fixed
+
+- **`dist/commands/**` was missing from the `files` field.** `cli.js` imports `runSetup`, `runUninstall`, and `runVerify` from `./commands/*`, but the `files` array shipped only `dist/cli`, `dist/lib`, `dist/steps`, and `dist/harnesses`. The v0.5.0 tarball crashed on first invocation with `ERR_MODULE_NOT_FOUND` before any user-visible output. v0.5.0 was never published to npm, so no consumers were affected.
+
+### Changed
+
+- **All `dependencies` and `devDependencies` pinned to exact versions** — removed caret ranges across the board (`@inquirer/prompts`, `@uluops/agent-metrics`, `chalk`, `commander`, `jsonc-parser`, and all dev tooling). Aligns this package with the UluOps-wide exact-pinning policy adopted 2026-06-01 in response to the RedHat-class supply-chain attack pattern.
+
 ## [0.5.0] - 2026-05-29
 
 ### Added

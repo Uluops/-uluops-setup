@@ -45,13 +45,16 @@ npx @uluops/setup --harness gemini-cli
 
 > Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Agent definitions and commands are transformed to the target harness format at install time from a single source.
 
-The installer runs five steps in sequence:
+The installer runs these steps in sequence:
 
 1. **Authenticate** — Validates your API key (or creates an account with `--signup`)
 2. **MCP config** — Writes tracker and registry server entries to the harness config
 3. **Definitions** — Copies pre-rendered agent definition files
 4. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
-5. **Health check** — Verifies both API endpoints are reachable
+5. **`ulu` CLI** *(optional)* — Offers to install `@uluops/cli` globally. Interactive runs are prompted (default Y); non-interactive runs skip unless `--with-cli` is passed. `--no-cli` always skips. The install is best-effort: if `npm install -g` fails (permissions, nvm prefix, etc.) the rest of setup still completes and a manual install command is printed.
+6. **Health check** — Verifies both API endpoints are reachable
+
+> When this setup installs the CLI, the install is recorded in the manifest so `--uninstall` removes it symmetrically. If the CLI was already on your PATH before running setup, it is left alone on uninstall.
 
 ## Usage
 
@@ -83,6 +86,8 @@ npx @uluops/setup [options]
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
   --local-defs         Save definitions to ./uluops/ for review
   --shell              Write API key export to shell profile
+  --with-cli           Install @uluops/cli globally (skip prompt)
+  --no-cli             Skip @uluops/cli install (skip prompt)
   --skip-validation    Accept API key without server verification
   --list               Show available agents and workflows without installing
   --verify             Check installation health: manifest, files, MCP config, API connectivity (no changes)
@@ -147,6 +152,12 @@ npx @uluops/setup --dry-run --api-key ulr_abc123
 
 # Persist API key in shell profile (~/.zshrc, ~/.bashrc, etc.)
 npx @uluops/setup --shell
+
+# Install the ulu CLI globally alongside harness setup
+npx @uluops/setup --with-cli
+
+# Skip the CLI prompt entirely (interactive runs default to asking)
+npx @uluops/setup --no-cli
 ```
 
 ## How updates work

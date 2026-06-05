@@ -16,6 +16,7 @@ import {
   installAgentsDefs,
   installCommandsDefs,
   configureMetricsStep,
+  configureCliStep,
   runHealthCheck,
   configureShell,
 } from "./helpers.js";
@@ -30,6 +31,8 @@ export async function runSetup(opts: {
   dryRun: boolean;
   yes: boolean;
   harness: string;
+  withCli?: boolean;
+  cli?: boolean;
 }): Promise<void> {
   const version = await getVersion();
   const profile = getProfile(opts.harness);
@@ -87,6 +90,14 @@ export async function runSetup(opts: {
 
   const metricsResult = await configureMetricsStep(profile, opts);
 
+  const cliResult = await configureCliStep({
+    withCli: opts.withCli,
+    cli: opts.cli,
+    yes: opts.yes,
+    apiKey: opts.apiKey,
+    dryRun: opts.dryRun,
+  });
+
   await runHealthCheck(opts);
 
   const shellModified = await configureShell(env, apiKey, opts);
@@ -119,6 +130,14 @@ export async function runSetup(opts: {
     manifest.installedAt = now;
     manifest.shellModified = shellModified || manifest.shellModified;
     manifest.harnesses[profile.name] = harnessEntry;
+
+    // Only flip cliInstalled to true when WE installed it (not when user-installed).
+    // Once true, persist across re-runs so uninstall remains symmetric — until the
+    // user explicitly removes it with --no-cli + uninstall, this manifest owns it.
+    if (cliResult && cliResult.installed && !cliResult.alreadyPresent) {
+      manifest.cliInstalled = true;
+      manifest.cliInstalledVersion = cliResult.version;
+    }
 
     await saveManifest(manifest);
   }

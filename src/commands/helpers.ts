@@ -12,6 +12,8 @@ import { installCommands } from "../steps/commands.js";
 import type { CommandsResult } from "../steps/commands.js";
 import { installMetrics } from "../steps/metrics.js";
 import type { MetricsResult } from "../steps/metrics.js";
+import { installCli, CLI_PACKAGE } from "../steps/cli.js";
+import type { CliExecutor, CliInstallResult } from "../steps/cli.js";
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
 import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
@@ -149,6 +151,87 @@ export async function configureMetricsStep(
     ok(`Agent metrics → ${toolPath}/ (${parts.join(", ")})`);
   } else {
     warn("Agent metrics hook not configured (tool files not found)");
+  }
+  return res;
+}
+
+/**
+ * Decide whether to install `@uluops/cli` globally and do it (or not).
+ *
+ * Decision matrix:
+ * - `--no-cli` (opts.cli === false) → skip, no prompt
+ * - `--with-cli` (opts.withCli === true) → install, no prompt
+ * - Neither flag + non-interactive (--yes / --api-key / no TTY) → skip
+ * - Neither flag + interactive → prompt (default Y)
+ *
+ * Returns null when the step did not run (skipped). Returns a `CliInstallResult`
+ * when an install attempt was made, with details for the manifest.
+ */
+export async function configureCliStep(opts: {
+  withCli?: boolean;
+  cli?: boolean;
+  yes: boolean;
+  apiKey?: string;
+  dryRun: boolean;
+  executor?: CliExecutor;
+}): Promise<CliInstallResult | null> {
+  if (opts.cli === false) {
+    info(chalk.dim(`Skipped global ${CLI_PACKAGE} install (--no-cli)`));
+    return null;
+  }
+
+  let shouldInstall: boolean;
+  if (opts.withCli === true) {
+    shouldInstall = true;
+  } else {
+    const nonInteractive =
+      opts.yes || !!opts.apiKey || !process.stdin.isTTY;
+    if (nonInteractive) {
+      info(
+        chalk.dim(
+          `Skipped global ${CLI_PACKAGE} install (non-interactive — pass --with-cli to install)`,
+        ),
+      );
+      return null;
+    }
+    const { confirm } = await import("@inquirer/prompts");
+    shouldInstall = await confirm({
+      message: `Install ${CLI_PACKAGE} globally (provides the ${chalk.cyan("ulu")} command)?`,
+      default: true,
+    });
+    if (!shouldInstall) {
+      info(chalk.dim(`Skipped global ${CLI_PACKAGE} install`));
+      return null;
+    }
+  }
+
+  const res = await installCli({
+    dryRun: opts.dryRun,
+    executor: opts.executor,
+  });
+
+  if (opts.dryRun && !res.alreadyPresent) {
+    ok(`Would install ${CLI_PACKAGE} globally`);
+    return res;
+  }
+  if (res.alreadyPresent) {
+    ok(
+      `${CLI_PACKAGE} already installed${res.version ? ` (${res.version})` : ""} — no change`,
+    );
+    return res;
+  }
+  if (res.installed) {
+    ok(
+      `${CLI_PACKAGE} installed globally${res.version ? ` (${res.version})` : ""}`,
+    );
+    return res;
+  }
+  warn(
+    `Could not install ${CLI_PACKAGE} globally — try ${chalk.cyan(`npm install -g ${CLI_PACKAGE}`)} manually`,
+  );
+  if (res.error) {
+    const oneLine = res.error.split("\n")[0]?.slice(0, 120) ?? "";
+    if (oneLine) info(chalk.dim(`  ${oneLine}`));
   }
   return res;
 }
