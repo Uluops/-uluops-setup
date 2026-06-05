@@ -2,6 +2,16 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.6.3] - 2026-06-05
+
+### Changed
+
+- **Setup now auto-detects the installed harness** when `--harness` was not passed explicitly. Previously the detection logic ran but its result was discarded — every default invocation wrote Claude Code-shaped config regardless of what was actually present. A Gemini-CLI-only user running `npx @uluops/setup` from the landing page no longer ends up with an inert `~/.claude/` tree.
+  - One harness detected → use it silently (no message for Claude Code to keep the common case quiet; a dim "Detected … — using as target" line for the other harnesses).
+  - Multiple harnesses detected → interactive runs prompt with a `select`; non-interactive runs (`--yes`, `--api-key`, no TTY) default to the first match and print a hint about `--harness`.
+  - No harnesses detected → fall back to `claude-code` (preserves the landing-page "just works" promise for fresh installs).
+  - `--harness <name>` passed explicitly → always honored, detection is skipped.
+
 ## [0.6.2] - 2026-06-05
 
 ### Changed

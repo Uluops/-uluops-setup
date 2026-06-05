@@ -8,6 +8,7 @@ import { getVersion } from "./lib/version.js";
 import {
   resolveHarnessName,
   listHarnesses,
+  detectHarnesses,
   HarnessNotTestedError,
 } from "./harnesses/index.js";
 import { runSetup } from "./commands/setup.js";
@@ -110,8 +111,48 @@ async function main(): Promise<void> {
   }
   const scope = opts.scope === "local" ? "local" : "global";
 
-  // Resolve harness name (supports aliases)
-  const harnessName = resolveHarnessName(opts.harness);
+  // Resolve harness: if --harness was passed explicitly, honor it as-is.
+  // Otherwise auto-detect — single match wins silently, multiple matches
+  // prompt the user, no matches falls back to the default (claude-code)
+  // to preserve the landing-page "just run npx @uluops/setup" promise.
+  const harnessExplicit = program.getOptionValueSource("harness") === "cli";
+  let harnessName: string;
+  if (harnessExplicit) {
+    harnessName = resolveHarnessName(opts.harness);
+  } else {
+    const detected = detectHarnesses();
+    if (detected.length === 1) {
+      harnessName = detected[0]!.name;
+      if (harnessName !== "claude-code") {
+        info(
+          chalk.dim(
+            `Detected ${chalk.cyan(detected[0]!.displayName)} — using as target (pass --harness to override)`,
+          ),
+        );
+      }
+    } else if (detected.length > 1) {
+      const isInteractive =
+        !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"] && process.stdin.isTTY;
+      if (isInteractive) {
+        const { select } = await import("@inquirer/prompts");
+        harnessName = await select({
+          message: "Multiple harnesses detected — which one are you setting up?",
+          choices: detected.map((p) => ({ name: p.displayName, value: p.name })),
+          default: detected[0]!.name,
+        });
+        console.log();
+      } else {
+        harnessName = detected[0]!.name;
+        info(
+          chalk.dim(
+            `Multiple harnesses detected (${detected.map((p) => p.displayName).join(", ")}); defaulting to ${chalk.cyan(detected[0]!.displayName)} — pass --harness to choose`,
+          ),
+        );
+      }
+    } else {
+      harnessName = resolveHarnessName(opts.harness);
+    }
+  }
 
   await runSetup({
     apiKey: opts.apiKey,
