@@ -47,7 +47,7 @@ npx @uluops/setup --harness gemini-cli
 
 The installer runs these steps in sequence:
 
-1. **Authenticate** — Validates your API key (or creates an account with `--signup`)
+1. **Authenticate** — Asks whether you're creating a new account. New users sign up with email + password; returning users paste an API key. Skip the question with `--api-key`, `--signup`, `--yes`, or `ULUOPS_API_KEY`.
 2. **MCP config** — Writes tracker and registry server entries to the harness config
 3. **Definitions** — Copies pre-rendered agent definition files
 4. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
@@ -62,15 +62,9 @@ The installer runs these steps in sequence:
 npx @uluops/setup
 ```
 
-You'll be prompted for your API key (get one at [app.uluops.ai/settings/api-keys](https://app.uluops.ai/settings/api-keys)). Everything else uses smart defaults — no other prompts. See [What it does](#what-it-does) for the full list of changes made.
+Setup will first ask whether you're creating a new UluOps account. Pick **Y** to sign up with an email and password (account + API key created automatically); pick **n** to paste an existing API key from [app.uluops.ai/settings/api-keys](https://app.uluops.ai/settings/api-keys). Everything else uses smart defaults — no other prompts. See [What it does](#what-it-does) for the full list of changes made.
 
-**New to UluOps?** Create an account without leaving the terminal:
-
-```
-npx @uluops/setup --signup
-```
-
-You'll be prompted for email and password. Account + API key are created automatically.
+> The account question is automatically skipped if you've already saved credentials, set `ULUOPS_API_KEY`, or passed `--api-key`/`--yes`/`--signup`. You can also pass `--signup` to skip the question and go straight to signup.
 
 > **🛑 IMPORTANT:** You must restart your harness (e.g., restart Claude Code) after setup to load the new agents and commands.
 
@@ -135,7 +129,11 @@ Validates your current installation against the local manifest and checks API co
 ### Examples
 
 ```bash
-# New user — create account + install in one shot
+# Default — asks "creating a new account?" then either signs you up or
+# prompts for an existing API key
+npx @uluops/setup
+
+# Skip the account question and go straight to signup
 npx @uluops/setup --signup
 
 # Install for OpenCode

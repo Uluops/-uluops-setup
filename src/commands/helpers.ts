@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { detect } from "../steps/detect.js";
 import { signup } from "../steps/signup.js";
-import { resolveApiKey } from "../steps/auth.js";
+import { resolveApiKey, hasCredentialsFile } from "../steps/auth.js";
 import { installMcp } from "../steps/mcp.js";
 import type { McpResult } from "../steps/mcp.js";
 import { installAgents } from "../steps/agents.js";
@@ -21,6 +21,33 @@ import { getHealthTimeout } from "../lib/health.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import type { HarnessProfile } from "../harnesses/index.js";
 
+/**
+ * Decide whether to ask the user "Are you creating a new account?".
+ * The prompt is the new-user friction-reducer — it should fire only when
+ * the user has provided no other signal about who they are.
+ *
+ * Skip the prompt when:
+ *  - `--signup` is set (forces signup path)
+ *  - `--api-key` flag is provided (user already has a key)
+ *  - `ULUOPS_API_KEY` env var is set (CI/automation)
+ *  - `--yes` is passed (non-interactive)
+ *  - stdin is not a TTY (piped / background)
+ *  - a credentials file already exists (returning user)
+ */
+async function shouldPromptForAccount(opts: {
+  apiKey?: string;
+  signup: boolean;
+  yes: boolean;
+}): Promise<boolean> {
+  if (opts.signup) return false;
+  if (opts.apiKey) return false;
+  if (process.env["ULUOPS_API_KEY"]) return false;
+  if (opts.yes) return false;
+  if (!process.stdin.isTTY) return false;
+  if (await hasCredentialsFile()) return false;
+  return true;
+}
+
 /** Resolve API key via flag, env, file, signup, or interactive prompt. Returns env detection + key. */
 export async function initContext(opts: {
   apiKey?: string;
@@ -30,8 +57,19 @@ export async function initContext(opts: {
 }): Promise<{ env: Awaited<ReturnType<typeof detect>>; apiKey: string }> {
   const env = await detect();
   let apiKey: string;
+
+  let creatingAccount = opts.signup;
+  if (!opts.signup && (await shouldPromptForAccount(opts))) {
+    const { confirm } = await import("@inquirer/prompts");
+    creatingAccount = await confirm({
+      message: "Are you creating a new UluOps account?",
+      default: true,
+    });
+    console.log();
+  }
+
   try {
-    if (opts.signup) {
+    if (creatingAccount) {
       info("Create your UluOps account\n");
       const auth = await signup();
       apiKey = auth.apiKey;

@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -9,6 +9,24 @@ export interface AuthResult {
 
 function getKeyPrefix(): string {
   return process.env["ULUOPS_KEY_PREFIX"] ?? "ulr_";
+}
+
+function credentialsPath(): string {
+  return join(homedir(), ".uluops", "credentials.json");
+}
+
+/**
+ * Returns true if a credentials file exists at the default path.
+ * Used by the setup flow to skip the "new account?" prompt for returning users.
+ * Existence-only — does not validate the file's shape or contents.
+ */
+export async function hasCredentialsFile(): Promise<boolean> {
+  try {
+    await access(credentialsPath());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -68,7 +86,7 @@ export async function resolveApiKey(options: {
 }
 
 async function readCredentialsFile(): Promise<string | undefined> {
-  const credsPath = join(homedir(), ".uluops", "credentials.json");
+  const credsPath = credentialsPath();
   let raw: string;
   try {
     raw = await readFile(credsPath, "utf-8");

@@ -2,6 +2,18 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.6.2] - 2026-06-05
+
+### Changed
+
+- **New users now get an "Are you creating a new account?" prompt as the first interactive question** instead of being dropped straight into an API-key input box. Default Y. Picking Y runs the email + password signup flow; picking n falls through to the existing API-key prompt. Eliminates the friction where the landing-page instruction (`npx @uluops/setup`) hit new users with a key prompt before they had any idea where to get a key.
+- The new prompt is skipped automatically when the user has already provided a signal about who they are: `--api-key`, `--signup`, `--yes`, `ULUOPS_API_KEY` set in env, no TTY attached, or `~/.uluops/credentials.json` already on disk. Returning users see zero new prompts.
+- `--signup` is preserved as an explicit override (skips the question, goes straight to signup) — useful for CI scripts or anyone who wants to bypass the confirm step.
+
+### Added
+
+- **`hasCredentialsFile()` exported from `steps/auth.ts`** — existence-only probe for `~/.uluops/credentials.json` used by the prompt-skip gate.
+
 ## [0.6.1] - 2026-06-05
 
 ### Changed

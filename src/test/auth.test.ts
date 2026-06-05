@@ -116,3 +116,33 @@ describe("credentials file fallback", () => {
     ).rejects.toThrow("No API key found");
   });
 });
+
+describe("hasCredentialsFile", () => {
+  it("returns true when ~/.uluops/credentials.json exists", async () => {
+    const credsDir = join(tmpDir, ".uluops");
+    await mkdir(credsDir, { recursive: true });
+    await writeFile(join(credsDir, "credentials.json"), "{}");
+
+    vi.mock("node:os", async (importOriginal) => {
+      const original = await importOriginal<typeof import("node:os")>();
+      return { ...original, homedir: () => tmpDir };
+    });
+
+    const { hasCredentialsFile: probe } = await import("../steps/auth.js");
+    expect(await probe()).toBe(true);
+
+    vi.restoreAllMocks();
+  });
+
+  it("returns false when the file does not exist", async () => {
+    vi.mock("node:os", async (importOriginal) => {
+      const original = await importOriginal<typeof import("node:os")>();
+      return { ...original, homedir: () => tmpDir };
+    });
+
+    const { hasCredentialsFile: probe } = await import("../steps/auth.js");
+    expect(await probe()).toBe(false);
+
+    vi.restoreAllMocks();
+  });
+});
