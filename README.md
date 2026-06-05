@@ -102,7 +102,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.4.0 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.6.0 — available agents and workflows
 
   WORKFLOWS
   /workflows:post-implementation   Iterative validation after coding
@@ -121,7 +121,7 @@ Displays all agents and workflows included in the current version of the setup t
 Validates your current installation against the local manifest and checks API connectivity.
 
 ```text
-  ⟨u⟩ ulu·ops Installation Check v0.4.0
+  ⟨u⟩ ulu·ops Installation Check v0.6.0
 
   ✓ Manifest found (~/.uluops/manifest.json)
   ✓ All 23 agents present in ~/.claude/agents/
@@ -176,6 +176,7 @@ Setup manages four surfaces: agent files, command files, MCP config entries, and
 - **Agents not appearing:** Ensure you have restarted your harness (Claude Code, etc.) after running setup. For Claude Code, simply exit and restart the CLI.
 - **MCP errors:** If the harness fails to start the MCP servers, ensure `npx` is available in your PATH. You can check your config at `~/.claude.json` or `~/.config/opencode/opencode.json`.
 - **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). If you are behind a corporate proxy, you may need to set `HTTPS_PROXY`.
+- **`@uluops/cli` install warning:** If setup warns it could not install the CLI globally (EACCES, nvm prefix mismatch, network), the rest of setup still completes. Run `npm install -g @uluops/cli` yourself when convenient — once it's on your PATH, every subsequent `npx @uluops/setup` will see it and skip the install step.
 - **Windows issues:** Remember that native Windows is not supported; you must run the installer and your harness within **WSL2**.
 
 ## Uninstall
@@ -184,7 +185,7 @@ Setup manages four surfaces: agent files, command files, MCP config entries, and
 npx @uluops/setup --uninstall
 ```
 
-Removes only UluOps-managed files: agents, commands, MCP config entries, and shell profile export (if `--shell` was used). Your custom agents and other MCP servers are preserved. Uninstall iterates all harnesses recorded in the manifest.
+Removes only UluOps-managed files: agents, commands, MCP config entries, shell profile export (if `--shell` was used), and the global `@uluops/cli` package (only if this setup installed it — a CLI you installed yourself is left alone). Your custom agents and other MCP servers are preserved. Uninstall iterates all harnesses recorded in the manifest.
 
 ## Requirements
 

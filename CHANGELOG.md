@@ -2,7 +2,7 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
-## [0.6.0] - 2026-06-04
+## [0.6.0] - 2026-06-05
 
 ### Added
 
