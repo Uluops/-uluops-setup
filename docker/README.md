@@ -103,19 +103,25 @@ Verdaccio at that point. For now, tarball is the lowest-friction option.
 - Ubuntu 24.04
 - Node 22.x (via NodeSource)
 - `@anthropic-ai/claude-code` (system-wide; provides `claude` on PATH)
+- `opencode-ai` (system-wide; provides `opencode` on PATH)
 - Non-root user `tester` (uid 1000)
 - Per-user npm prefix at `/home/tester/.npm-global/` (in `PATH`, `NPM_CONFIG_PREFIX`,
   and `.profile`/`.bashrc` for login + interactive shells)
 
-The Claude Code CLI is installed system-wide as root during image build,
-so `claude` is on PATH for `tester` without per-user setup. But harness
-**detection** keys off `existsSync(~/.claude/)` (see
-`src/harnesses/index.ts:72`), so:
+Claude Code and OpenCode CLIs are installed system-wide as root during
+image build, so `claude` and `opencode` are on PATH for `tester` without
+per-user setup. But harness **detection** keys off `existsSync(profile.paths.home)`
+(see `src/harnesses/index.ts:72`), so:
 
-- Scenarios that want the "Claude Code detected" branch → `mkdir -p ~/.claude`
-  before running setup
-- Scenarios that want the "no harness detected → fall back to claude-code
-  default" branch → leave the dir absent
+- Claude Code: detection requires `~/.claude/` to exist
+- OpenCode: detection requires `$XDG_CONFIG_HOME/opencode/` (defaults to
+  `~/.config/opencode/`)
+
+Scenarios that want a specific branch:
+- "Detected" → `mkdir -p` the relevant home dir before running setup
+- "No harness detected → fall back to claude-code default" → leave both absent
+- "Specific harness regardless of state" → pass `--harness claude-code` or
+  `--harness opencode` explicitly
 
 The per-user npm prefix matters: without it, `npm install -g` would EACCES
 under `tester` and we couldn't distinguish "setup's install logic is broken"
@@ -123,11 +129,27 @@ from "container env is broken." See the Dockerfile comments for the rationale.
 
 ## Existing scenarios
 
+### Claude Code
+
 | Scenario | Asserts |
 |---|---|
 | `fresh-install` | npx setup succeeds on a clean OS; agents/commands/manifest appear |
 | `agent-metrics-cli` | Regression guard for CHANGELOG [0.7.1] — `agent-metrics` is on PATH in a **new** shell spawned after the npx process exits |
 | `uninstall-roundtrip` | Setup-owned state goes on uninstall; user-owned files (sentinel agent, third-party MCP entry) survive |
+
+### OpenCode
+
+| Scenario | Asserts |
+|---|---|
+| `opencode-fresh-install` | Pre-creates `~/.config/opencode/` to fire detection; runs setup `--harness opencode`; asserts opencode-shaped MCP config (`mcp` key not `mcpServers`, `type: "local"`, `command` as list, `environment` not `env`); asserts agents land in `~/.config/opencode/agents/`; asserts no `~/.claude/` contamination |
+| `opencode-uninstall-roundtrip` | Install → assert merge (sentinel agent + third-party MCP preserved); uninstall → assert setup-owned state removed while user-owned state survives, in the opencode-shaped config |
+
+OpenCode-specific gotcha pinned by these scenarios: as of setup 0.7.1,
+commands are NOT installed for OpenCode — setup prints "Commands not yet
+supported for OpenCode (coming soon)" and skips the dir, but the
+`opencode.ts` profile still defines `commandsDir`. The scenarios assert
+present behavior; if commands ship for OpenCode later, the fresh-install
+scenario will print a `NOTE:` line prompting an update.
 
 ## Adding a scenario
 

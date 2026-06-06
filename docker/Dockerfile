@@ -29,6 +29,13 @@ RUN apt-get update \
 # "no harness detected" fallback path leave it absent.
 RUN npm install -g @anthropic-ai/claude-code
 
+# OpenCode CLI — the second stable harness setup targets. Lightweight
+# (~2 packages, 2s install). Detection still keys off existsSync of
+# $XDG_CONFIG_HOME/opencode/ (defaults to ~/.config/opencode/); scenarios
+# that want opencode-as-target either pre-create that dir or pass
+# `--harness opencode` explicitly.
+RUN npm install -g opencode-ai
+
 # Non-root user matches real-user PATH semantics. uid 1000 matches the
 # typical first-user uid on Ubuntu/WSL so bind-mounted files retain
 # sensible ownership if anyone mounts a host directory in.
