@@ -7,6 +7,7 @@ All notable changes to `@uluops/setup` will be documented in this file.
 ### Added
 
 - **Process-level install lock.** `runSetup` and `runUninstall` now acquire `~/.uluops/install.lock/` before touching shared state. A second concurrent `npx @uluops/setup` (or `uluops-setup --uninstall`) running on the same machine now fails fast with a clear message naming the holding PID, hostname, and how long it has been running — instead of silently racing the read-merge-write windows on `~/.claude.json`, `~/.gemini/settings.json`, `~/.config/opencode/opencode.json`, `~/.claude/settings.json`, `~/.bashrc`/`.zshrc`, and `~/.uluops/manifest.json` (six surfaces, not the one originally identified). Surfaced by ship-pipeline code-auditor as AF-006 on `uluops-setup` run #19. Hand-rolled around `mkdir`-atomicity — no new runtime dependency. Lock metadata `{pid, hostname, startedAt}` is written inside the lock dir; stale locks are reclaimed when the holding PID is detected as dead (same host) or when the lock is older than 30 minutes (cross-host fallback). SIGINT/SIGTERM/uncaughtException all release the lock before exit. Dry-run is read-only and bypasses the lock.
+- **`agent-metrics` CLI prompt.** Setup now offers to install `@uluops/agent-metrics` globally so the `agent-metrics` command is available on PATH after install — previously the package was copied into `~/.claude/tools/agent-metrics/` only so the SubagentStop hook could invoke `dist/hook.js`, but the `bin` entry never reached PATH and users hit `command not found` when trying to inspect captures. The prompt fires only when the metrics hook itself was configured (i.e., when there are captures to read). New `--with-agent-metrics-cli` and `--no-agent-metrics-cli` flags mirror the existing `--with-cli` / `--no-cli` pair. Non-interactive runs (`--yes`, `--api-key`, no TTY) skip the prompt and require the explicit flag to install. Manifest gains `agentMetricsCliInstalled` + `agentMetricsCliInstalledVersion`; uninstall reverses the global install only when this setup performed it (same ownership rule as `@uluops/cli`).
 
 ### Known limitations
 
@@ -19,7 +20,10 @@ All notable changes to `@uluops/setup` will be documented in this file.
 - 11 unit tests in `src/test/install-lock.test.ts` covering acquire/release, fail-fast on held lock, stale-by-dead-PID, stale-by-timeout, stale-by-corrupt-meta, stale-by-missing-meta, `waitMs` polling success and timeout, idempotent release, and cross-host lock semantics.
 - 1 integration test in `src/test/install-lock-integration.test.ts` spawning two real child `node` processes against the compiled dist — true OS-level concurrency serializes as expected.
 - `src/cli.ts` formats `InstallLockHeldError` with a hint about stale-lock auto-recovery rather than emitting a stack trace.
-- Suite: 200 → 212 tests (+12).
+- New `src/steps/agent-metrics-cli.ts` mirrors `src/steps/cli.ts` — `AgentMetricsCliExecutor` interface with `detect`/`install`/`uninstall`, `installAgentMetricsCli` + `uninstallAgentMetricsCli`, executor injection for tests.
+- New `configureAgentMetricsCliStep` helper in `src/commands/helpers.ts` carries the decision matrix and user-facing prompt; `runSetup` invokes it after `configureMetricsStep`, gated on `metricsResult.hookConfigured`.
+- 11 unit tests in `src/test/agent-metrics-cli.test.ts` covering install (already-present, success, failure, post-install detect miss, dryRun) and uninstall (absent, present, post-uninstall recovery, persistent failure, dryRun).
+- Suite: 200 → 223 tests (+23 total for this release — 12 from install-lock + 11 from agent-metrics-cli).
 
 ## [0.6.5] - 2026-06-05
 

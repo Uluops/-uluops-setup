@@ -53,6 +53,14 @@ export interface Manifest {
   cliInstalled?: boolean;
   /** Version reported by `ulu --version` at install time, for drift detection. */
   cliInstalledVersion?: string | null;
+  /**
+   * Tracks whether `@uluops/agent-metrics` was installed globally by this
+   * setup run. Same ownership semantics as `cliInstalled` — uninstall only
+   * removes the global package when this is true.
+   */
+  agentMetricsCliInstalled?: boolean;
+  /** Version reported by `agent-metrics --version` at install time. */
+  agentMetricsCliInstalledVersion?: string | null;
   contentHash?: string;
 }
 

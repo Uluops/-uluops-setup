@@ -14,6 +14,10 @@ import { uninstallCommands } from "../steps/commands.js";
 import { removeShellExport } from "../steps/shell.js";
 import { uninstallMetrics } from "../steps/metrics.js";
 import { uninstallCli, CLI_PACKAGE } from "../steps/cli.js";
+import {
+  uninstallAgentMetricsCli,
+  AGENT_METRICS_PACKAGE,
+} from "../steps/agent-metrics-cli.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 import { getProfile } from "../harnesses/index.js";
@@ -120,6 +124,24 @@ export async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
     } else {
       warn(
         `Could not remove ${CLI_PACKAGE} (global) — try \`npm uninstall -g ${CLI_PACKAGE}\` manually`,
+      );
+      if (res.error) {
+        const oneLine = res.error.split("\n")[0]?.slice(0, 120) ?? "";
+        if (oneLine) info(`  ${oneLine}`);
+      }
+    }
+  }
+
+  // Same ownership rule for the agent-metrics CLI.
+  if (manifest.agentMetricsCliInstalled) {
+    const res = await uninstallAgentMetricsCli({ dryRun: opts.dryRun });
+    if (opts.dryRun) {
+      ok(`Would remove ${AGENT_METRICS_PACKAGE} (global)`);
+    } else if (res.removed) {
+      ok(`Removed ${AGENT_METRICS_PACKAGE} (global)`);
+    } else {
+      warn(
+        `Could not remove ${AGENT_METRICS_PACKAGE} (global) — try \`npm uninstall -g ${AGENT_METRICS_PACKAGE}\` manually`,
       );
       if (res.error) {
         const oneLine = res.error.split("\n")[0]?.slice(0, 120) ?? "";

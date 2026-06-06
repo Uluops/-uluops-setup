@@ -21,6 +21,7 @@ import {
   installCommandsDefs,
   configureMetricsStep,
   configureCliStep,
+  configureAgentMetricsCliStep,
   runHealthCheck,
   configureShell,
 } from "./helpers.js";
@@ -37,6 +38,8 @@ export async function runSetup(opts: {
   harness: string;
   withCli?: boolean;
   cli?: boolean;
+  withAgentMetricsCli?: boolean;
+  agentMetricsCli?: boolean;
 }): Promise<void> {
   const version = await getVersion();
   const profile = getProfile(opts.harness);
@@ -113,6 +116,19 @@ export async function runSetup(opts: {
     dryRun: opts.dryRun,
   });
 
+  // Only offer the agent-metrics CLI when the hook itself got configured —
+  // the CLI's purpose is reading captures the hook produces, so without the
+  // hook there's nothing for the CLI to surface.
+  const agentMetricsCliResult = metricsResult.hookConfigured
+    ? await configureAgentMetricsCliStep({
+        withAgentMetricsCli: opts.withAgentMetricsCli,
+        agentMetricsCli: opts.agentMetricsCli,
+        yes: opts.yes,
+        apiKey: opts.apiKey,
+        dryRun: opts.dryRun,
+      })
+    : null;
+
   await runHealthCheck(opts);
 
   const shellModified = await configureShell(env, apiKey, opts);
@@ -152,6 +168,17 @@ export async function runSetup(opts: {
     if (cliResult && cliResult.installed && !cliResult.alreadyPresent) {
       manifest.cliInstalled = true;
       manifest.cliInstalledVersion = cliResult.version;
+    }
+
+    // Same ownership rule for agent-metrics CLI — only manifest a global install
+    // we performed ourselves.
+    if (
+      agentMetricsCliResult &&
+      agentMetricsCliResult.installed &&
+      !agentMetricsCliResult.alreadyPresent
+    ) {
+      manifest.agentMetricsCliInstalled = true;
+      manifest.agentMetricsCliInstalledVersion = agentMetricsCliResult.version;
     }
 
     await saveManifest(manifest);

@@ -14,6 +14,15 @@ import { installMetrics } from "../steps/metrics.js";
 import type { MetricsResult } from "../steps/metrics.js";
 import { installCli, CLI_PACKAGE } from "../steps/cli.js";
 import type { CliExecutor, CliInstallResult } from "../steps/cli.js";
+import {
+  installAgentMetricsCli,
+  AGENT_METRICS_PACKAGE,
+  AGENT_METRICS_BIN,
+} from "../steps/agent-metrics-cli.js";
+import type {
+  AgentMetricsCliExecutor,
+  AgentMetricsCliInstallResult,
+} from "../steps/agent-metrics-cli.js";
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
 import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
@@ -266,6 +275,95 @@ export async function configureCliStep(opts: {
   }
   warn(
     `Could not install ${CLI_PACKAGE} globally — try ${chalk.cyan(`npm install -g ${CLI_PACKAGE}`)} manually`,
+  );
+  if (res.error) {
+    const oneLine = res.error.split("\n")[0]?.slice(0, 120) ?? "";
+    if (oneLine) info(chalk.dim(`  ${oneLine}`));
+  }
+  return res;
+}
+
+/**
+ * Decide whether to install `@uluops/agent-metrics` globally and do it.
+ *
+ * Only meaningful when the SubagentStop hook actually got configured —
+ * otherwise the CLI has no captures to read. Caller gates on
+ * `metricsResult.hookConfigured`.
+ *
+ * Decision matrix mirrors `configureCliStep`:
+ * - `--no-agent-metrics-cli` (opts.agentMetricsCli === false) → skip, no prompt
+ * - `--with-agent-metrics-cli` (opts.withAgentMetricsCli === true) → install, no prompt
+ * - Neither flag + non-interactive (--yes / --api-key / no TTY) → skip
+ * - Neither flag + interactive → prompt (default Y)
+ *
+ * Returns null when the step did not run (skipped). Returns an install result
+ * when an attempt was made, for manifest recording.
+ */
+export async function configureAgentMetricsCliStep(opts: {
+  withAgentMetricsCli?: boolean;
+  agentMetricsCli?: boolean;
+  yes: boolean;
+  apiKey?: string;
+  dryRun: boolean;
+  executor?: AgentMetricsCliExecutor;
+}): Promise<AgentMetricsCliInstallResult | null> {
+  if (opts.agentMetricsCli === false) {
+    info(
+      chalk.dim(
+        `Skipped global ${AGENT_METRICS_PACKAGE} install (--no-agent-metrics-cli)`,
+      ),
+    );
+    return null;
+  }
+
+  let shouldInstall: boolean;
+  if (opts.withAgentMetricsCli === true) {
+    shouldInstall = true;
+  } else {
+    const nonInteractive =
+      opts.yes || !!opts.apiKey || !process.stdin.isTTY;
+    if (nonInteractive) {
+      info(
+        chalk.dim(
+          `Skipped global ${AGENT_METRICS_PACKAGE} install (non-interactive — pass --with-agent-metrics-cli to install)`,
+        ),
+      );
+      return null;
+    }
+    const { confirm } = await import("@inquirer/prompts");
+    shouldInstall = await confirm({
+      message: `Install ${AGENT_METRICS_PACKAGE} globally (provides the ${chalk.cyan(AGENT_METRICS_BIN)} command for reading captures)?`,
+      default: true,
+    });
+    if (!shouldInstall) {
+      info(chalk.dim(`Skipped global ${AGENT_METRICS_PACKAGE} install`));
+      return null;
+    }
+  }
+
+  const res = await installAgentMetricsCli({
+    dryRun: opts.dryRun,
+    executor: opts.executor,
+  });
+
+  if (opts.dryRun && !res.alreadyPresent) {
+    ok(`Would install ${AGENT_METRICS_PACKAGE} globally`);
+    return res;
+  }
+  if (res.alreadyPresent) {
+    ok(
+      `${AGENT_METRICS_PACKAGE} already installed${res.version ? ` (${res.version})` : ""} — no change`,
+    );
+    return res;
+  }
+  if (res.installed) {
+    ok(
+      `${AGENT_METRICS_PACKAGE} installed globally${res.version ? ` (${res.version})` : ""}`,
+    );
+    return res;
+  }
+  warn(
+    `Could not install ${AGENT_METRICS_PACKAGE} globally — try ${chalk.cyan(`npm install -g ${AGENT_METRICS_PACKAGE}`)} manually`,
   );
   if (res.error) {
     const oneLine = res.error.split("\n")[0]?.slice(0, 120) ?? "";
