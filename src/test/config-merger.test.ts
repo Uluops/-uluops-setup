@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mergeUluopsMcp, removeUluopsMcp } from "../lib/config-merger.js";
 
 describe("mergeUluopsMcp", () => {
@@ -102,5 +102,62 @@ describe("removeUluopsMcp", () => {
   it("handles config with no mcpServers key", () => {
     const result = removeUluopsMcp({ numStartups: 1 });
     expect(result.mcpServers).toBeUndefined();
+  });
+});
+
+describe("checkMcpPackageAvailability", () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("includes the rejection reason for network failures instead of 'unknown'", async () => {
+    const { checkMcpPackageAvailability } = await import(
+      "../lib/config-merger.js"
+    );
+    // Make every fetch reject with a real Error so we exercise the rejection
+    // branch (network/DNS/timeout class).
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error("getaddrinfo ENOTFOUND registry.npmjs.org"), {
+          code: "ENOTFOUND",
+        }),
+      ) as unknown as typeof fetch;
+
+    const result = await checkMcpPackageAvailability();
+    expect(result.available).toEqual([]);
+    expect(result.missing).toHaveLength(2);
+    // Each missing entry now carries the package name AND the network reason —
+    // no literal 'unknown' fallback that hides the real failure.
+    for (const entry of result.missing) {
+      expect(entry).not.toBe("unknown");
+      expect(entry).toMatch(/@uluops\/(ops-mcp|registry-mcp)/);
+      expect(entry).toContain("network:");
+      expect(entry).toContain("ENOTFOUND");
+    }
+  });
+
+  it("emits the bare package name (no annotation) on registry-side miss (non-2xx)", async () => {
+    const { checkMcpPackageAvailability } = await import(
+      "../lib/config-merger.js"
+    );
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+    }) as unknown as typeof fetch;
+
+    const result = await checkMcpPackageAvailability();
+    expect(result.available).toEqual([]);
+    expect(result.missing).toEqual([
+      "@uluops/ops-mcp",
+      "@uluops/registry-mcp",
+    ]);
+    // No `(network: ...)` suffix on registry-side misses.
+    for (const entry of result.missing) {
+      expect(entry).not.toContain("network:");
+    }
   });
 });

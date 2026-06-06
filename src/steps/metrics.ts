@@ -6,7 +6,8 @@
  */
 
 import { mkdir, readdir, copyFile, rm, access, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { HarnessProfile } from "../harnesses/index.js";
 
 /** Where agent-metrics dist files are installed (derived from profile) */
@@ -60,8 +61,14 @@ interface MetricsSource {
 async function findMetricsSource(): Promise<MetricsSource | null> {
   try {
     const resolved = import.meta.resolve("@uluops/agent-metrics");
-    // resolved is like file:///path/to/dist/index.js — get the package root
-    const distDir = new URL(".", resolved).pathname;
+    // resolved is a file:// URL like file:///path/to/dist/index.js. Convert
+    // to a filesystem path via fileURLToPath, which handles Windows drive
+    // letters correctly. The previous `.pathname` access produced
+    // `/C:/path/to/...` on Windows (and WSL-mounted Windows paths),
+    // breaking the subsequent readFile of package.json — silently returning
+    // a null version and defeating verify's drift detection.
+    const distFile = fileURLToPath(resolved);
+    const distDir = dirname(distFile);
     const pkgRoot = join(distDir, "..");
     const version = await readSourceVersion(pkgRoot);
     return { pkgRoot, version };

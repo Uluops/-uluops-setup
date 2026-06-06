@@ -193,6 +193,62 @@ describe("validateManifest", () => {
   });
 });
 
+describe("manifest schema invariants", () => {
+  it("rejects a manifest with empty harnesses: {} (vacuous-truth regression)", async () => {
+    // Truncated/partial-write produced a structurally complete top level but
+    // zero harness entries. The previous isNewManifest used a for-of loop
+    // that vacuously accepted the empty case, so uninstall would later
+    // delete this manifest and report success while leaving every MCP
+    // config, agent file, hook, and shell export in place.
+    const emptyHarnesses = {
+      version: "0.7.1",
+      installedAt: "2026-06-06T00:00:00.000Z",
+      shellModified: false,
+      harnesses: {},
+    };
+    await writeFile(manifestPath, JSON.stringify(emptyHarnesses));
+    const result = await loadManifest();
+    expect(result).toBeNull();
+  });
+});
+
+describe("validateManifest hash check", () => {
+  it("does not emit a false 'Cannot read manifest file' warning when only legacy manifest exists on disk", async () => {
+    // Reproduces the bug: user has only the legacy manifest. loadManifest()
+    // migrates it in-memory but never writes the new path. validateManifest
+    // used to hardcode getManifestPath() (new), the read failed, and a
+    // misleading warning fired on every uninstall.
+    await writeFile(legacyPath, JSON.stringify(legacyManifest));
+    const manifest = await loadManifest();
+    expect(manifest).not.toBeNull();
+    const result = await validateManifest(manifest!);
+    expect(
+      result.warnings.find((w) => w.includes("Cannot read manifest file")),
+    ).toBeUndefined();
+  });
+
+  it("still detects hash mismatch when the on-disk new-path manifest has been tampered with", async () => {
+    // saveManifest writes a canonical form with contentHash. We then mutate
+    // a top-level field after the fact to simulate user editing — the hash
+    // must mismatch and the warning must fire.
+    await saveManifest(sampleManifest);
+    const raw = await import("node:fs/promises").then((m) =>
+      m.readFile(manifestPath, "utf-8"),
+    );
+    const tampered = raw.replace(
+      '"shellModified": false',
+      '"shellModified": true',
+    );
+    await writeFile(manifestPath, tampered);
+    const reloaded = await loadManifest();
+    expect(reloaded).not.toBeNull();
+    const result = await validateManifest(reloaded!);
+    expect(
+      result.warnings.some((w) => w.includes("content hash mismatch")),
+    ).toBe(true);
+  });
+});
+
 describe("deleteManifest", () => {
   it("deletes existing manifest", async () => {
     await writeFile(manifestPath, JSON.stringify(sampleManifest));

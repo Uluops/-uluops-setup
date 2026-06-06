@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { installCli, uninstallCli } from "../steps/cli.js";
+import { spawnSync } from "node:child_process";
+import { installCli, uninstallCli, summarizeSpawnResult } from "../steps/cli.js";
 import type { CliExecutor } from "../steps/cli.js";
 
 function makeExecutor(overrides: Partial<CliExecutor> = {}): CliExecutor {
@@ -152,5 +153,44 @@ describe("uninstallCli", () => {
     const res = await uninstallCli({ dryRun: true, executor: exec });
     expect(res.removed).toBe(true);
     expect(called).toBe(false);
+  });
+});
+
+describe("summarizeSpawnResult — npm timeout handling", () => {
+  it("recognizes a SIGTERM + null status as a timeout and surfaces a clear error message", () => {
+    // Run a real subprocess with a tight timeout to produce a genuine
+    // SIGTERM/null-status result, instead of fabricating the shape.
+    const r = spawnSync(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { encoding: "utf-8", timeout: 50 },
+    );
+    expect(r.signal).toBe("SIGTERM");
+    expect(r.status).toBeNull();
+
+    const summary = summarizeSpawnResult(r, "install");
+    expect(summary.ok).toBe(false);
+    expect(summary.error).toContain("timeout");
+    expect(summary.error).toContain("install");
+  });
+
+  it("reports the captured stderr on a normal non-zero exit", () => {
+    const r = spawnSync(
+      process.execPath,
+      ["-e", "process.stderr.write('boom'); process.exit(2)"],
+      { encoding: "utf-8" },
+    );
+    expect(r.status).toBe(2);
+    const summary = summarizeSpawnResult(r, "install");
+    expect(summary.ok).toBe(false);
+    expect(summary.error).toBe("boom");
+  });
+
+  it("returns ok on clean exit", () => {
+    const r = spawnSync(process.execPath, ["-e", "process.exit(0)"], {
+      encoding: "utf-8",
+    });
+    const summary = summarizeSpawnResult(r, "install");
+    expect(summary).toEqual({ ok: true });
   });
 });

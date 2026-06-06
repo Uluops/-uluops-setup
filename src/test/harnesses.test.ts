@@ -301,3 +301,60 @@ describe("scaffold profiles", () => {
     expect(() => codexProfile.mcpConfig.check({})).toThrow(HarnessNotTestedError);
   });
 });
+
+describe("opencode XDG_CONFIG_HOME validation is deferred", () => {
+  // These tests prove that an invalid XDG_CONFIG_HOME does NOT block module
+  // loading or unrelated CLI flows (--help, --uninstall of claude-code, etc.)
+  // — the validation fires only when opencode is the selected profile.
+
+  it("importing opencode does not throw when XDG_CONFIG_HOME is invalid (path traversal)", async () => {
+    const prior = process.env["XDG_CONFIG_HOME"];
+    process.env["XDG_CONFIG_HOME"] = "/etc/../passwd";
+    try {
+      // Re-import via vi.resetModules to exercise the IIFE under the new env.
+      const { resetModules } = await import("vitest").then((m) => ({
+        resetModules: m.vi.resetModules,
+      }));
+      resetModules();
+      await expect(import("../harnesses/opencode.js")).resolves.toBeDefined();
+    } finally {
+      if (prior === undefined) delete process.env["XDG_CONFIG_HOME"];
+      else process.env["XDG_CONFIG_HOME"] = prior;
+    }
+  });
+
+  it("getProfile('opencode') throws the deferred error when XDG_CONFIG_HOME is invalid", async () => {
+    const prior = process.env["XDG_CONFIG_HOME"];
+    process.env["XDG_CONFIG_HOME"] = "/etc/../passwd";
+    try {
+      const { vi } = await import("vitest");
+      vi.resetModules();
+      const opencodeMod = await import("../harnesses/opencode.js");
+      // Calling assertOpencodeEnvironment directly is the simplest, most
+      // isolated test of the deferred-validation contract.
+      expect(() => opencodeMod.assertOpencodeEnvironment()).toThrow(
+        /XDG_CONFIG_HOME/,
+      );
+    } finally {
+      if (prior === undefined) delete process.env["XDG_CONFIG_HOME"];
+      else process.env["XDG_CONFIG_HOME"] = prior;
+    }
+  });
+
+  it("getProfile('claude-code') does not throw even when XDG_CONFIG_HOME is invalid", async () => {
+    const prior = process.env["XDG_CONFIG_HOME"];
+    process.env["XDG_CONFIG_HOME"] = "/etc/../passwd";
+    try {
+      const { vi } = await import("vitest");
+      vi.resetModules();
+      const reg = await import("../harnesses/index.js");
+      // Selecting an unrelated harness must not surface opencode's deferred
+      // error — preserves `--help` / `--uninstall` usability for users with
+      // a broken XDG.
+      expect(() => reg.getProfile("claude-code")).not.toThrow();
+    } finally {
+      if (prior === undefined) delete process.env["XDG_CONFIG_HOME"];
+      else process.env["XDG_CONFIG_HOME"] = prior;
+    }
+  });
+});

@@ -62,11 +62,35 @@ export function parseGlobalAgentMetricsVersion(stdout: string | undefined): stri
  * proxy. `npm ls` exits non-zero when the queried package is missing but still
  * emits valid JSON, so we rely on the JSON content rather than the exit code.
  */
+/** Same bounds as the @uluops/cli installer — see src/steps/cli.ts rationale. */
+const NPM_TIMEOUT_MS = 5 * 60_000;
+const DETECT_TIMEOUT_MS = 30_000;
+
+function summarizeNpmResult(
+  r: ReturnType<typeof spawnSync>,
+  op: string,
+): { ok: boolean; error?: string } {
+  if (r.status === 0) return { ok: true };
+  if (r.signal === "SIGTERM" && r.status === null) {
+    return {
+      ok: false,
+      error: `npm ${op} exceeded ${NPM_TIMEOUT_MS / 1000}s timeout and was terminated`,
+    };
+  }
+  const stderr = (r.stderr ?? "").toString().trim();
+  const stdout = (r.stdout ?? "").toString().trim();
+  return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+}
+
 export function detectGlobalAgentMetrics(): string | null {
   const r = spawnSync(
     "npm",
     ["ls", "-g", AGENT_METRICS_PACKAGE, "--depth=0", "--json"],
-    { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: DETECT_TIMEOUT_MS,
+    },
   );
   return parseGlobalAgentMetricsVersion(r.stdout);
 }
@@ -78,21 +102,17 @@ export const defaultAgentMetricsExecutor: AgentMetricsCliExecutor = {
     const r = spawnSync("npm", ["install", "-g", AGENT_METRICS_PACKAGE], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: NPM_TIMEOUT_MS,
     });
-    if (r.status === 0) return { ok: true };
-    const stderr = (r.stderr ?? "").toString().trim();
-    const stdout = (r.stdout ?? "").toString().trim();
-    return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+    return summarizeNpmResult(r, "install");
   },
   uninstall: () => {
     const r = spawnSync("npm", ["uninstall", "-g", AGENT_METRICS_PACKAGE], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: NPM_TIMEOUT_MS,
     });
-    if (r.status === 0) return { ok: true };
-    const stderr = (r.stderr ?? "").toString().trim();
-    const stdout = (r.stdout ?? "").toString().trim();
-    return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+    return summarizeNpmResult(r, "uninstall");
   },
 };
 

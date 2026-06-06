@@ -33,16 +33,27 @@ export async function checkMcpPackageAvailability(): Promise<{
     ),
   );
 
+  // Per-index correspondence: results[i] corresponds to MCP_PACKAGES[i] by
+  // Promise.allSettled's stable ordering. The previous `?? "unknown"` fallback
+  // could emit a literal "unknown" string into `missing`, hiding the real
+  // failure reason (DNS error, timeout, 404) under an undiagnosable label.
   for (let i = 0; i < results.length; i++) {
     const result = results[i]!;
-    if (result.status === "fulfilled" && result.value.ok) {
-      available.push(result.value.pkg);
+    const pkg = MCP_PACKAGES[i]!;
+    if (result.status === "fulfilled") {
+      if (result.value.ok) {
+        available.push(pkg);
+      } else {
+        // Registry returned non-2xx — package likely missing or unpublished.
+        missing.push(pkg);
+      }
     } else {
-      const pkg =
-        result.status === "fulfilled"
-          ? result.value.pkg
-          : MCP_PACKAGES[i] ?? "unknown";
-      missing.push(pkg);
+      // Network failure: AbortError (timeout), DNS, TLS, EAI_AGAIN, etc.
+      const reason =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      missing.push(`${pkg} (network: ${reason})`);
     }
   }
 

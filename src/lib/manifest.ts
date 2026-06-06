@@ -90,8 +90,14 @@ function isNewManifest(obj: unknown): obj is Manifest {
     m["harnesses"] === null
   ) return false;
 
-  // Validate at least one harness entry has required fields
+  // An on-disk manifest must reference at least one harness installation.
+  // The empty-harnesses case used to pass vacuously (the for-loop iterated
+  // zero times), letting a truncated `{...harnesses:{}}` file masquerade as
+  // valid — and a subsequent uninstall would then iterate zero harnesses,
+  // delete the manifest, and report success while leaving every MCP config,
+  // agent, hook, and shell export in place.
   const harnesses = m["harnesses"] as Record<string, unknown>;
+  if (Object.keys(harnesses).length === 0) return false;
   for (const h of Object.values(harnesses)) {
     if (typeof h !== "object" || h === null) return false;
     const hm = h as Record<string, unknown>;
@@ -191,20 +197,36 @@ export async function validateManifest(
     }
   }
 
-  const manifestPath = getManifestPath();
-  try {
-    const raw = await readFile(manifestPath, "utf-8");
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const { contentHash: storedHash, ...withoutHash } = parsed;
-    const canonical = JSON.stringify(withoutHash, null, 2) + "\n";
-    const currentHash = fileHash(canonical);
-    if (storedHash && storedHash !== currentHash) {
-      warnings.push(
-        "Manifest file has been modified since installation — content hash mismatch",
-      );
+  // Hash verification reads whichever manifest file actually exists. The
+  // previous implementation hardcoded the new path, which produced a false
+  // "Cannot read manifest file to verify content hash" warning on every
+  // uninstall after `loadManifest` migrated a legacy manifest in memory
+  // without writing it back to the new location. Silently skip the hash
+  // check when no manifest is on disk in either location (in-memory-only
+  // manifest, or both locations missing).
+  let raw: string | null = null;
+  for (const candidate of [getManifestPath(), getLegacyManifestPath()]) {
+    try {
+      raw = await readFile(candidate, "utf-8");
+      break;
+    } catch {
+      // Try next candidate
     }
-  } catch {
-    warnings.push("Cannot read manifest file to verify content hash");
+  }
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const { contentHash: storedHash, ...withoutHash } = parsed;
+      const canonical = JSON.stringify(withoutHash, null, 2) + "\n";
+      const currentHash = fileHash(canonical);
+      if (storedHash && storedHash !== currentHash) {
+        warnings.push(
+          "Manifest file has been modified since installation — content hash mismatch",
+        );
+      }
+    } catch {
+      warnings.push("Manifest file is unparseable JSON");
+    }
   }
 
   return { valid: errors.length === 0, errors, warnings };

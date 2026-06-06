@@ -3,6 +3,18 @@ import { spawnSync } from "node:child_process";
 export const CLI_PACKAGE = "@uluops/cli";
 export const CLI_BIN = "ulu";
 
+/**
+ * Maximum time we wait for an `npm install -g` / `npm uninstall -g` to
+ * complete before terminating it. Bounded to protect setup from indefinite
+ * hangs caused by corporate proxy stalls, lifecycle scripts awaiting stdin,
+ * or registry slow-response storms. 5 minutes is generous for an npm install
+ * of a small CLI and tight enough that users notice and can intervene.
+ */
+const NPM_TIMEOUT_MS = 5 * 60_000;
+
+/** Short read; 30s is plenty for `ulu --version`. */
+const DETECT_TIMEOUT_MS = 30_000;
+
 export interface CliExecutor {
   /** Returns the installed CLI version, or null if `ulu` is not on PATH or fails to run. */
   detect: () => string | null;
@@ -12,12 +24,30 @@ export interface CliExecutor {
   uninstall: () => { ok: boolean; error?: string };
 }
 
+/** @internal — exported for test access to the timeout-summarization branch. */
+export function summarizeSpawnResult(
+  r: ReturnType<typeof spawnSync>,
+  op: string,
+): { ok: boolean; error?: string } {
+  if (r.status === 0) return { ok: true };
+  if (r.signal === "SIGTERM" && r.status === null) {
+    return {
+      ok: false,
+      error: `npm ${op} exceeded ${NPM_TIMEOUT_MS / 1000}s timeout and was terminated`,
+    };
+  }
+  const stderr = (r.stderr ?? "").toString().trim();
+  const stdout = (r.stdout ?? "").toString().trim();
+  return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+}
+
 /** Default executor — shells out to `ulu` and `npm`. */
 export const defaultExecutor: CliExecutor = {
   detect: () => {
     const r = spawnSync(CLI_BIN, ["--version"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
+      timeout: DETECT_TIMEOUT_MS,
     });
     if (r.status !== 0 || !r.stdout) return null;
     return r.stdout.trim() || null;
@@ -26,21 +56,17 @@ export const defaultExecutor: CliExecutor = {
     const r = spawnSync("npm", ["install", "-g", CLI_PACKAGE], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: NPM_TIMEOUT_MS,
     });
-    if (r.status === 0) return { ok: true };
-    const stderr = (r.stderr ?? "").toString().trim();
-    const stdout = (r.stdout ?? "").toString().trim();
-    return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+    return summarizeSpawnResult(r, "install");
   },
   uninstall: () => {
     const r = spawnSync("npm", ["uninstall", "-g", CLI_PACKAGE], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: NPM_TIMEOUT_MS,
     });
-    if (r.status === 0) return { ok: true };
-    const stderr = (r.stderr ?? "").toString().trim();
-    const stdout = (r.stdout ?? "").toString().trim();
-    return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+    return summarizeSpawnResult(r, "uninstall");
   },
 };
 
