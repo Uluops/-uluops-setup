@@ -104,24 +104,26 @@ Verdaccio at that point. For now, tarball is the lowest-friction option.
 - Node 22.x (via NodeSource)
 - `@anthropic-ai/claude-code` (system-wide; provides `claude` on PATH)
 - `opencode-ai` (system-wide; provides `opencode` on PATH)
+- `@google/gemini-cli` (system-wide; provides `gemini` on PATH)
 - Non-root user `tester` (uid 1000)
 - Per-user npm prefix at `/home/tester/.npm-global/` (in `PATH`, `NPM_CONFIG_PREFIX`,
   and `.profile`/`.bashrc` for login + interactive shells)
 
-Claude Code and OpenCode CLIs are installed system-wide as root during
-image build, so `claude` and `opencode` are on PATH for `tester` without
-per-user setup. But harness **detection** keys off `existsSync(profile.paths.home)`
-(see `src/harnesses/index.ts:72`), so:
+Claude Code, OpenCode, and Gemini CLIs are installed system-wide as root
+during image build, so `claude`, `opencode`, and `gemini` are on PATH for
+`tester` without per-user setup. But harness **detection** keys off
+`existsSync(profile.paths.home)` (see `src/harnesses/index.ts:72`), so:
 
 - Claude Code: detection requires `~/.claude/` to exist
 - OpenCode: detection requires `$XDG_CONFIG_HOME/opencode/` (defaults to
   `~/.config/opencode/`)
+- Gemini CLI: detection requires `~/.gemini/` to exist
 
 Scenarios that want a specific branch:
 - "Detected" → `mkdir -p` the relevant home dir before running setup
-- "No harness detected → fall back to claude-code default" → leave both absent
-- "Specific harness regardless of state" → pass `--harness claude-code` or
-  `--harness opencode` explicitly
+- "No harness detected → fall back to claude-code default" → leave all absent
+- "Specific harness regardless of state" → pass `--harness claude-code`,
+  `--harness opencode`, or `--harness gemini-cli` explicitly
 
 The per-user npm prefix matters: without it, `npm install -g` would EACCES
 under `tester` and we couldn't distinguish "setup's install logic is broken"
@@ -143,6 +145,13 @@ from "container env is broken." See the Dockerfile comments for the rationale.
 |---|---|
 | `opencode-fresh-install` | Pre-creates `~/.config/opencode/` to fire detection; runs setup `--harness opencode`; asserts opencode-shaped MCP config (`mcp` key not `mcpServers`, `type: "local"`, `command` as list, `environment` not `env`); asserts agents land in `~/.config/opencode/agents/`; asserts no `~/.claude/` contamination |
 | `opencode-uninstall-roundtrip` | Install → assert merge (sentinel agent + third-party MCP preserved); uninstall → assert setup-owned state removed while user-owned state survives, in the opencode-shaped config |
+
+### Gemini CLI
+
+| Scenario | Asserts |
+|---|---|
+| `gemini-fresh-install` | Pre-creates `~/.gemini/` to fire detection; runs setup `--harness gemini-cli`; asserts Gemini-shaped MCP config (`mcpServers` key like Claude, but each server has `trust: true`); asserts hooks installed with `AfterTool` event + `invoke_agent` matcher (different from Claude's `SubagentStop`); asserts agents + commands + metrics tools all under `~/.gemini/`; asserts no `~/.claude/` or `~/.config/opencode/` contamination |
+| `gemini-uninstall-roundtrip` | Install with planted user sentinel + third-party MCP entry + user-owned `AfterTool` hook with matcher `user-custom`; assert merge correctness (uluops's `trust:true` server added, third-party preserved, user hook preserved); uninstall; assert setup-owned state (mcp entries, uluops hook, metrics tools dir) removed while user-owned state (sentinel agent, third-party MCP, user-custom hook) survives |
 
 OpenCode-specific gotcha pinned by these scenarios: as of setup 0.7.1,
 commands are NOT installed for OpenCode — setup prints "Commands not yet

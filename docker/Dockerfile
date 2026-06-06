@@ -36,6 +36,12 @@ RUN npm install -g @anthropic-ai/claude-code
 # `--harness opencode` explicitly.
 RUN npm install -g opencode-ai
 
+# Gemini CLI — the third stable harness setup targets. Detection keys off
+# existsSync(~/.gemini/). Scenarios pre-create ~/.gemini/ or pass
+# `--harness gemini-cli` explicitly. Note: Gemini's MCP config gets a
+# `trust: true` field that Claude Code's doesn't — scenarios assert it.
+RUN npm install -g @google/gemini-cli
+
 # Non-root user matches real-user PATH semantics. uid 1000 matches the
 # typical first-user uid on Ubuntu/WSL so bind-mounted files retain
 # sensible ownership if anyone mounts a host directory in.
