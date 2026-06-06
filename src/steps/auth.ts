@@ -112,7 +112,10 @@ async function readCredentialsFile(): Promise<string | undefined> {
 async function validateKey(
   apiKey: string,
 ): Promise<{ email: string | null }> {
-  const url = "https://api.uluops.ai/api/v1/registry/users/me";
+  // Self-identity lives in ops-uluops-api (`/api/v1/auth/me`), not the
+  // registry-api users namespace. Registry-api `/users/:id` Zod-validates the
+  // id as UUID, so /users/me returns 400 with `id: ["Invalid uuid"]`.
+  const url = "https://api.uluops.ai/api/v1/auth/me";
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
@@ -129,8 +132,9 @@ async function validateKey(
       throw new Error(`API returned ${res.status}. Try --skip-validation to continue offline.`);
     }
 
-    const data = (await res.json()) as { email?: string };
-    return { email: data.email ?? null };
+    // ops-uluops-api wraps user payloads as { data: { email, ... } }
+    const body = (await res.json()) as { data?: { email?: string } };
+    return { email: body.data?.email ?? null };
   } catch (err) {
     // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED).
     // Re-thrown errors from the res.status checks above are plain Error instances.

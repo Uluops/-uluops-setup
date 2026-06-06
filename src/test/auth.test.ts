@@ -117,6 +117,83 @@ describe("credentials file fallback", () => {
   });
 });
 
+describe("validateKey (server validation path)", () => {
+  // Regression coverage for the 0.6.x→0.6.4 fix where validateKey called
+  // /registry/users/me (registry-api UUID-typed /:id route → 400) instead of
+  // ops-uluops-api /auth/me, and didn't unwrap the { data: { ... } } envelope.
+
+  it("calls /api/v1/auth/me with Bearer header and unwraps body.data.email", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ data: { id: "uuid", email: "user@example.com" } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resolveApiKey({
+      apiKeyFlag: "ulr_realkey",
+      skipValidation: false,
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.uluops.ai/api/v1/auth/me");
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      "Bearer ulr_realkey",
+    );
+    expect(result.email).toBe("user@example.com");
+  });
+
+  it("returns email null when payload omits email", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { id: "uuid" } }), { status: 200 }),
+      ),
+    );
+
+    const result = await resolveApiKey({
+      apiKeyFlag: "ulr_realkey",
+      skipValidation: false,
+    });
+    expect(result.email).toBeNull();
+  });
+
+  it("surfaces 401 with 'Invalid API key' message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("", { status: 401 })),
+    );
+
+    await expect(
+      resolveApiKey({ apiKeyFlag: "ulr_bad", skipValidation: false }),
+    ).rejects.toThrow(/Invalid API key/);
+  });
+
+  it("surfaces non-401 HTTP errors with status and --skip-validation hint", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("", { status: 500 })),
+    );
+
+    await expect(
+      resolveApiKey({ apiKeyFlag: "ulr_realkey", skipValidation: false }),
+    ).rejects.toThrow(/API returned 500.*--skip-validation/);
+  });
+
+  it("surfaces network failure as connection error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    );
+
+    await expect(
+      resolveApiKey({ apiKeyFlag: "ulr_realkey", skipValidation: false }),
+    ).rejects.toThrow(/Can't reach api\.uluops\.ai/);
+  });
+});
+
 describe("hasCredentialsFile", () => {
   it("returns true when ~/.uluops/credentials.json exists", async () => {
     const credsDir = join(tmpDir, ".uluops");
