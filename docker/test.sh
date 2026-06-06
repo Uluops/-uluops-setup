@@ -32,6 +32,23 @@ fi
 scenario="${1:-fresh-install}"
 shift || true
 
+# Preflight: confirm a Docker daemon is reachable. The `docker` CLI on its own
+# tells you nothing useful when the daemon is down — it just emits a raw
+# socket error. Hitting the daemon with `docker info` is fast (<100ms when up)
+# and gives us a clean place to surface install/start guidance.
+if ! docker info >/dev/null 2>&1; then
+  echo "${C_RED}✗${C_RESET} Docker daemon is not reachable."
+  echo
+  echo "  The Docker CLI is installed, but no daemon backend is running."
+  echo "  Common macOS backends:"
+  echo "    • OrbStack:        ${C_BOLD}brew install --cask orbstack${C_RESET} && open -a OrbStack"
+  echo "    • Colima:          ${C_BOLD}brew install colima${C_RESET} && ${C_BOLD}colima start${C_RESET}"
+  echo "    • Docker Desktop:  install from docker.com, then launch it"
+  echo
+  echo "  Once the daemon is up, ${C_BOLD}docker info${C_RESET} should succeed; then re-run this script."
+  exit 1
+fi
+
 # Special-case "shell" — interactive shell in the image, useful for poking
 # around manually without writing a scenario script.
 if [ "$scenario" = "shell" ]; then

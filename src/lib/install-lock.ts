@@ -23,7 +23,7 @@ import {
 } from "node:fs/promises";
 import { rmSync } from "node:fs";
 import { hostname } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { getInstallLockDir } from "./paths.js";
 
 const META_FILENAME = "meta.json";
@@ -79,6 +79,17 @@ export async function acquireInstallLock(
   const waitMs = opts.waitMs ?? DEFAULT_WAIT_MS;
 
   const deadline = Date.now() + waitMs;
+
+  // Ensure the parent directory exists before the atomic lock mkdir below.
+  // The lock dir itself is created with `recursive: false` to preserve
+  // mkdir-atomicity as the lock primitive (two racing processes can't both
+  // win the mkdir). But if the user has never run setup before, ~/.uluops/
+  // doesn't exist yet — and `recursive: false` mkdir surfaces ENOENT on
+  // the missing parent rather than EEXIST on the lock itself, so the loop
+  // below would treat that as an unrecoverable error. Pre-creating the
+  // parent with `recursive: true` is safe (it's idempotent and not part of
+  // the atomicity contract — only the lock dir mkdir is).
+  await mkdir(dirname(lockDir), { recursive: true });
 
   // First try (and one retry after stale-lock reclaim).
   for (let attempt = 0; attempt < 2; attempt++) {

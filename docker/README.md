@@ -171,9 +171,15 @@ Conventions:
 
 ## Troubleshooting
 
-**"failed to connect to the docker API"** — Docker daemon isn't running.
-On macOS, open Docker Desktop. The CLI tools work without the daemon for
-parsing but anything that touches the engine fails.
+**"failed to connect to the docker API" / "Docker daemon is not reachable"** —
+no Docker daemon backend is running (or installed). The Docker CLI on its
+own tells you nothing on macOS — you need one of:
+- **OrbStack** — `brew install --cask orbstack && open -a OrbStack`. Fastest
+  on Apple Silicon; free for personal use. **The current setup uses this.**
+- **Colima** — `brew install colima && colima start`. Headless, FOSS.
+- **Docker Desktop** — install from docker.com.
+`test.sh` runs a `docker info` preflight and prints install/start guidance
+when the daemon is unreachable, so this should be friendly to hit cold.
 
 **Image build hangs at `apt-get install`** — corporate proxy or NodeSource
 hiccup. Try `docker build --no-cache docker/` to bypass any half-pulled

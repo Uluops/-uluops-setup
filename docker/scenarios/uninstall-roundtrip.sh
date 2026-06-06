@@ -25,7 +25,7 @@ cat > "$HOME/.claude.json" <<'JSON'
 JSON
 
 # Install
-npx --yes /pkg/setup.tgz \
+setup-tgz \
   --api-key=ulr_fake_test_key_000000000000000000 \
   --skip-validation \
   --no-cli \
@@ -43,7 +43,7 @@ grep -q "uluops-tracker" "$HOME/.claude.json" || { echo "FAIL: uluops-tracker MC
 grep -q "third-party-server" "$HOME/.claude.json" || { echo "FAIL: third-party MCP entry was clobbered"; exit 1; }
 
 # Uninstall
-npx --yes /pkg/setup.tgz --uninstall --yes
+setup-tgz --uninstall --yes
 
 # Post-uninstall: setup-owned things gone, user-owned things preserved
 [ ! -f "$HOME/.uluops/manifest.json" ] || { echo "FAIL: manifest still present after uninstall"; exit 1; }

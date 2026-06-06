@@ -32,7 +32,10 @@ RUN npm install -g @anthropic-ai/claude-code
 # Non-root user matches real-user PATH semantics. uid 1000 matches the
 # typical first-user uid on Ubuntu/WSL so bind-mounted files retain
 # sensible ownership if anyone mounts a host directory in.
-RUN useradd -m -u 1000 -s /bin/bash tester
+# Ubuntu 24.04 ships with a default `ubuntu` user already at uid 1000;
+# remove it first so `useradd -u 1000 tester` doesn't collide.
+RUN userdel -r ubuntu 2>/dev/null || true \
+ && useradd -m -u 1000 -s /bin/bash tester
 USER tester
 WORKDIR /home/tester
 
@@ -53,6 +56,19 @@ RUN mkdir -p /home/tester/.npm-global \
 # Sanity sentinel — scenarios `cat ~/.uluops-test-marker` to confirm they're
 # running inside this image and not someone's host shell.
 RUN echo "uluops-setup-test-container" > /home/tester/.uluops-test-marker
+
+# Wrapper that invokes `npx` against the bind-mounted setup tarball.
+#
+# npx interprets bare arguments without a `./` prefix as registry package
+# names — `npx --yes /pkg/setup.tgz` produces `sh: 1: /pkg/setup.tgz:
+# Permission denied` instead of installing the tarball. The fix is the
+# combination of `cd` to the tarball's directory and a `./` prefix; this
+# wrapper hides that quirk so scenarios stay short and don't all have to
+# carry the same boilerplate.
+USER root
+RUN printf '#!/bin/bash\nset -euo pipefail\ncd /pkg && exec npx --yes ./setup.tgz "$@"\n' > /usr/local/bin/setup-tgz \
+ && chmod +x /usr/local/bin/setup-tgz
+USER tester
 
 # Scenario scripts are bind-mounted at /scenarios by the test driver, so the
 # image doesn't need rebuilding when scenarios change. The setup package

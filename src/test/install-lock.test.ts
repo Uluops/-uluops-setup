@@ -33,6 +33,19 @@ describe("acquireInstallLock", () => {
     await expect(stat(lockDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("acquires a lock whose parent directory does not yet exist", async () => {
+    // Regression: first-time users with no ~/.uluops/ on disk hit
+    // ENOENT inside the `recursive: false` mkdir on the lock dir.
+    // The fix pre-creates the parent with `recursive: true` while keeping
+    // the lock-dir mkdir atomic. Discovered by docker/scenarios/fresh-install.sh.
+    const nestedLockDir = join(tmpDir, "missing-parent", "install.lock");
+    await expect(stat(join(tmpDir, "missing-parent"))).rejects.toMatchObject({ code: "ENOENT" });
+
+    const handle = await acquireInstallLock({ lockDir: nestedLockDir });
+    await expect(stat(nestedLockDir)).resolves.toMatchObject({ isDirectory: expect.any(Function) });
+    await handle.release();
+  });
+
   it("rejects a second acquisition while the first is held (fails fast with waitMs=0)", async () => {
     const handle = await acquireInstallLock({ lockDir });
     try {

@@ -23,8 +23,9 @@ if npm ls -g @uluops/agent-metrics --depth=0 >/dev/null 2>&1; then
 fi
 
 # Run setup with --with-agent-metrics-cli (skips the interactive prompt,
-# instructs setup to install agent-metrics globally).
-npx --yes /pkg/setup.tgz \
+# instructs setup to install agent-metrics globally). `setup-tgz` is the
+# image-baked wrapper around `npx --yes ./setup.tgz`.
+setup-tgz \
   --api-key=ulr_fake_test_key_000000000000000000 \
   --skip-validation \
   --no-cli \

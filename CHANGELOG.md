@@ -13,10 +13,11 @@ All notable changes to `@uluops/setup` will be documented in this file.
 - **`validateManifest` no longer emits a false "Cannot read manifest file" warning when the manifest came from legacy.** `loadManifest` migrates a legacy manifest in memory without writing it back to the new location, but `validateManifest` hardcoded `getManifestPath()` (new) for the hash check — the read failed on every uninstall after migration, training users to ignore real corruption signals. The hash verification now reads whichever manifest file actually exists (new path tried first, legacy as fallback) and silently skips when neither is on disk. The "modified since installation" hash-mismatch warning is preserved for the genuine tamper case. Surfaced as SEM-INC/H.
 - **`npm install -g` and `npm uninstall -g` now timeout after 5 minutes.** Both `defaultExecutor` (in `src/steps/cli.ts`) and `defaultAgentMetricsExecutor` (in `src/steps/agent-metrics-cli.ts`) called `spawnSync` without a `timeout` option. A corporate proxy stall, registry slow-response storm, or a lifecycle script awaiting input could block setup indefinitely with no recovery path other than `^C`. Both executors now use a 5-minute upper bound, and the `detect` paths use a 30-second bound. Timeout-driven SIGTERM produces a clear `npm install exceeded 300s timeout and was terminated` error instead of a misleading exit-code failure. Surfaced as SEM-COM/H.
 - **Windows/WSL path resolution for `@uluops/agent-metrics`.** `findMetricsSource` in `src/steps/metrics.ts` accessed `new URL('.', resolved).pathname` to derive the package root from `import.meta.resolve`. On Windows (including WSL when a path surfaces through a Windows mount), `.pathname` yields `/C:/path/...` — the leading slash before the drive letter is invalid, the subsequent `readFile(pkgRoot/package.json)` fails, and `findMetricsSource` returns `null` with `version: null`, defeating verify's drift detection. Now uses `fileURLToPath(resolved)` from `node:url`, which handles drive letters correctly. Surfaced as SEM-COR/H.
+- **`acquireInstallLock` now creates the parent `~/.uluops/` directory before the atomic lock-dir mkdir.** First-time users with no `~/.uluops/` on disk hit `ENOENT: no such file or directory, mkdir '/home/.../.uluops/install.lock'` from `acquireInstallLock` because the lock-dir mkdir uses `recursive: false` (intentional — `mkdir` atomicity is the lock primitive) and ENOENT on the missing parent is not the same as EEXIST on the lock itself. The parent is now pre-created with `recursive: true` while the lock-dir mkdir keeps its atomicity contract. Surfaced by the new `docker/scenarios/fresh-install.sh` substrate on its very first run against a clean WSL-shaped Ubuntu container — exactly the bug class that local `npm test` cannot reproduce because dev machines always have `~/.uluops/` from prior runs. Regression test pinned at `src/test/install-lock.test.ts`.
 
 ### Internal
 
-- 16 new regression tests across the affected modules:
+- 17 new regression tests across the affected modules:
   - 5 for the `agent-metrics` detect fix (covering present/absent/unrelated-deps/missing-version/unparseable-stdout shapes of `npm ls -g --json`).
   - `src/test/config-merger.test.ts` — `checkMcpPackageAvailability` rejection-reason annotation + bare-package-name on registry miss (2 tests, mocked `fetch`).
   - `src/test/manifest.test.ts` — empty-harnesses rejection + legacy-only validate no-false-warning + hash-mismatch tamper detection (3 tests).
@@ -24,7 +25,8 @@ All notable changes to `@uluops/setup` will be documented in this file.
   - `src/test/harnesses.test.ts` — opencode module-load no-throw under invalid XDG + `assertOpencodeEnvironment` throws on demand + claude-code selection unaffected (3 tests with `vi.resetModules`).
 - `summarizeSpawnResult` exported as `@internal` from `src/steps/cli.ts` for direct test access to the timeout branch.
 - `assertOpencodeEnvironment` exported from `src/harnesses/opencode.ts` and invoked from `getProfile` in the harness registry.
-- Suite: 223 → 239 tests (+16).
+- 1 install-lock test for the missing-parent-dir regression on first-time users.
+- Suite: 223 → 240 tests (+17).
 
 ## [0.7.0] - 2026-06-05
 

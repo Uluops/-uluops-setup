@@ -14,11 +14,12 @@ cd /home/tester
 [ ! -d "$HOME/.claude" ]
 [ ! -d "$HOME/.uluops" ]
 
-# `npx <tarball>` resolves like `npx @uluops/setup` for the purposes of the
-# npx-cache PATH semantics that bit us in 0.7.0. --yes auto-confirms the
-# npx prompt, --skip-validation avoids hitting api.uluops.ai (no network
-# stub in container).
-npx --yes /pkg/setup.tgz \
+# `setup-tgz` is a wrapper baked into the image that handles the
+# `cd /pkg && npx --yes ./setup.tgz` quirk (see Dockerfile). The npx cache
+# + transient-PATH semantics are identical to `npx @uluops/setup` against
+# the real registry — what we need to reproduce the 0.7.0 bug class.
+# --skip-validation avoids hitting api.uluops.ai (no network stub here).
+setup-tgz \
   --api-key=ulr_fake_test_key_000000000000000000 \
   --skip-validation \
   --no-cli \
