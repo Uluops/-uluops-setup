@@ -126,19 +126,42 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
   }
 }
 
+/**
+ * XDG_CONFIG_HOME validation is deferred from module-load to first opencode
+ * use. The previous design threw at import, which crashed `uluops-setup
+ * --help` and `--uninstall` for any user with an invalid XDG_CONFIG_HOME —
+ * blocking them from running the very commands they need to recover. Now
+ * the IIFE caches any validation error and the harness registry calls
+ * `assertOpencodeEnvironment()` only when the opencode profile is actually
+ * selected. Unselected, the module loads cleanly and the fallback path is
+ * used for shape-only computations.
+ */
+let deferredXdgConfigError: Error | null = null;
 const xdgConfig = (() => {
   const env = process.env["XDG_CONFIG_HOME"];
   if (env) {
     if (!isAbsolute(env) || env.includes("..")) {
-      throw new Error(
+      deferredXdgConfigError = new Error(
         `XDG_CONFIG_HOME must be an absolute path without traversal: ${env}`,
       );
+      return join(homedir(), ".config");
     }
     return env;
   }
   return join(homedir(), ".config");
 })();
 const home = join(xdgConfig, "opencode");
+
+/**
+ * Throws the deferred XDG_CONFIG_HOME validation error, if any. Called by
+ * the harness registry when the user actually selects opencode (via
+ * `--harness opencode` or auto-detection picking it). Other entry points
+ * (`--help`, `--uninstall` of an unrelated harness, `--list`) never trigger
+ * this and remain usable.
+ */
+export function assertOpencodeEnvironment(): void {
+  if (deferredXdgConfigError) throw deferredXdgConfigError;
+}
 
 export const opencodeProfile: HarnessProfile = {
   name: "opencode",

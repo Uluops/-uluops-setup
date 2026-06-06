@@ -8,7 +8,7 @@
 import { existsSync } from "node:fs";
 import type { HarnessProfile } from "./types.js";
 import { claudeCodeProfile } from "./claude-code.js";
-import { opencodeProfile } from "./opencode.js";
+import { opencodeProfile, assertOpencodeEnvironment } from "./opencode.js";
 import { geminiCliProfile } from "./gemini-cli.js";
 import { codexProfile } from "./codex.js";
 
@@ -51,6 +51,10 @@ export function getProfile(name: string): HarnessProfile {
       `Unknown harness "${name}". Available: ${available}`,
     );
   }
+  // Harness-specific environment validation deferred from module-load to
+  // selection time. Keeps `--help` and `--uninstall` usable even when an
+  // unrelated harness's env is misconfigured.
+  if (resolved === "opencode") assertOpencodeEnvironment();
   return profile;
 }
 

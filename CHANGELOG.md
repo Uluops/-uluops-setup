@@ -2,6 +2,16 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.7.1] - 2026-06-05
+
+### Fixed
+
+- **`@uluops/agent-metrics` global-install detection no longer false-positives under `npx`.** v0.7.0's `defaultAgentMetricsExecutor.detect` ran `spawnSync("agent-metrics", ["--version"])` to decide whether to skip the global install. But `@uluops/agent-metrics` is a runtime dependency of `@uluops/setup` itself (used by `findMetricsSource` to resolve files to copy), so when setup runs under `npx @uluops/setup`, npx prepends its transient cache `.bin/` to PATH for the spawned process — the bin resolves there even when the user has nothing installed globally. Detect returned "0.4.0", setup reported "already installed — no change", user hit `command not found` after npx exited. Detect now queries npm directly via `npm ls -g --depth=0 --json` and parses the result, answering the actual question ("is it in the user's global install") instead of a PATH-resolution proxy. Pure JSON-parsing logic split out as `parseGlobalAgentMetricsVersion` for direct unit coverage. 5 regression tests added covering: package-present, package-absent (empty + no-deps shapes), unrelated-deps-only, version-field-missing, and unparseable-stdout. The companion `@uluops/cli` flow does NOT have this bug because setup doesn't depend on `@uluops/cli` transitively; its detect is left as-is.
+
+### Internal
+
+- Suite: 223 → 228 tests (+5).
+
 ## [0.7.0] - 2026-06-05
 
 ### Added

@@ -25,16 +25,55 @@ export interface AgentMetricsCliExecutor {
   uninstall: () => { ok: boolean; error?: string };
 }
 
-/** Default executor — shells out to `agent-metrics` and `npm`. */
+/**
+ * Parse `npm ls -g --json` output and extract the installed version of
+ * AGENT_METRICS_PACKAGE, or null if absent or unparseable.
+ *
+ * Exported for direct unit testing — keeps the JSON shape contract explicit.
+ */
+export function parseGlobalAgentMetricsVersion(stdout: string | undefined): string | null {
+  if (!stdout) return null;
+  try {
+    const parsed = JSON.parse(stdout) as {
+      dependencies?: Record<string, { version?: string }>;
+    };
+    const entry = parsed.dependencies?.[AGENT_METRICS_PACKAGE];
+    return entry?.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detect whether `@uluops/agent-metrics` is installed in npm's GLOBAL prefix.
+ *
+ * IMPORTANT: this cannot be a simple `spawnSync("agent-metrics", ["--version"])`.
+ * `@uluops/agent-metrics` is a runtime dependency of `@uluops/setup` (used by
+ * `findMetricsSource` to resolve files to copy into the harness tree). When
+ * setup runs under `npx @uluops/setup`, npx prepends its transient cache
+ * `.bin/` to PATH for the spawned process — `agent-metrics` resolves there
+ * even when the user has nothing installed globally. The check then returns
+ * "already installed" and setup skips the global install, leaving the user
+ * with `command not found` after npx exits. This was the actual bug behavior
+ * observed in v0.7.0 on the first ship.
+ *
+ * We query npm directly via `npm ls -g --depth=0 --json` — answers the actual
+ * question ("is it in the user's global install") instead of a PATH-resolution
+ * proxy. `npm ls` exits non-zero when the queried package is missing but still
+ * emits valid JSON, so we rely on the JSON content rather than the exit code.
+ */
+export function detectGlobalAgentMetrics(): string | null {
+  const r = spawnSync(
+    "npm",
+    ["ls", "-g", AGENT_METRICS_PACKAGE, "--depth=0", "--json"],
+    { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+  );
+  return parseGlobalAgentMetricsVersion(r.stdout);
+}
+
+/** Default executor — queries npm directly to avoid npx-transient-PATH false positives. */
 export const defaultAgentMetricsExecutor: AgentMetricsCliExecutor = {
-  detect: () => {
-    const r = spawnSync(AGENT_METRICS_BIN, ["--version"], {
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    if (r.status !== 0 || !r.stdout) return null;
-    return r.stdout.trim() || null;
-  },
+  detect: detectGlobalAgentMetrics,
   install: () => {
     const r = spawnSync("npm", ["install", "-g", AGENT_METRICS_PACKAGE], {
       encoding: "utf-8",

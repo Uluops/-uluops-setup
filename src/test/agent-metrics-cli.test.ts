@@ -2,8 +2,54 @@ import { describe, it, expect } from "vitest";
 import {
   installAgentMetricsCli,
   uninstallAgentMetricsCli,
+  parseGlobalAgentMetricsVersion,
 } from "../steps/agent-metrics-cli.js";
 import type { AgentMetricsCliExecutor } from "../steps/agent-metrics-cli.js";
+
+describe("parseGlobalAgentMetricsVersion", () => {
+  // Regression: prior detect() used `spawnSync("agent-metrics", ["--version"])`,
+  // which produced a false positive under npx because @uluops/agent-metrics is
+  // a runtime dep of @uluops/setup → npx's transient .bin/ is on PATH during
+  // the spawn but not after. We now parse `npm ls -g --json` directly.
+
+  it("returns the version when the package is in npm's global tree", () => {
+    const stdout = JSON.stringify({
+      name: "lib",
+      dependencies: {
+        "@uluops/agent-metrics": { version: "0.4.0", overridden: false },
+      },
+    });
+    expect(parseGlobalAgentMetricsVersion(stdout)).toBe("0.4.0");
+  });
+
+  it("returns null when the package is not in the global tree", () => {
+    // npm ls -g exits non-zero in this case but still emits {} or { dependencies: {} }
+    expect(parseGlobalAgentMetricsVersion(JSON.stringify({ name: "lib" }))).toBeNull();
+    expect(
+      parseGlobalAgentMetricsVersion(JSON.stringify({ dependencies: {} })),
+    ).toBeNull();
+  });
+
+  it("returns null for unrelated packages in dependencies", () => {
+    const stdout = JSON.stringify({
+      dependencies: { "other-package": { version: "1.0.0" } },
+    });
+    expect(parseGlobalAgentMetricsVersion(stdout)).toBeNull();
+  });
+
+  it("returns null when version field is missing from the entry", () => {
+    const stdout = JSON.stringify({
+      dependencies: { "@uluops/agent-metrics": { overridden: false } },
+    });
+    expect(parseGlobalAgentMetricsVersion(stdout)).toBeNull();
+  });
+
+  it("returns null for unparseable stdout (npm error case)", () => {
+    expect(parseGlobalAgentMetricsVersion("not json")).toBeNull();
+    expect(parseGlobalAgentMetricsVersion("")).toBeNull();
+    expect(parseGlobalAgentMetricsVersion(undefined)).toBeNull();
+  });
+});
 
 function makeExecutor(
   overrides: Partial<AgentMetricsCliExecutor> = {},
