@@ -35,14 +35,15 @@ export async function writeShellExport(
   }
 
   const startIdx = content.indexOf(FENCE_START);
-  const endIdx = content.indexOf(FENCE_END);
+  const endIdx = content.lastIndexOf(FENCE_END);
 
   if (!dryRun) {
     await backupProfile(profilePath);
   }
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    // Replace existing fenced block (use last FENCE_END after FENCE_START to handle duplicates)
+    // Replace existing fenced block — using lastIndexOf for FENCE_END collapses
+    // any duplicate blocks left by earlier buggy installs into a single new block
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + FENCE_END.length);
     if (!dryRun) {
@@ -68,7 +69,7 @@ export async function removeShellExport(profilePath: string): Promise<void> {
   }
 
   const startIdx = content.indexOf(FENCE_START);
-  const endIdx = content.indexOf(FENCE_END);
+  const endIdx = content.lastIndexOf(FENCE_END);
 
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     await backupProfile(profilePath);

@@ -68,21 +68,44 @@ async function backupConfig(
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {
   const root = await findProjectRoot();
-  const gitignorePath = join(root, ".gitignore");
   try {
     await access(join(root, ".git"));
   } catch {
     return;
   }
+  await ensureGitignoreEntry(join(root, ".gitignore"), localConfigFilename);
+}
 
+/**
+ * Append `entry` to a .gitignore file, creating it if missing.
+ *
+ * Discriminates ENOENT (file does not exist → create fresh) from other read
+ * errors (permission denied, I/O error, EISDIR → warn and skip). The previous
+ * implementation caught everything and wrote a single-line file, silently
+ * clobbering user content on any read failure.
+ *
+ * `reader` is injected for testing the error-discrimination behavior; defaults
+ * to the real fs reader.
+ */
+export async function ensureGitignoreEntry(
+  gitignorePath: string,
+  entry: string,
+  reader: (path: string) => Promise<string> = (p) => readFile(p, "utf-8"),
+): Promise<void> {
+  let content: string;
   try {
-    const content = await readFile(gitignorePath, "utf-8");
-    if (content.includes(localConfigFilename)) return;
-    await atomicWrite(
-      gitignorePath,
-      content.trimEnd() + `\n${localConfigFilename}\n`,
+    content = await reader(gitignorePath);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      await atomicWrite(gitignorePath, `${entry}\n`);
+      return;
+    }
+    console.warn(
+      `Warning: could not read ${gitignorePath} (${(err as Error).message}). Skipping .gitignore update.`,
     );
-  } catch {
-    await atomicWrite(gitignorePath, `${localConfigFilename}\n`);
+    return;
   }
+
+  if (content.includes(entry)) return;
+  await atomicWrite(gitignorePath, content.trimEnd() + `\n${entry}\n`);
 }

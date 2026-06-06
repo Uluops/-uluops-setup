@@ -2,6 +2,48 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.6.5] - 2026-06-05
+
+### Fixed
+
+- **`.gitignore` no longer clobbered when `.gitignore` exists but cannot be read.** The previous `addToGitignore` (`src/steps/mcp.ts`) wrapped the `readFile` call in a bare `catch {}` that unconditionally wrote a single-line file. `ENOENT` was the intended trigger — the catch path exists to create `.gitignore` when it doesn't exist yet — but `EACCES`, `EISDIR`, `EBUSY`, and transient I/O errors were silently treated the same way, destroying any existing user content. The new `ensureGitignoreEntry` helper discriminates `err.code === "ENOENT"` for the fresh-write path and warns-and-skips on all other read errors. Surfaced by ship-pipeline code-auditor as AF-002 on `uluops-setup` run #19. The function is now exported from `src/steps/mcp.ts` with an injectable `reader` parameter so the non-ENOENT-no-clobber contract is directly testable.
+- **Shell-profile fence handling now collapses duplicate UluOps blocks** left by earlier buggy installs. `writeShellExport` and `removeShellExport` in `src/steps/shell.ts` used `content.indexOf(FENCE_END)` (first occurrence) while a code comment at line 45 explicitly claimed "use last FENCE_END after FENCE_START to handle duplicates". The mismatch meant: (a) on re-install, the new block replaced only the first half of a duplicate-block region, leaving a stale block — and its stale `ULUOPS_API_KEY` export — sitting below the new one; (b) on uninstall, the second block was never removed. Both sites now use `content.lastIndexOf(FENCE_END)`. Surfaced by code-auditor as a SEM-INC/H finding.
+
+### Internal
+
+- New `ensureGitignoreEntry` tests in `src/test/mcp.test.ts` covering ENOENT (file creation), append-to-existing, idempotency on already-present entry, and the regression guard — non-ENOENT read failure must not clobber existing content.
+- New `writeShellExport` and `removeShellExport` tests in `src/test/shell.test.ts` covering the duplicate-fence-block scenario for both install and uninstall.
+- Suite now 200 cases (+12).
+
+## [0.6.4] - 2026-06-05
+
+### Fixed
+
+- **`validateKey()` now hits the correct self-identity endpoint.** Server
+  validation called `GET /api/v1/registry/users/me` — the registry-api's
+  public user-lookup route, which Zod-validates the path param as a UUID and
+  returns `400 { id: ["Invalid uuid"] }` for the literal `me`. Endpoint has
+  been wrong since the initial `feat: implement @uluops/setup zero-friction
+  installer` (commit `70a01a2`); users hit it any time they ran setup with a
+  freshly-minted key and no `--skip-validation`. Now points at
+  `GET /api/v1/auth/me` (ops-uluops-api) and unwraps the
+  `{ data: { email, ... } }` envelope. Five regression tests added covering
+  URL, header, response unwrap, 401 path, 500 path, and network-failure path.
+
+### Changed
+
+- **Stopped stamping backend URLs into MCP host configs.** Previously
+  `mergeUluopsMcp` (Claude) and the OpenCode harness wrote
+  `ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1"` for `uluops-tracker` and
+  `ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry"` for
+  `uluops-registry` into every generated config. Both URLs are already
+  resolved automatically by `@uluops/ops-mcp` / `@uluops/registry-mcp` via
+  their bundled SDKs (prod by default), so stamping was redundant — and
+  worse, would pin every user to a static URL that could go stale if our
+  production endpoints ever shifted. The generated `env` block now contains
+  only `ULUOPS_API_KEY`. Pairs with `@uluops/ops-mcp@0.2.1` which made
+  `ULUOPS_BASE_URL` officially optional on the consumer side.
+
 ## [0.6.3] - 2026-06-05
 
 ### Changed

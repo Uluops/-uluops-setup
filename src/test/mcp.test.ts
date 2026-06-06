@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { writeFile, readFile, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -115,5 +115,76 @@ describe("mergeUluopsMcp logic", () => {
   it("throws on malformed config to prevent silent data loss", async () => {
     await writeFile(configPath, "not json{{{");
     await expect(readConfig(configPath)).rejects.toThrow("invalid JSON");
+  });
+});
+
+describe("ensureGitignoreEntry", () => {
+  let gitignorePath: string;
+
+  beforeEach(() => {
+    gitignorePath = join(tmpDir, ".gitignore");
+  });
+
+  it("creates a new .gitignore with just the entry when file does not exist (ENOENT)", async () => {
+    const { ensureGitignoreEntry } = await import("../steps/mcp.js");
+    await ensureGitignoreEntry(gitignorePath, ".mcp.json");
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toBe(".mcp.json\n");
+  });
+
+  it("appends the entry to an existing .gitignore preserving prior content", async () => {
+    await writeFile(gitignorePath, "node_modules\n*.log\n");
+    const { ensureGitignoreEntry } = await import("../steps/mcp.js");
+    await ensureGitignoreEntry(gitignorePath, ".mcp.json");
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toContain("node_modules");
+    expect(content).toContain("*.log");
+    expect(content).toContain(".mcp.json");
+  });
+
+  it("is idempotent when the entry already exists", async () => {
+    const initial = "node_modules\n.mcp.json\n*.log\n";
+    await writeFile(gitignorePath, initial);
+    const { ensureGitignoreEntry } = await import("../steps/mcp.js");
+    await ensureGitignoreEntry(gitignorePath, ".mcp.json");
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toBe(initial);
+  });
+
+  it("does NOT clobber an existing .gitignore when read fails with a non-ENOENT error (EACCES, EISDIR, EBUSY)", async () => {
+    const original = "important user content\n.env\nsecrets/\n";
+    await writeFile(gitignorePath, original);
+    const { ensureGitignoreEntry } = await import("../steps/mcp.js");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const failingReader = () =>
+      Promise.reject(
+        Object.assign(new Error("EACCES: permission denied, open '.gitignore'"), {
+          code: "EACCES",
+        }),
+      );
+
+    await ensureGitignoreEntry(gitignorePath, ".mcp.json", failingReader);
+
+    // File on disk must be unchanged — this is the regression guard
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toBe(original);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("could not read"),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it("creates the file on injected ENOENT (regression: ENOENT path still works under injection)", async () => {
+    const { ensureGitignoreEntry } = await import("../steps/mcp.js");
+    const enoentReader = () =>
+      Promise.reject(
+        Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" }),
+      );
+
+    await ensureGitignoreEntry(gitignorePath, ".mcp.json", enoentReader);
+    const content = await readFile(gitignorePath, "utf-8");
+    expect(content).toBe(".mcp.json\n");
   });
 });

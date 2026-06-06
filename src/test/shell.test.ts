@@ -64,6 +64,33 @@ describe("writeShellExport", () => {
     const content = await readFile(profilePath, "utf-8");
     expect(content).toBe("# existing\n");
   });
+
+  it("collapses duplicate fence blocks left by earlier buggy installs into a single block", async () => {
+    // Simulate the state a user on a pre-fix install could end up with —
+    // two adjacent fence blocks where the first FENCE_END was used incorrectly.
+    const duplicateState = [
+      "# before",
+      "",
+      "# --- UluOps (managed by @uluops/setup) ---",
+      'export ULUOPS_API_KEY="ulr_first"',
+      "# --- /UluOps ---",
+      "# --- UluOps (managed by @uluops/setup) ---",
+      'export ULUOPS_API_KEY="ulr_second"',
+      "# --- /UluOps ---",
+      "",
+      "# after",
+      "",
+    ].join("\n");
+    await writeFile(profilePath, duplicateState);
+    await writeShellExport(profilePath, "ulr_new", false);
+    const content = await readFile(profilePath, "utf-8");
+    expect(content).toContain('export ULUOPS_API_KEY="ulr_new"');
+    expect(content).not.toContain("ulr_first");
+    expect(content).not.toContain("ulr_second");
+    // Exactly one fence block should remain
+    expect(content.split("# --- UluOps").length).toBe(2);
+    expect(content.split("# --- /UluOps ---").length).toBe(2);
+  });
 });
 
 describe("removeShellExport", () => {
@@ -87,5 +114,28 @@ describe("removeShellExport", () => {
 
   it("does nothing if file does not exist", async () => {
     await expect(removeShellExport(join(tmpDir, "nonexistent"))).resolves.toBeUndefined();
+  });
+
+  it("removes duplicate fence blocks left by earlier buggy installs", async () => {
+    const duplicateState = [
+      "# before",
+      "",
+      "# --- UluOps (managed by @uluops/setup) ---",
+      'export ULUOPS_API_KEY="ulr_first"',
+      "# --- /UluOps ---",
+      "# --- UluOps (managed by @uluops/setup) ---",
+      'export ULUOPS_API_KEY="ulr_second"',
+      "# --- /UluOps ---",
+      "",
+      "# after",
+      "",
+    ].join("\n");
+    await writeFile(profilePath, duplicateState);
+    await removeShellExport(profilePath);
+    const content = await readFile(profilePath, "utf-8");
+    expect(content).toContain("# before");
+    expect(content).toContain("# after");
+    expect(content).not.toContain("ULUOPS_API_KEY");
+    expect(content).not.toContain("UluOps");
   });
 });
