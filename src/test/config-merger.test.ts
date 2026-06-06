@@ -9,7 +9,6 @@ describe("mergeUluopsMcp", () => {
       command: "npx",
       args: ["-y", "@uluops/ops-mcp"],
       env: {
-        ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
         ULUOPS_API_KEY: "ulr_test123",
       },
     });
@@ -17,10 +16,15 @@ describe("mergeUluopsMcp", () => {
       command: "npx",
       args: ["-y", "@uluops/registry-mcp"],
       env: {
-        ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
         ULUOPS_API_KEY: "ulr_test123",
       },
     });
+  });
+
+  it("does not stamp backend URLs (resolved by MCP SDKs)", () => {
+    const result = mergeUluopsMcp({}, "ulr_test123");
+    expect(result.mcpServers!["uluops-tracker"]!.env).not.toHaveProperty("ULUOPS_BASE_URL");
+    expect(result.mcpServers!["uluops-registry"]!.env).not.toHaveProperty("ULUOPS_REGISTRY_URL");
   });
 
   it("preserves existing non-UluOps MCP servers", () => {

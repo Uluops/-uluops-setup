@@ -78,6 +78,10 @@ export function mergeUluopsMcp(
   const existing = config.mcpServers ?? {};
   const trustField = trust ? { trust: true } : {};
 
+  // Backend URLs are resolved by the respective MCP servers (@uluops/ops-mcp
+  // and @uluops/registry-mcp) against their bundled SDKs. Stamping
+  // ULUOPS_BASE_URL / ULUOPS_REGISTRY_URL here would override that resolution
+  // with a value that could go stale if production endpoints ever shift.
   return {
     ...config,
     mcpServers: {
@@ -86,7 +90,6 @@ export function mergeUluopsMcp(
         command: "npx",
         args: ["-y", "@uluops/ops-mcp"],
         env: {
-          ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
           ULUOPS_API_KEY: apiKey,
         },
         ...trustField,
@@ -95,7 +98,6 @@ export function mergeUluopsMcp(
         command: "npx",
         args: ["-y", "@uluops/registry-mcp"],
         env: {
-          ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
           ULUOPS_API_KEY: apiKey,
         },
         ...trustField,

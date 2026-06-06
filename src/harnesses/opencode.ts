@@ -61,13 +61,14 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
   ): Record<string, unknown> {
     const raw = config["mcp"];
     const existing = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+    // Backend URLs resolved by @uluops/ops-mcp and @uluops/registry-mcp via
+    // their bundled SDKs. See lib/config-merger.ts for rationale.
     const tracker: OpenCodeMcpServer = {
       type: "local",
       command: ["npx", "-y", "@uluops/ops-mcp"],
       enabled: true,
       timeout: 30000,
       environment: {
-        ULUOPS_BASE_URL: "https://api.uluops.ai/api/v1",
         ULUOPS_API_KEY: apiKey,
       },
     };
@@ -77,7 +78,6 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
       enabled: true,
       timeout: 30000,
       environment: {
-        ULUOPS_REGISTRY_URL: "https://api.uluops.ai/api/v1/registry",
         ULUOPS_API_KEY: apiKey,
       },
     };
