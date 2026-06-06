@@ -11,6 +11,7 @@ import {
   detectHarnesses,
   HarnessNotTestedError,
 } from "./harnesses/index.js";
+import { InstallLockHeldError } from "./lib/install-lock.js";
 import { runSetup } from "./commands/setup.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runVerify } from "./commands/verify.js";
@@ -172,6 +173,17 @@ async function main(): Promise<void> {
 main().catch((err: unknown) => {
   if (err instanceof HarnessNotTestedError) {
     console.error(chalk.yellow(`\n  ${err.message}\n`));
+    process.exit(1);
+  }
+  if (err instanceof InstallLockHeldError) {
+    console.error(chalk.yellow(`\n  ${err.message}\n`));
+    console.error(
+      chalk.dim(
+        "  Wait for the other process to finish, or — if it crashed —\n" +
+          "  the lock auto-releases after 30 minutes or when the held\n" +
+          "  PID is detected as no longer running.\n",
+      ),
+    );
     process.exit(1);
   }
   const msg = err instanceof Error ? err.message : String(err);

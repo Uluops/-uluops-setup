@@ -2,6 +2,25 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.7.0] - 2026-06-05
+
+### Added
+
+- **Process-level install lock.** `runSetup` and `runUninstall` now acquire `~/.uluops/install.lock/` before touching shared state. A second concurrent `npx @uluops/setup` (or `uluops-setup --uninstall`) running on the same machine now fails fast with a clear message naming the holding PID, hostname, and how long it has been running — instead of silently racing the read-merge-write windows on `~/.claude.json`, `~/.gemini/settings.json`, `~/.config/opencode/opencode.json`, `~/.claude/settings.json`, `~/.bashrc`/`.zshrc`, and `~/.uluops/manifest.json` (six surfaces, not the one originally identified). Surfaced by ship-pipeline code-auditor as AF-006 on `uluops-setup` run #19. Hand-rolled around `mkdir`-atomicity — no new runtime dependency. Lock metadata `{pid, hostname, startedAt}` is written inside the lock dir; stale locks are reclaimed when the holding PID is detected as dead (same host) or when the lock is older than 30 minutes (cross-host fallback). SIGINT/SIGTERM/uncaughtException all release the lock before exit. Dry-run is read-only and bypasses the lock.
+
+### Known limitations
+
+- **Setup-vs-harness races remain unaddressed.** This lock excludes other `uluops-setup` processes only. If the user is actively using Claude Code, Gemini CLI, or OpenCode while running setup, the harness CLI may write to its own state file (e.g. `~/.claude.json`) concurrently with our read-merge-write, and those harness writes can still be lost. A future spec will address this via content compare-and-swap on the merge target. Mitigation today: close the harness CLI before running setup.
+
+### Internal
+
+- New `src/lib/install-lock.ts` (~220 lines) with `acquireInstallLock`, `LockHandle.release()`, `InstallLockHeldError`, signal-handler registration, and a test seam for handler reset.
+- New `src/lib/paths.ts:getInstallLockDir()` reusing `getUluopsDir()`.
+- 11 unit tests in `src/test/install-lock.test.ts` covering acquire/release, fail-fast on held lock, stale-by-dead-PID, stale-by-timeout, stale-by-corrupt-meta, stale-by-missing-meta, `waitMs` polling success and timeout, idempotent release, and cross-host lock semantics.
+- 1 integration test in `src/test/install-lock-integration.test.ts` spawning two real child `node` processes against the compiled dist — true OS-level concurrency serializes as expected.
+- `src/cli.ts` formats `InstallLockHeldError` with a hint about stale-lock auto-recovery rather than emitting a stack trace.
+- Suite: 200 → 212 tests (+12).
+
 ## [0.6.5] - 2026-06-05
 
 ### Fixed

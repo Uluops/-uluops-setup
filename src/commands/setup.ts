@@ -10,6 +10,10 @@ import { info, printSetupSummary } from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 import { getProfile } from "../harnesses/index.js";
 import {
+  acquireInstallLock,
+  type LockHandle,
+} from "../lib/install-lock.js";
+import {
   initContext,
   checkConflicts,
   configureMcpStep,
@@ -54,6 +58,17 @@ export async function runSetup(opts: {
 
   const { env, apiKey } = await initContext(opts);
   console.log();
+
+  // Acquire the install lock before touching any shared state. Skipped on
+  // dry-run (read-only). The lock excludes a second concurrent `uluops-setup`
+  // from racing the manifest / MCP config / shell-profile / settings.json
+  // read-merge-write windows. Released in `finally` below.
+  let lock: LockHandle | null = null;
+  if (!opts.dryRun) {
+    lock = await acquireInstallLock();
+  }
+
+  try {
 
   // Load existing manifest for update detection
   const existingManifest = await loadManifest();
@@ -148,4 +163,8 @@ export async function runSetup(opts: {
     commandCount: commandsResult.files.length,
     apiKey,
   });
+
+  } finally {
+    if (lock) await lock.release();
+  }
 }

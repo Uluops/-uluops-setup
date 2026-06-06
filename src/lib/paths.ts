@@ -99,6 +99,11 @@ export function getManifestPath(): string {
   return join(getUluopsDir(), "manifest.json");
 }
 
+/** Return the directory used as a process-level install/uninstall mutex. */
+export function getInstallLockDir(): string {
+  return join(getUluopsDir(), "install.lock");
+}
+
 /** Return the legacy manifest path for migration. */
 export function getLegacyManifestPath(): string {
   return join(getClaudeHome(), "uluops-manifest.json");

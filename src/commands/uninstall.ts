@@ -4,6 +4,10 @@ import {
   deleteManifest,
   validateManifest,
 } from "../lib/manifest.js";
+import {
+  acquireInstallLock,
+  type LockHandle,
+} from "../lib/install-lock.js";
 import { uninstallMcp } from "../steps/mcp.js";
 import { uninstallAgents } from "../steps/agents.js";
 import { uninstallCommands } from "../steps/commands.js";
@@ -26,6 +30,15 @@ export async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
   if (opts.dryRun) {
     info(chalk.dim("(dry run — no changes will be made)\n"));
   }
+
+  // Same lock as runSetup — concurrent setup+uninstall would race the same
+  // shared state. Skipped on dry-run (read-only).
+  let lock: LockHandle | null = null;
+  if (!opts.dryRun) {
+    lock = await acquireInstallLock();
+  }
+
+  try {
 
   const manifest = await loadManifest();
   if (!manifest) {
@@ -135,4 +148,8 @@ export async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
   console.log();
   info("UluOps has been removed. Restart your harness to complete.");
   console.log();
+
+  } finally {
+    if (lock) await lock.release();
+  }
 }
