@@ -15,11 +15,46 @@ export interface ClaudeConfig {
 
 const MCP_PACKAGES = ["@uluops/ops-mcp", "@uluops/registry-mcp"];
 
-/** Check whether the UluOps MCP client packages exist on the npm registry. Returns lists of available and missing packages. */
-export async function checkMcpPackageAvailability(): Promise<{
+interface AvailabilityResult {
   available: string[];
   missing: string[];
-}> {
+}
+
+/**
+ * In-process memoization for the npm availability probe.
+ *
+ * Setup runs once per process; with multi-harness installs (or any future
+ * code path that calls installMcp more than once), the probe was firing
+ * redundantly against the npm registry. We cache the in-flight promise so
+ * concurrent callers share a single round-trip and subsequent callers get
+ * the resolved value instantly. Cache lifetime is the process — setup is
+ * one-shot, so a TTL adds state without buying anything.
+ *
+ * `__resetAvailabilityCacheForTesting` exists ONLY for tests that stub
+ * `fetch` per-case. Without a reset, the first test in a file would lock
+ * the cached result for every subsequent test in the same process.
+ */
+let _availabilityCache: Promise<AvailabilityResult> | null = null;
+
+/** Test-only: drop the memoized availability promise so the next call re-probes. */
+export function __resetAvailabilityCacheForTesting(): void {
+  _availabilityCache = null;
+}
+
+/** Check whether the UluOps MCP client packages exist on the npm registry. Returns lists of available and missing packages. */
+export function checkMcpPackageAvailability(): Promise<AvailabilityResult> {
+  if (_availabilityCache) return _availabilityCache;
+  _availabilityCache = probeAvailability().catch((err) => {
+    // If the probe itself throws unexpectedly (not an individual fetch — those
+    // are caught by Promise.allSettled), drop the cache so retries don't
+    // permanently inherit a poisoned promise.
+    _availabilityCache = null;
+    throw err;
+  });
+  return _availabilityCache;
+}
+
+async function probeAvailability(): Promise<AvailabilityResult> {
   const available: string[] = [];
   const missing: string[] = [];
 

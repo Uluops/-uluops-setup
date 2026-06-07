@@ -1,6 +1,7 @@
 import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { extractEmail } from "../lib/json-guards.js";
 
 export interface AuthResult {
   apiKey: string;
@@ -107,30 +108,6 @@ async function readCredentialsFile(): Promise<string | undefined> {
   const profiles = creds as Record<string, { apiKey?: string; api_key?: string }>;
   const defaultProfile = profiles["default"];
   return defaultProfile?.apiKey ?? defaultProfile?.api_key;
-}
-
-/**
- * Narrow the auth/me response shape. Accepts `{ data: { email: string } }`
- * (the documented envelope) and returns null in every other case. Throws a
- * plain Error on responses that aren't objects at all — those indicate the
- * endpoint is no longer the one we expect (HTML error page, redirect to a
- * login portal, schema breakage) and should not be papered over as "logged
- * in with no email."
- *
- * NOTE: plain `Error`, not `TypeError`, because `validateKey` rewrites
- * `TypeError` as "Can't reach api.uluops.ai" (fetch's network-failure shape).
- */
-function extractEmail(body: unknown): string | null {
-  if (typeof body !== "object" || body === null) {
-    throw new Error(
-      "API returned an unexpected response shape (not an object). The endpoint may have changed — try --skip-validation to continue offline.",
-    );
-  }
-  const data = (body as { data?: unknown }).data;
-  if (data === undefined || data === null) return null;
-  if (typeof data !== "object") return null;
-  const email = (data as { email?: unknown }).email;
-  return typeof email === "string" ? email : null;
 }
 
 async function validateKey(

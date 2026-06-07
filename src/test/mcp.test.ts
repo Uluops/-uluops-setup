@@ -19,10 +19,16 @@ beforeEach(async () => {
     "fetch",
     vi.fn().mockResolvedValue(new Response("", { status: 200 })),
   );
+  // checkMcpPackageAvailability now memoizes at module level for production
+  // (avoid redundant probes across multi-harness installs). Tests must reset
+  // between cases or the first stub locks the cached result and downstream
+  // tests see whatever the first one returned.
+  __resetAvailabilityCacheForTesting();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  __resetAvailabilityCacheForTesting();
 });
 
 // Test the core logic via config-merger (already tested),
@@ -34,6 +40,7 @@ import {
   readConfig,
   writeConfig,
   checkMcpPackageAvailability,
+  __resetAvailabilityCacheForTesting,
 } from "../lib/config-merger.js";
 import { installMcp, uninstallMcp } from "../steps/mcp.js";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -314,6 +321,24 @@ describe("checkMcpPackageAvailability", () => {
     for (const entry of result.missing) {
       expect(entry).toContain("(network: fetch failed)");
     }
+  });
+
+  it("memoizes across consecutive calls in the same process", async () => {
+    // Locks the PRA-EFF/M fix: probe fires once even when called multiple
+    // times (multi-harness install, future repeat callers).
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const a = await checkMcpPackageAvailability();
+    const b = await checkMcpPackageAvailability();
+    const c = await checkMcpPackageAvailability();
+
+    // 2 packages × 1 round-trip — not × 3 calls.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(a).toEqual(b);
+    expect(b).toEqual(c);
   });
 
   it("preserves per-index correspondence when one package succeeds and the other fails", async () => {

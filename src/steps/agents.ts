@@ -1,8 +1,12 @@
-import { readdir, mkdir, unlink } from "node:fs/promises";
+import { readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged, unlinkFiles } from "../lib/file-ops.js";
+import {
+  copyIfChanged,
+  unlinkFiles,
+  removeStaleFiles,
+} from "../lib/file-ops.js";
 
 export interface AgentsResult {
   copied: number;
@@ -68,22 +72,12 @@ export async function installAgents(
     }
   }
 
-  // Remove files that were in the old manifest but no longer in the package
-  let removed = 0;
-  if (existingManifestAgents) {
-    for (const oldFile of existingManifestAgents) {
-      if (!files.includes(oldFile)) {
-        if (!dryRun) {
-          try {
-            await unlink(join(destDir, oldFile));
-          } catch {
-            // Already gone
-          }
-        }
-        removed++;
-      }
-    }
-  }
+  const removed = await removeStaleFiles(
+    destDir,
+    existingManifestAgents,
+    files,
+    dryRun,
+  );
 
   return { copied, skipped, removed, files, failures };
 }

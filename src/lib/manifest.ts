@@ -219,9 +219,21 @@ export async function validateManifest(
       const { contentHash: storedHash, ...withoutHash } = parsed;
       const canonical = JSON.stringify(withoutHash, null, 2) + "\n";
       const currentHash = fileHash(canonical);
-      if (storedHash && storedHash !== currentHash) {
+      // Typeof check rather than truthiness — a malformed manifest with
+      // `contentHash: 0`, `contentHash: false`, `contentHash: ""`, or no
+      // contentHash key at all would all evaluate `storedHash && ...` to
+      // false and silently skip tamper detection. Only a missing-key
+      // (undefined) manifest is legitimately exempt (legacy / pre-hash);
+      // a present-but-not-a-string value is suspect and should warn.
+      if (typeof storedHash === "string") {
+        if (storedHash !== currentHash) {
+          warnings.push(
+            "Manifest file has been modified since installation — content hash mismatch",
+          );
+        }
+      } else if (storedHash !== undefined) {
         warnings.push(
-          "Manifest file has been modified since installation — content hash mismatch",
+          `Manifest contentHash has wrong type (${typeof storedHash}); tamper detection skipped`,
         );
       }
     } catch {

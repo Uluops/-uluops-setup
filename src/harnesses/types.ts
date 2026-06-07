@@ -135,7 +135,10 @@ export class ConfigParseError extends Error {
 export class HarnessNotTestedError extends Error {
   constructor(harnessName: string) {
     super(
-      `${harnessName} harness is not yet tested. Use --harness claude-code or --harness opencode.`,
+      // Keep this list in sync with profiles whose `status === "stable"`.
+      // Today: claude-code, opencode, gemini-cli. When a new stable profile
+      // lands, add it here so the error stays actionable.
+      `${harnessName} harness is not yet tested. Use --harness claude-code, --harness opencode, or --harness gemini-cli.`,
     );
     this.name = "HarnessNotTestedError";
   }

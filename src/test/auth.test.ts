@@ -2,17 +2,39 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { writeFile, mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveApiKey } from "../steps/auth.js";
+
+/**
+ * One top-level vi.mock for `node:os` instead of repeated calls inside
+ * `it()` blocks (the prior pattern). vi.mock is hoisted to module load
+ * time globally — calling it from inside a test was the same as calling
+ * it at the top, and `vi.restoreAllMocks()` doesn't unwind module mocks.
+ * Tests that need a per-case override write to `mockHomeDir` instead.
+ *
+ * See tracker issue PRA-FRA/M ("vi.mock inside it-blocks in auth.test.ts
+ * is fragile").
+ */
+let mockHomeDir: string | null = null;
+vi.mock("node:os", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:os")>();
+  return {
+    ...original,
+    homedir: () => mockHomeDir ?? original.homedir(),
+  };
+});
+
+import { resolveApiKey, hasCredentialsFile } from "../steps/auth.js";
 
 let tmpDir: string;
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-auth-"));
+  mockHomeDir = null;
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  mockHomeDir = null;
 });
 
 describe("resolveApiKey", () => {
@@ -71,20 +93,13 @@ describe("credentials file fallback", () => {
       JSON.stringify({ default: { apiKey: "ulr_fromfile" } }),
     );
 
-    // Mock homedir to point to our tmpDir so readCredentialsFile finds our fixture
-    vi.mock("node:os", async (importOriginal) => {
-      const original = await importOriginal<typeof import("node:os")>();
-      return { ...original, homedir: () => tmpDir };
-    });
-
-    // Re-import to pick up the mocked homedir
-    const { resolveApiKey: resolve } = await import("../steps/auth.js");
-
+    mockHomeDir = tmpDir;
     vi.stubEnv("ULUOPS_API_KEY", "");
-    const result = await resolve({ interactive: false, skipValidation: true });
+    const result = await resolveApiKey({
+      interactive: false,
+      skipValidation: true,
+    });
     expect(result.apiKey).toBe("ulr_fromfile");
-
-    vi.restoreAllMocks();
   });
 
   it("reads api_key (snake_case) from credentials.json", async () => {
@@ -95,18 +110,13 @@ describe("credentials file fallback", () => {
       JSON.stringify({ default: { api_key: "ulr_snakecase" } }),
     );
 
-    vi.mock("node:os", async (importOriginal) => {
-      const original = await importOriginal<typeof import("node:os")>();
-      return { ...original, homedir: () => tmpDir };
-    });
-
-    const { resolveApiKey: resolve } = await import("../steps/auth.js");
-
+    mockHomeDir = tmpDir;
     vi.stubEnv("ULUOPS_API_KEY", "");
-    const result = await resolve({ interactive: false, skipValidation: true });
+    const result = await resolveApiKey({
+      interactive: false,
+      skipValidation: true,
+    });
     expect(result.apiKey).toBe("ulr_snakecase");
-
-    vi.restoreAllMocks();
   });
 
   it("throws when all sources fail", async () => {
@@ -200,26 +210,12 @@ describe("hasCredentialsFile", () => {
     await mkdir(credsDir, { recursive: true });
     await writeFile(join(credsDir, "credentials.json"), "{}");
 
-    vi.mock("node:os", async (importOriginal) => {
-      const original = await importOriginal<typeof import("node:os")>();
-      return { ...original, homedir: () => tmpDir };
-    });
-
-    const { hasCredentialsFile: probe } = await import("../steps/auth.js");
-    expect(await probe()).toBe(true);
-
-    vi.restoreAllMocks();
+    mockHomeDir = tmpDir;
+    expect(await hasCredentialsFile()).toBe(true);
   });
 
   it("returns false when the file does not exist", async () => {
-    vi.mock("node:os", async (importOriginal) => {
-      const original = await importOriginal<typeof import("node:os")>();
-      return { ...original, homedir: () => tmpDir };
-    });
-
-    const { hasCredentialsFile: probe } = await import("../steps/auth.js");
-    expect(await probe()).toBe(false);
-
-    vi.restoreAllMocks();
+    mockHomeDir = tmpDir;
+    expect(await hasCredentialsFile()).toBe(false);
   });
 });

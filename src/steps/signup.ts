@@ -83,12 +83,21 @@ export async function signup(): Promise<AuthResult> {
   };
 }
 
+/**
+ * Issue a POST and decode the response into `T` via a caller-supplied
+ * structural predicate. `validate` is required, not optional — making it
+ * optional in earlier revisions meant a call site could omit it and get
+ * back `body as T` with only a "not null, is object" check, which is the
+ * pattern type-safety-validator flagged (EPI-OVR/H). Every current call
+ * site supplies a real predicate; this signature change locks that in for
+ * future call sites.
+ */
 async function callApi<T extends object>(
   url: string,
   method: string,
   body: Record<string, unknown>,
-  bearerToken?: string,
-  validate?: (res: T) => boolean,
+  bearerToken: string | undefined,
+  validate: (res: T) => boolean,
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -119,7 +128,11 @@ async function callApi<T extends object>(
     if (typeof body !== "object" || body === null) {
       throw new Error("Unexpected API response shape");
     }
-    if (validate && !validate(body as T)) {
+    // `body as T` is a type assertion, not a runtime check — the validate
+    // predicate is what actually proves the structure. With validate now
+    // required, every code path passes through a real shape check before
+    // the cast is trusted.
+    if (!validate(body as T)) {
       throw new Error("API response failed structural validation");
     }
     return body as T;

@@ -25,6 +25,19 @@ export async function installMcp(
       : join(await findProjectRoot(), profile.paths.localMcpConfig);
 
   const config = await profile.mcpConfig.read(configPath);
+
+  // Backup IMMEDIATELY after read, before any other awaits. The prior order
+  // (backup at write-time) had a race: between read and backup we did a
+  // network probe that can take seconds. If anyone modified configPath in
+  // that window, the backup captured their modification, then write below
+  // clobbered it with a merge derived from the pre-modification snapshot —
+  // and the backup we kept represented the now-lost state, not the state
+  // we overwrote. Moving backup here shrinks the race window from seconds
+  // to microseconds without adding a file lock.
+  if (!dryRun) {
+    await backupConfig(profile.name, configPath);
+  }
+
   const merged = profile.mcpConfig.merge(config, apiKey);
 
   const packageWarnings: string[] = [];
@@ -36,8 +49,6 @@ export async function installMcp(
   }
 
   if (!dryRun) {
-    // Backup before first write
-    await backupConfig(profile.name, configPath);
     await profile.mcpConfig.write(configPath, merged);
   }
 

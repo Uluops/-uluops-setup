@@ -68,6 +68,44 @@ describe("harness registry", () => {
     // Result is a subset of ALL_PROFILES
     expect(detected.length).toBeLessThanOrEqual(ALL_PROFILES.length);
   });
+
+  /**
+   * Locks the experimental-filter contract: even when an experimental
+   * profile's home directory exists on disk, detectHarnesses() must NOT
+   * include it. Auto-detection that returned an experimental profile would
+   * break the relational promise "in the detected list = safe to install"
+   * — the next step would call into a profile that throws
+   * HarnessNotTestedError.
+   *
+   * Codex is the only experimental profile today (status: "experimental").
+   * We confirm it is excluded; we also confirm every returned profile has
+   * status === "stable" so the contract holds for any future experimental
+   * additions.
+   *
+   * See tracker issue EPI-GRN/M ("detectHarnesses experimental-filter
+   * contract untested").
+   */
+  it("detectHarnesses never returns experimental profiles even when their home dir exists", () => {
+    // The codex profile points at ~/.codex/. On a real dev machine this dir
+    // may or may not exist; either way, codex must NOT appear in the result
+    // because its status is "experimental".
+    const detected = detectHarnesses();
+    expect(detected.find((p) => p.name === "codex")).toBeUndefined();
+
+    // Stronger guarantee: every detected profile is stable, no matter how
+    // detection criteria evolve.
+    for (const p of detected) {
+      expect(p.status).toBe("stable");
+    }
+  });
+
+  it("codex profile is registered as experimental (so the filter has something to filter)", () => {
+    // Anchor: if codex is ever promoted to stable, this assertion flips and
+    // the "experimental filter" coverage above stops exercising the branch.
+    // When that happens, add a new experimental profile or seed a synthetic
+    // one for the filter test.
+    expect(codexProfile.status).toBe("experimental");
+  });
 });
 
 describe("claude-code profile", () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mergeUluopsMcp, removeUluopsMcp } from "../lib/config-merger.js";
 
 describe("mergeUluopsMcp", () => {
@@ -108,9 +108,23 @@ describe("removeUluopsMcp", () => {
 describe("checkMcpPackageAvailability", () => {
   const originalFetch = globalThis.fetch;
 
-  afterEach(() => {
+  beforeEach(async () => {
+    // Memoization landed in config-merger; without resetting between cases
+    // the first stub locks the cached result for every subsequent test in
+    // this file. See SEM-EFF/M fix.
+    const { __resetAvailabilityCacheForTesting } = await import(
+      "../lib/config-merger.js"
+    );
+    __resetAvailabilityCacheForTesting();
+  });
+
+  afterEach(async () => {
     globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
+    const { __resetAvailabilityCacheForTesting } = await import(
+      "../lib/config-merger.js"
+    );
+    __resetAvailabilityCacheForTesting();
   });
 
   it("includes the rejection reason for network failures instead of 'unknown'", async () => {

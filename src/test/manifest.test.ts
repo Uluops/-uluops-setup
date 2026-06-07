@@ -247,6 +247,78 @@ describe("validateManifest hash check", () => {
       result.warnings.some((w) => w.includes("content hash mismatch")),
     ).toBe(true);
   });
+
+  /**
+   * Tamper-detection negative + edge cases. The "mismatch fires the warning"
+   * branch was covered above, but the rest of the conditional shape was not:
+   *  - legitimate hash match must NOT warn
+   *  - missing contentHash key (legacy / pre-hash manifest) must NOT warn
+   *  - unparseable JSON on disk warns with the parse-error message
+   *  - non-string contentHash (0/false/"") warns with the type message
+   *    (locks the SEM-INC/M fix — pre-fix, truthiness check would skip
+   *    tamper detection silently)
+   *
+   * See tracker issues SEM-COM/M ("Manifest content-hash tamper-detection
+   * branch untested") and SEM-INC/M ("Manifest contentHash truthiness check
+   * accepts 0/false/empty/missing").
+   */
+  it("does not warn when the on-disk manifest hash matches", async () => {
+    await saveManifest(sampleManifest);
+    const reloaded = await loadManifest();
+    const result = await validateManifest(reloaded!);
+    expect(
+      result.warnings.some((w) => w.includes("content hash mismatch")),
+    ).toBe(false);
+    expect(
+      result.warnings.some((w) => w.includes("wrong type")),
+    ).toBe(false);
+  });
+
+  it("does not warn when the manifest predates contentHash (legacy / missing key)", async () => {
+    // Hand-craft a new-format manifest with NO contentHash field — represents
+    // either a legacy hand-edited file or a setup version that predates the
+    // hash. Validation should skip tamper detection silently.
+    const noHash = { ...sampleManifest };
+    await writeFile(manifestPath, JSON.stringify(noHash, null, 2) + "\n");
+    const reloaded = await loadManifest();
+    const result = await validateManifest(reloaded!);
+    expect(
+      result.warnings.some((w) => w.includes("content hash mismatch")),
+    ).toBe(false);
+    expect(
+      result.warnings.some((w) => w.includes("wrong type")),
+    ).toBe(false);
+  });
+
+  it("warns when the manifest file on disk is unparseable JSON", async () => {
+    // loadManifest returns the in-memory parsed form earlier (via a re-read
+    // of the same path). To trigger the catch in validateManifest, we
+    // saveManifest first (so the path exists), keep the loaded in-memory
+    // manifest, then corrupt the file on disk.
+    await saveManifest(sampleManifest);
+    const loaded = await loadManifest();
+    expect(loaded).not.toBeNull();
+    await writeFile(manifestPath, "not json{{{");
+    const result = await validateManifest(loaded!);
+    expect(
+      result.warnings.some((w) => w.includes("unparseable JSON")),
+    ).toBe(true);
+  });
+
+  it("warns when contentHash is present but not a string (0 / false / empty)", async () => {
+    // Pre-fix (SEM-INC/M), `if (storedHash && ...)` would skip tamper
+    // detection silently for any falsy contentHash value — a malformed
+    // manifest with `contentHash: 0` could bypass the check entirely. Now
+    // a non-string-but-present value must warn.
+    const withFalsy = { ...sampleManifest, contentHash: 0 };
+    await writeFile(manifestPath, JSON.stringify(withFalsy, null, 2) + "\n");
+    const loaded = await loadManifest();
+    expect(loaded).not.toBeNull();
+    const result = await validateManifest(loaded!);
+    expect(
+      result.warnings.some((w) => w.includes("wrong type")),
+    ).toBe(true);
+  });
 });
 
 describe("deleteManifest", () => {

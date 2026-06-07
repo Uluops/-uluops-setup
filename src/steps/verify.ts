@@ -4,6 +4,7 @@ import { loadManifest, type HarnessManifest } from "../lib/manifest.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
 import { readInstalledMetricsVersion } from "./metrics.js";
+import { extractEmail } from "../lib/json-guards.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -278,9 +279,26 @@ export async function verify(): Promise<VerifyResult> {
         },
       );
       if (res.ok) {
-        const data = (await res.json()) as { email?: string };
+        // Decode via the shared envelope guard. Bare `as { email?: string }`
+        // would silently produce a "key valid (no user)" label on HTML error
+        // pages or schema drift. extractEmail throws when the body is not an
+        // object at all (surfaced below as a check failure) and returns null
+        // when data/email are absent or wrong-typed.
+        let email: string | null;
+        try {
+          email = extractEmail(await res.json());
+        } catch (err) {
+          checks.push({
+            label: "API key valid",
+            passed: false,
+            detail:
+              err instanceof Error ? err.message : "Unexpected response shape",
+          });
+          allOk = false;
+          return { ok: allOk, checks };
+        }
         checks.push({
-          label: `API key valid${data.email ? ` (user: ${data.email})` : ""}`,
+          label: `API key valid${email ? ` (user: ${email})` : ""}`,
           passed: true,
         });
       } else {
