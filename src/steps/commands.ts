@@ -12,6 +12,13 @@ export interface CommandsResult {
   removed: number;
   files: string[];
   skippedReason?: string;
+  /**
+   * Per-file copy failures across all subdirs. The loop continues past errors
+   * so a single bad file cannot abort the install and leave commands half-
+   * installed. The caller surfaces these via `warn()`. Files in this list are
+   * NOT counted in agent/workflow/pipeline counters (or `skipped`).
+   */
+  failures: { file: string; error: string }[];
 }
 
 const SUBDIRS = ["agents", "workflows", "pipelines"] as const;
@@ -46,6 +53,7 @@ export async function installCommands(
       removed: 0,
       files: [],
       skippedReason: "not-supported",
+      failures: [],
     };
   }
 
@@ -54,6 +62,7 @@ export async function installCommands(
   let pipelineCommands = 0;
   let skipped = 0;
   const allFiles: string[] = [];
+  const failures: CommandsResult["failures"] = [];
 
   for (const subdir of SUBDIRS) {
     const srcDir = join(srcBase, subdir);
@@ -74,21 +83,33 @@ export async function installCommands(
 
     for (const file of files) {
       const relativePath = `${subdir}/${file}`;
-      const result = await copyIfChanged(
-        join(srcDir, file),
-        join(destDir, file),
-        dryRun,
-      );
+      try {
+        const result = await copyIfChanged(
+          join(srcDir, file),
+          join(destDir, file),
+          dryRun,
+        );
 
-      if (result === "copied") {
-        if (subdir === "agents") agentCommands++;
-        else if (subdir === "workflows") workflowCommands++;
-        else pipelineCommands++;
-      } else {
-        skipped++;
+        if (result === "copied") {
+          if (subdir === "agents") agentCommands++;
+          else if (subdir === "workflows") workflowCommands++;
+          else pipelineCommands++;
+        } else {
+          skipped++;
+        }
+        // Only track files that actually made it into a known state. Failed
+        // copies do NOT enter allFiles — otherwise the manifest's "remove
+        // stale entries on re-run" diff would treat a never-copied file as
+        // present, and an `--uninstall` would later try to unlink something
+        // that was never written.
+        allFiles.push(relativePath);
+      } catch (err) {
+        // Continue past per-file failures (see AgentsResult.failures rationale).
+        failures.push({
+          file: relativePath,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
-
-      allFiles.push(relativePath);
     }
   }
 
@@ -116,6 +137,7 @@ export async function installCommands(
     skipped,
     removed,
     files: allFiles,
+    failures,
   };
 }
 

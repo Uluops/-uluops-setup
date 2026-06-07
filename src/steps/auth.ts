@@ -109,6 +109,30 @@ async function readCredentialsFile(): Promise<string | undefined> {
   return defaultProfile?.apiKey ?? defaultProfile?.api_key;
 }
 
+/**
+ * Narrow the auth/me response shape. Accepts `{ data: { email: string } }`
+ * (the documented envelope) and returns null in every other case. Throws a
+ * plain Error on responses that aren't objects at all — those indicate the
+ * endpoint is no longer the one we expect (HTML error page, redirect to a
+ * login portal, schema breakage) and should not be papered over as "logged
+ * in with no email."
+ *
+ * NOTE: plain `Error`, not `TypeError`, because `validateKey` rewrites
+ * `TypeError` as "Can't reach api.uluops.ai" (fetch's network-failure shape).
+ */
+function extractEmail(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) {
+    throw new Error(
+      "API returned an unexpected response shape (not an object). The endpoint may have changed — try --skip-validation to continue offline.",
+    );
+  }
+  const data = (body as { data?: unknown }).data;
+  if (data === undefined || data === null) return null;
+  if (typeof data !== "object") return null;
+  const email = (data as { email?: unknown }).email;
+  return typeof email === "string" ? email : null;
+}
+
 async function validateKey(
   apiKey: string,
 ): Promise<{ email: string | null }> {
@@ -132,9 +156,20 @@ async function validateKey(
       throw new Error(`API returned ${res.status}. Try --skip-validation to continue offline.`);
     }
 
-    // ops-uluops-api wraps user payloads as { data: { email, ... } }
-    const body = (await res.json()) as { data?: { email?: string } };
-    return { email: body.data?.email ?? null };
+    // ops-uluops-api wraps user payloads as { data: { email, ... } }.
+    // Guard against malformed responses (HTML error pages, proxy interception,
+    // schema drift) — bare `as` would let `data` be a string, number, or null
+    // and produce a silent `email: null` result that looks like a normal
+    // logged-in user with no email on record.
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error(
+        "API returned a non-JSON response. The endpoint may be down or behind a captive portal — try --skip-validation to continue offline.",
+      );
+    }
+    return { email: extractEmail(body) };
   } catch (err) {
     // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED).
     // Re-thrown errors from the res.status checks above are plain Error instances.

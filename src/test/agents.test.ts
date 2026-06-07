@@ -30,8 +30,52 @@ describe("installAgents integration", () => {
     const result = await installAgents(profile, false, false);
 
     expect(result.files.length).toBeGreaterThan(0);
+    expect(result.failures).toEqual([]);
     const created = await readdir(agentsDir);
     expect(created.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Continue-on-error contract. Previously the loop halted on the first
+   * `copyIfChanged` throw, leaving the destination half-populated and no
+   * record of what failed. We exercise that branch by colliding one
+   * destination path with a directory (writeFile → EISDIR) and verify:
+   *   1. the failing file shows up in `failures` with its error message
+   *   2. the remaining files still copy successfully
+   *   3. the result's `copied` count reflects only the successes
+   *
+   * See tracker issue SEM-COM/M ("agents.ts/commands.ts halt mid-loop on
+   * copy failure, leaving partial state").
+   */
+  it("continues past a per-file copy failure and reports it in failures[]", async () => {
+    const agentsDir = join(tmpDir, "halt-test-agents");
+    await mkdir(agentsDir, { recursive: true });
+    // Pre-create one destination path as a directory so the matching writeFile
+    // throws EISDIR. The agent name must match a real shipped asset, otherwise
+    // installAgents skips it entirely.
+    await mkdir(join(agentsDir, "anxiety-reader-agent.md"), {
+      recursive: true,
+    });
+
+    const profile = {
+      name: "claude-code",
+      displayName: "Claude Code",
+      agentExtension: ".md",
+      paths: { agentsDir },
+    } as unknown as HarnessProfile;
+
+    const result = await installAgents(profile, false, false);
+
+    expect(result.failures.length).toBeGreaterThanOrEqual(1);
+    const failed = result.failures.find(
+      (f) => f.file === "anxiety-reader-agent.md",
+    );
+    expect(failed).toBeDefined();
+    expect(failed!.error).toMatch(/EISDIR|illegal operation|directory/i);
+
+    // The rest of the files still made it through.
+    expect(result.copied + result.skipped).toBeGreaterThan(0);
+    expect(result.files).toContain("aristotle-analyst-agent.md");
   });
 });
 

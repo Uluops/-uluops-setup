@@ -32,6 +32,16 @@ npx @uluops/setup --harness opencode
 npx @uluops/setup --harness gemini-cli
 ```
 
+### Harness auto-detection
+
+If you don't pass `--harness`, setup probes your home directory for known harness install markers and picks a target:
+
+- **One harness detected** — that harness is used as the target. A dimmed `Detected <Name>` line confirms the choice (suppressed when the detected harness is the default `claude-code`).
+- **Multiple harnesses detected** — interactive runs get a `select` prompt; non-interactive runs (`--yes`, `--api-key`, piped stdin) take the first detected harness with a dimmed notice listing the others.
+- **No harnesses detected** — falls back to the default (`claude-code`) so `npx @uluops/setup` always does something useful on a fresh machine.
+
+Passing `--harness <name>` always wins — auto-detection is skipped entirely. Experimental harnesses are excluded from auto-detection (an explicit `--harness` is the only way to opt in).
+
 ## What it does
 
 | Artifact | Count | Destination (Claude Code) |

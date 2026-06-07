@@ -97,6 +97,45 @@ describe("settings-merger", () => {
       expect(result.hooks!["PreToolUse"]).toHaveLength(1);
       expect(result.hooks!["SubagentStop"]).toHaveLength(1);
     });
+
+    /**
+     * Ownership-sentinel collision. The merger identifies prior UluOps hooks
+     * by substring-matching `agent-metrics/dist/hook.js` against existing hook
+     * commands. A user-defined hook that legitimately contains this substring
+     * (a forked agent-metrics, a vendored copy under a different parent dir,
+     * or a path that happens to embed the suffix) gets misidentified as a
+     * prior UluOps install and silently filtered out on re-run.
+     *
+     * This test documents the collision so any future change to the sentinel
+     * scheme has to confront it. If/when this is fixed (e.g., by adding a
+     * structural marker like a sentinel object key), update this test to
+     * assert preservation rather than the collision behavior.
+     *
+     * See tracker issue SEM-COM/M ("Ownership sentinel collision with user
+     * 'uluops' hooks not tested").
+     */
+    it("documents ownership-sentinel collision: user hook containing the sentinel substring is filtered", () => {
+      const userCommand =
+        "node /opt/my-fork/agent-metrics/dist/hook.js --custom-flag";
+      const settings = {
+        hooks: {
+          SubagentStop: [
+            { hooks: [{ type: "command", command: userCommand }] },
+          ],
+        },
+      };
+      const result = mergeUluopsHook(
+        settings,
+        "node ~/.claude/tools/agent-metrics/dist/hook.js",
+      );
+      // Current behavior: user hook is filtered out, only UluOps hook remains.
+      // If this assertion flips to length=2, the collision was fixed — update
+      // the test to assert preservation instead.
+      expect(result.hooks!["SubagentStop"]).toHaveLength(1);
+      expect(
+        result.hooks!["SubagentStop"]![0]!.hooks[0]!.command,
+      ).not.toBe(userCommand);
+    });
   });
 
   describe("removeUluopsHook", () => {

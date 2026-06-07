@@ -132,6 +132,11 @@ export async function installAgentsDefs(
   ok(
     `${res.files.length} agents → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
   );
+  // Per-file copy failures are non-fatal — surface them so the user knows
+  // re-running setup will retry the unwritten files.
+  for (const f of res.failures) {
+    warn(`Failed to copy agent ${f.file}: ${f.error} — re-run setup to retry`);
+  }
   return res;
 }
 
@@ -166,6 +171,11 @@ export async function installCommandsDefs(
   ok(
     `${res.files.length} commands → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
   );
+  // Per-file copy failures are non-fatal — surface them so the user knows
+  // re-running setup will retry the unwritten files.
+  for (const f of res.failures) {
+    warn(`Failed to copy command ${f.file}: ${f.error} — re-run setup to retry`);
+  }
   return res;
 }
 
@@ -376,7 +386,7 @@ export async function configureAgentMetricsCliStep(opts: {
 export async function runHealthCheck(opts: {
   skipValidation: boolean;
   dryRun: boolean;
-}) {
+}): Promise<void> {
   if (!opts.skipValidation && !opts.dryRun) {
     try {
       const [trackerOk, registryOk] = await Promise.all([
