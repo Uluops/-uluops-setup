@@ -142,18 +142,40 @@ describe("detect — Node version gate", () => {
     expect(env.nodeVersion).toBe("v22.5.1");
   });
 
-  it("documents latent bug: corrupt process.version silently passes the gate", async () => {
-    // `parseInt('BOGUS', 10)` is NaN and `NaN < 20` is false, so detect()
-    // doesn't reject on a corrupt version string. This is a latent bug — a
-    // future change should add `Number.isNaN(majorVersion)` to the guard.
-    // Pinning current behavior so the fix has to flip this assertion
-    // deliberately rather than slipping through unnoticed.
+  it("rejects unparseable version string with a distinct error message", async () => {
     Object.defineProperty(process, "version", {
       value: "vBOGUS",
       configurable: true,
     });
+    // Distinct message from the "requires 20 or higher" gate — someone whose
+    // actual problem is an unparseable runtime should see "your runtime is
+    // wrong", not the misleading version-too-low error.
+    await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
+  });
+
+  it("rejects a bare 'v' with no major number", async () => {
+    Object.defineProperty(process, "version", {
+      value: "v",
+      configurable: true,
+    });
+    await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
+  });
+
+  it("rejects an empty version string", async () => {
+    Object.defineProperty(process, "version", {
+      value: "",
+      configurable: true,
+    });
+    await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
+  });
+
+  it("accepts v20.x.y where minor/patch are non-numeric (major is what matters)", async () => {
+    Object.defineProperty(process, "version", {
+      value: "v20.x.y",
+      configurable: true,
+    });
     const env = await detect();
-    expect(env.nodeVersion).toBe("vBOGUS");
+    expect(env.nodeVersion).toBe("v20.x.y");
   });
 });
 

@@ -34,7 +34,24 @@ export async function detect(): Promise<Environment> {
     os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;
-  const majorVersion = parseInt(nodeVersion.slice(1).split(".")[0] ?? "0", 10);
+  // Standard process.version is v-prefixed semver ("v20.10.0"). We take the
+  // major after stripping the "v". The `?? "0"` removed from the prior version
+  // here was dead code — `"".split(".")` returns `[""]`, not an empty array,
+  // so the nullish coalesce never fired and an unparseable major silently
+  // resulted in NaN, which then fell through the `< 20` gate.
+  const majorVersion = parseInt(nodeVersion.slice(1).split(".")[0] ?? "", 10);
+
+  if (Number.isNaN(majorVersion)) {
+    // Defense in depth: a tampered binary, a wrapper that spoofs
+    // process.version, or a future Node release that breaks the v-prefixed
+    // semver convention would all silently pass the major-version gate.
+    // Reject with a distinct error so the user sees "your runtime is wrong"
+    // rather than the misleading "requires Node.js 20 or higher."
+    throw new Error(
+      `Cannot parse Node.js version "${nodeVersion}". ` +
+        `@uluops/setup requires a standard v-prefixed semver (e.g., v20.10.0).`,
+    );
+  }
 
   if (majorVersion < 20) {
     throw new Error(
