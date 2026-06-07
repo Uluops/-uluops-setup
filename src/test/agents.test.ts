@@ -76,6 +76,15 @@ describe("installAgents integration", () => {
     // The rest of the files still made it through.
     expect(result.copied + result.skipped).toBeGreaterThan(0);
     expect(result.files).toContain("aristotle-analyst-agent.md");
+
+    // The failed file must NOT be in result.files. The manifest treats
+    // this list as authoritative — including a never-written file here
+    // would cause uninstall to attempt to remove a file that does not
+    // exist, and verify to falsely report drift. Aligns installAgents
+    // with installCommands / installSkills (which already only track
+    // successfully-copied files). Required by the multi-target install
+    // partial-state contract (spec §7.6.6).
+    expect(result.files).not.toContain("anxiety-reader-agent.md");
   });
 });
 

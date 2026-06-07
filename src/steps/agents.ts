@@ -49,6 +49,7 @@ export async function installAgents(
 
   let copied = 0;
   let skipped = 0;
+  const installedFiles: string[] = [];
   const failures: AgentsResult["failures"] = [];
 
   for (const file of files) {
@@ -60,6 +61,13 @@ export async function installAgents(
       );
       if (result === "copied") copied++;
       else skipped++;
+      // Only files that actually landed on disk enter installedFiles.
+      // A failed copy must not appear here — the manifest treats this list
+      // as authoritative, and uninstall would later attempt to unlink a
+      // file that was never written. Aligned with installCommands /
+      // installSkills behavior; required by the multi-target install
+      // partial-state contract (§7.6.2 / §7.6.6).
+      installedFiles.push(file);
     } catch (err) {
       // Continue past per-file failures so one bad file (EACCES, ENOSPC,
       // ENAMETOOLONG) does not abort the whole install and leave the
@@ -75,11 +83,11 @@ export async function installAgents(
   const removed = await removeStaleFiles(
     destDir,
     existingManifestAgents,
-    files,
+    installedFiles,
     dryRun,
   );
 
-  return { copied, skipped, removed, files, failures };
+  return { copied, skipped, removed, files: installedFiles, failures };
 }
 
 /** Remove previously installed agent files by name. */
