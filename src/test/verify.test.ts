@@ -139,6 +139,86 @@ describe("verify", () => {
     expect(agentCheck!.detail).toContain("Missing 1");
   });
 
+  it("emits partial-install warning when manifest entry has partial set", async () => {
+    // Partial install means a per-harness step threw mid-pipeline after
+    // MCP succeeded. The recorded file lists are still honest (post-Phase
+    // 0.5 contract), so the per-file checks should still pass, but the
+    // run must flip to ok=false so the user knows to re-run.
+    const defsPath = join(tmpDir, "defs");
+    await mkdir(join(defsPath, "agents"), { recursive: true });
+    await writeFile(join(defsPath, "agents", "a.md"), "content");
+
+    const configPath = join(tmpDir, "claude.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          "uluops-tracker": { command: "npx", args: [], env: {} },
+          "uluops-registry": { command: "npx", args: [], env: {} },
+        },
+      }),
+    );
+
+    mockLoadManifest.mockResolvedValue(
+      makeManifest(defsPath, configPath, {
+        agents: ["a.md"],
+        partial: "commands", // step that threw — commands never attempted
+      }),
+    );
+
+    const result = await verify();
+
+    expect(result.ok).toBe(false);
+    const partialCheck = result.checks.find((c) =>
+      c.label.includes("partial install"),
+    );
+    expect(partialCheck).toBeDefined();
+    expect(partialCheck!.passed).toBe(false);
+    expect(partialCheck!.label).toContain('failed at "commands"');
+    expect(partialCheck!.detail).toContain("Re-run: npx @uluops/setup --harness claude-code");
+
+    // The per-file MCP + agents checks should still have run and passed
+    // (recorded lists are honest — partial is about which step DIDN'T run,
+    // not corruption of what did).
+    const mcpCheck = result.checks.find((c) => c.label.includes("MCP config"));
+    expect(mcpCheck?.passed).toBe(true);
+    const agentsCheck = result.checks.find((c) => c.label.includes("agents in"));
+    expect(agentsCheck?.passed).toBe(true);
+  });
+
+  it("partial: null on the manifest entry does NOT emit the partial-install check", async () => {
+    // Regression guard: pre-Phase-1 manifests have no `partial` field at
+    // all; Phase 1+ writes `partial: null` for fully-installed harnesses.
+    // Neither case should produce a partial-install warning row.
+    const defsPath = join(tmpDir, "defs");
+    await mkdir(join(defsPath, "agents"), { recursive: true });
+    await writeFile(join(defsPath, "agents", "a.md"), "content");
+
+    const configPath = join(tmpDir, "claude.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          "uluops-tracker": { command: "npx", args: [], env: {} },
+          "uluops-registry": { command: "npx", args: [], env: {} },
+        },
+      }),
+    );
+
+    mockLoadManifest.mockResolvedValue(
+      makeManifest(defsPath, configPath, {
+        agents: ["a.md"],
+        partial: null,
+      }),
+    );
+
+    const result = await verify();
+    const partialCheck = result.checks.find((c) =>
+      c.label.includes("partial install"),
+    );
+    expect(partialCheck).toBeUndefined();
+  });
+
   it("passes when all manifest entries match filesystem", async () => {
     const defsPath = join(tmpDir, "defs");
     await mkdir(join(defsPath, "agents"), { recursive: true });

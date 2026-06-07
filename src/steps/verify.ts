@@ -228,6 +228,23 @@ async function verifyHarness(
     return false;
   }
 
+  // Partial install gets surfaced before any per-file check runs. The
+  // recorded file lists are honest (post-Phase-0.5 contract) so the
+  // file-existence checks will pass, but the user needs to know the
+  // install never completed and a re-run is required. Reported as a
+  // failed check so verify exits 1 — partial state is not "passes". The
+  // remaining checks still run so the report shows exactly what landed
+  // before the step threw. (Spec §7.6.4.)
+  let partialOk = true;
+  if (hm.partial) {
+    checks.push({
+      label: `[${profile.displayName}] partial install — failed at "${hm.partial}"`,
+      passed: false,
+      detail: `Re-run: npx @uluops/setup --harness ${harnessName}`,
+    });
+    partialOk = false;
+  }
+
   // Run sequentially: the checks share a `checks` array and the user-visible
   // report depends on insertion order (readiness → mcp → agents → commands →
   // hooks). Promise.all would scramble that order. AND together at the end so
@@ -238,7 +255,7 @@ async function verifyHarness(
   const agentsOk = await checkAgents(profile, hm, checks);
   const commandsOk = await checkCommands(profile, hm, checks);
   const hooksOk = await checkHooks(profile, hm, checks);
-  return readinessOk && mcpOk && agentsOk && commandsOk && hooksOk;
+  return partialOk && readinessOk && mcpOk && agentsOk && commandsOk && hooksOk;
 }
 
 /** Run all verification checks against the current installation and return structured results. */

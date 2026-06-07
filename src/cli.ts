@@ -120,7 +120,17 @@ async function main(): Promise<void> {
   }
 
   if (opts.uninstall) {
-    await runUninstall({ dryRun: opts.dryRun });
+    // --harness / --all-detected on uninstall acts as a FILTER over the
+    // manifest's recorded harnesses, not a selection over what's detected
+    // on disk. Pass through the raw flag values; runUninstall delegates
+    // parsing + validation to resolveUninstallFilter (which mirrors the
+    // install-side conflict detection).
+    await runUninstall({
+      dryRun: opts.dryRun,
+      harnessArg: opts.harness,
+      harnessFromCli: program.getOptionValueSource("harness") === "cli",
+      allDetected: opts.allDetected,
+    });
     return;
   }
 
