@@ -2,6 +2,66 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.8.0] - 2026-06-07
+
+### Added
+
+- **Multi-target install — one invocation, every detected harness.** `@uluops/setup` is positioned as the zero-friction installer for any agentic stack a user has. Before this release, a user with Claude Code + Codex + Gemini CLI on the same machine had to run setup three separate times, repeating the API-key resolution, signup decision, npm-availability probe, and health check on every invocation. That contradicted the positioning the moment a user had two harnesses. New CLI surface:
+  - `--harness all` and `--all-detected` install into every detected stable harness in one run.
+  - `--harness claude-code,codex` installs into a specific comma-separated subset.
+  - Interactive multi-detection now uses a `@inquirer/prompts/checkbox` with every option checked by default — the "install everywhere" case is a single Enter press; uncheck entries with space to install into a subset.
+  - Non-interactive multi-detection preserves today's first-detected behavior to keep CI scripts predictable; CI users opt in to multi-install explicitly with `--all-detected`.
+  - `--harness <single-name> --all-detected` is a conflicting-flags error that fails fast with no state touched.
+  - `--harness all` with zero detected falls back to the default (`claude-code`) so the landing-page "just run npx @uluops/setup" promise is preserved.
+- **Per-target failure isolation.** One harness failing does not abort the others. The orchestrator splits each per-harness step into its own `try`/`catch`; a failing harness lands as `failed` (operational error) or `declined` (user-rejected conflict prompt) in the per-harness summary while siblings install cleanly. The new `HarnessManifest.partial` field records which step threw when a post-MCP-success step (agents, commands, skills, metrics) fails — earlier steps' file lists are preserved so `--verify` and `--uninstall` operate on honest state.
+- **4-tier exit-code classifier (spec §7.5).** Exit 0 when every harness succeeded, every harness was declined, or the run was a no-op (user unchecked everything on the prompt). Exit 1 only when at least one harness failed operationally (EACCES, ENOSPC, parse error, etc.). User-rejected conflict prompts no longer poison the exit code — CI scripts wrapping `--harness all` only fail on actionable errors.
+- **Multi-harness summary block with per-status icons.** New unified rendering in `src/lib/display.ts` produces a `[<Harness>] installed/failed/skipped` line per target with ✓/✗/⊘/⚠ icons, partial-state markers, and a per-failure `Re-run: npx @uluops/setup --harness <name>` hint. The combined restart instruction at the end names every successfully-installed harness. Single-harness runs preserve today's `Setup complete!` banner format exactly (regression baseline).
+- **`--uninstall --harness <name>` filter (symmetric to install).** Uninstall now accepts the same syntax as install: single name, comma-separated subset, `all` sentinel, `--all-detected` synonym, with the same fail-fast flag-conflict detection. Subset uninstall removes only the named harnesses, updates the manifest in place (instead of deleting it), and **preserves shared infrastructure** — the global `@uluops/cli`, `@uluops/agent-metrics`, and shell-profile export are only removed on a full uninstall, since remaining harnesses still need them. Unknown harness in the filter fails fast with an error message listing what IS in the manifest so the user can correct typos.
+- **`--verify` partial-install warning.** When the manifest records `partial: "<step>"` on a harness entry, verify surfaces a `[<Harness>] partial install — failed at "<step>"` row with a re-run hint. The per-file checks still run because the recorded lists are honest — the warning adds context about why a re-run is needed. Verify exits non-zero on partial state — partial isn't "passes", it's "incomplete".
+- **Full Codex harness implementation** (lifted from scaffold to first-class support). Real TOML `mcp_servers` write/read/remove with nested table + env subtable handling, plus a skills install step delivering `ULUOPS_OPERATOR` under `~/.codex/skills`. Codex is still flagged `status: "experimental"` so it's excluded from `--all-detected` detection; opt in explicitly with `--harness codex`.
+
+### Fixed
+
+- **`installAgents.files` now tracks only successfully-copied files.** Previously returned the source `readdir` listing including failed files — so a failed copy ended up in `manifest.agents[]` even though the file was never on disk. Subsequent `--uninstall` would attempt to remove a never-written file (harmless but noisy), and `--verify` falsely reported drift. Aligned with `installCommands`/`installSkills` which already only push to their files lists inside the try-block. Prerequisite for the multi-target install partial-state contract (the manifest treats `agents`/`commands`/`skills` as the authoritative list of what's on disk; all three installers must honor that).
+- **`src/cli/select-harnesses.ts` added to the package tarball.** The Phase 2 selection module was missing from `package.json`'s `files` glob — the unit suite imported from source so vitest passed, but the published tarball would have shipped a broken `cli.js` with an unresolvable `ERR_MODULE_NOT_FOUND` import. Caught by the docker test substrate on its first multi-target scenario run. Fixed by adding `dist/cli/**` to the `files` field.
+
+### Internal
+
+- **New module structure** for the multi-target orchestration:
+  - `src/commands/per-harness.ts` — `PerHarnessResult` type + `classifyExit` 4-tier classifier (extracted from `setup.ts` so `display.ts` can import the type without circular dependency).
+  - `src/commands/errors.ts` — typed `ConflictRejectedError` (replaces `process.exit(0)` in `checkConflicts` so the per-harness loop can catch and continue).
+  - `src/cli/select-harnesses.ts` — pure selection logic for the §5 behavior matrix (prompt callback injected for testability; cli.ts wires the real `@inquirer/prompts/checkbox`).
+  - `src/commands/uninstall-filter.ts` — pure filter parser + validator mirroring the install-side syntax.
+- **`runSetup` restructured** into outer (once-per-run: `initContext`, install-lock, manifest load) and inner (per-harness: conflict check, MCP, agents, commands, skills, metrics) phases plus once-per-run-after globals (CLI install, agent-metrics CLI install gated on aggregate `anyHookConfigured`, health check, shell, single `saveManifest`). Each iteration reads its own slice of `existingManifest?.harnesses[harnessName]` for drift detection — no cross-iteration state reuse.
+- **`HarnessManifest.partial?: PartialStep | null`** additive field with `isNewManifest` validation when present. Absent on pre-multi-target manifests (assumed fully installed). Re-runs against a partial entry re-prompt `checkConflicts` (gated on `existingHarness.partial == null`) so the safety check isn't bypassed on the recovery path.
+- **Suite: 240 → 340 tests (+100):**
+  - `src/test/select-harnesses.test.ts` (26) — every row of the §5 behavior matrix.
+  - `src/test/per-harness.test.ts` (10) — every row of the §7.5 4-tier exit-code table.
+  - `src/test/display-summary.test.ts` (10) — single-harness regression baseline + multi-harness mixed-outcome rendering + partial entry + all-declined + `maskKey` behavior; captures stdout, strips ANSI, asserts on substrings.
+  - `src/test/uninstall-filter.test.ts` (16) — CLI matrix + conflict detection + unknown-harness validation + edge cases.
+  - `src/test/verify.test.ts` (+2) — partial-install warning emitted; absent partial field does NOT emit the warning row.
+  - `src/test/agents.test.ts` (+1 assertion) — failed file not in `installedFiles`.
+- **Docker test substrate: 12 → 16 scenarios:**
+  - `multi-all-detected` — 3 detected harnesses install in one invocation; manifest aggregates all three.
+  - `multi-explicit-subset` — `--harness claude-code,codex` honors explicit list when 4 harnesses detected; user-typed order preserved; no cross-harness contamination.
+  - `multi-flag-conflict` — `--harness codex --all-detected` exits non-zero, no state touched.
+  - `multi-non-interactive-default` — CI compatibility: `--yes` + multi-detect preserves first-detected + dimmed notice.
+  - `multi-harness-all-zero-detected` — `--harness all` with no detection falls back to claude-code.
+  - `multi-mcp-fail-one` — sabotages opencode (pre-create `opencode.json` as a directory → EISDIR), asserts failure isolation: siblings install, exit 1, per-harness summary surfaces failure + re-run hint, opencode absent from manifest.
+  - `multi-verify-partial` — installs, sabotages manifest to set `partial: "agents"` (with recomputed contentHash), runs `--verify`, asserts partial warning row + non-zero exit + per-file checks still ran.
+  - `multi-uninstall-subset` — installs 3 harnesses, `--uninstall --harness opencode`, asserts opencode removed + others preserved + manifest updated (not deleted) + globals-preservation notice.
+  - `multi-uninstall-unknown-harness` — install claude-code, `--uninstall --harness opencode`, asserts non-zero exit + error names unknown harness + lists manifest contents + state untouched.
+
+### Breaking changes
+
+- `runSetup` programmatic signature: `harness: string` → `harnesses: string[]`. The CLI is the only documented caller; internal callers (if any) need a one-line change to wrap their single-harness invocation in `[harnessName]`.
+
+### Spec / process
+
+This release ships against a specification authored and reviewed via the pre-implementation pipeline:
+- **Spec:** `plans/multi-harness/setup-multi-target-install-spec-v0_1_0.md` (v0.2.2, Option A — multi-select checkbox + `--all-detected` + comma-split — locked in after pre-implementation pipeline produced architect / docs-validator / assumption-excavator reviews; persona-evidence claim was rewritten to ground in product-positioning consistency after the assumption-excavator surfaced the unsourced claim).
+- **Checklist:** `plans/multi-harness/setup-multi-target-install-checklist-v0_2_1.md` tracks each phase with gates between them; every checked item maps to a commit on `feature/multi-target-install`.
+
 ## [0.7.1] - 2026-06-05
 
 ### Fixed

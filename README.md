@@ -19,28 +19,67 @@ npx @uluops/setup
 | Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
 | OpenCode | Fully supported | `oc` | `~/.config/opencode/opencode.json` |
 | Gemini CLI | Fully supported | `gemini` | `~/.gemini/settings.json` |
-| Codex | Coming soon | — | `~/.codex/config.toml` |
+| Codex | Experimental (opt-in via `--harness codex`) | — | `~/.codex/config.toml` |
 
 ```bash
 # Install for Claude Code (default)
 npx @uluops/setup
 
-# Install for OpenCode
+# Install for one specific harness
 npx @uluops/setup --harness opencode
-
-# Install for Gemini CLI
 npx @uluops/setup --harness gemini-cli
+
+# Install into every detected stable harness in a single run
+npx @uluops/setup --all-detected
+
+# Install into a specific subset (comma-separated)
+npx @uluops/setup --harness claude-code,gemini-cli
 ```
 
 ### Harness auto-detection
 
-If you don't pass `--harness`, setup probes your home directory for known harness install markers and picks a target:
+If you don't pass `--harness` or `--all-detected`, setup probes your home directory for known harness install markers and picks a target:
 
 - **One harness detected** — that harness is used as the target. A dimmed `Detected <Name>` line confirms the choice (suppressed when the detected harness is the default `claude-code`).
-- **Multiple harnesses detected** — interactive runs get a `select` prompt; non-interactive runs (`--yes`, `--api-key`, piped stdin) take the first detected harness with a dimmed notice listing the others.
+- **Multiple harnesses detected (interactive)** — you get a multi-select checkbox listing every detected harness, with **every option checked by default** so the "install everywhere" case is a single Enter press. Use space to toggle entries off.
+- **Multiple harnesses detected (non-interactive — `--yes`, `--api-key`, piped stdin)** — to keep CI scripts predictable, this preserves earlier behavior: the first detected harness installs and a dimmed notice lists the others. CI users who want multi-install opt in explicitly with `--all-detected`.
 - **No harnesses detected** — falls back to the default (`claude-code`) so `npx @uluops/setup` always does something useful on a fresh machine.
 
 Passing `--harness <name>` always wins — auto-detection is skipped entirely. Experimental harnesses are excluded from auto-detection (an explicit `--harness` is the only way to opt in).
+
+### Multi-harness install
+
+`@uluops/setup` is a zero-friction installer for any agentic stack you have. When you've installed multiple harnesses on the same machine, one invocation can wire UluOps into all of them — once-per-run prompts (API key, signup, CLI install) run a single time across the whole batch.
+
+```bash
+# Install into every detected stable harness
+npx @uluops/setup --all-detected
+
+# Same thing, alternative form (--all-detected is the canonical name)
+npx @uluops/setup --harness all
+
+# Subset
+npx @uluops/setup --harness claude-code,opencode
+
+# Aliases work in the comma-separated list
+npx @uluops/setup --harness claude,oc
+```
+
+Each harness gets its own per-section block in the summary:
+
+```
+  Setup complete: 3 installed of 3 harnesses
+
+  ✓ [Claude Code] installed (23 agents · 28 commands · metrics)
+  ✓ [OpenCode] installed (23 agents)
+  ✓ [Gemini CLI] installed (23 agents · 28 commands · metrics)
+
+  Restart each of Claude Code, OpenCode, Gemini CLI to load agents.
+```
+
+**Failure isolation:** one harness failing does not abort the others. The failing harness lands as `✗ [<Name>] failed — <reason>` in the summary with a `Re-run: npx @uluops/setup --harness <name>` hint; siblings install cleanly. The process exits 1 when any harness failed operationally, 0 when every harness either succeeded or was declined at the conflict prompt (user choice is not failure).
+
+**Partial state:** if a per-harness step throws after MCP succeeded (e.g., a `mkdir` permission error during the agents step), the manifest records what landed plus `partial: "<step>"` naming the failed step. `--verify` surfaces this with a `partial install — failed at "<step>"` warning so you know a re-run is needed.
 
 ## What it does
 
@@ -84,8 +123,16 @@ Setup will first ask whether you're creating a new UluOps account. Pick **Y** to
 npx @uluops/setup [options]
 
   --api-key <key>      API key (skip prompt)
-  --harness <name>     Target harness: claude-code, opencode, gemini-cli, codex
+  --harness <value>    Target harness(es). Single name, comma-separated subset,
+                       or "all" sentinel:
+                         --harness claude-code
+                         --harness claude-code,codex
+                         --harness all
+                       Names: claude-code, opencode, gemini-cli, codex
                        Aliases: claude, oc, gemini (default: claude-code)
+  --all-detected       Install into every detected stable harness. Canonical
+                       synonym for --harness all. Cannot be combined with
+                       --harness <single-name> (fail-fast conflict error).
   --signup             Create account from terminal (email + password)
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
   --local-defs         Save definitions to ./uluops/ for review
@@ -95,7 +142,11 @@ npx @uluops/setup [options]
   --skip-validation    Accept API key without server verification
   --list               Show available agents and workflows without installing
   --verify             Check installation health: manifest, files, MCP config, API connectivity (no changes)
-  --uninstall          Remove all UluOps-managed artifacts
+  --uninstall          Remove UluOps-managed artifacts. Combine with --harness
+                       <name>[,<name>] to uninstall from a subset only —
+                       remaining harnesses (and global infrastructure like
+                       @uluops/cli) are preserved. Plain --uninstall removes
+                       everything (today's behavior).
   --dry-run            Show what would happen without making changes
   -y, --yes            Skip confirmations
 ```
@@ -149,8 +200,17 @@ npx @uluops/setup --signup
 # Install for OpenCode
 npx @uluops/setup --harness opencode
 
+# Install into every detected stable harness in one run
+npx @uluops/setup --all-detected
+
+# Install into a specific subset
+npx @uluops/setup --harness claude-code,gemini-cli
+
 # Non-interactive (CI/automation)
 npx @uluops/setup --api-key ulr_abc123 -y
+
+# CI multi-harness: explicit opt-in to all-detected
+npx @uluops/setup --api-key ulr_abc123 --all-detected -y
 
 # Local MCP config (project-scoped)
 npx @uluops/setup --scope local
@@ -190,10 +250,22 @@ Setup manages four surfaces: agent files, command files, MCP config entries, and
 ## Uninstall
 
 ```
+# Uninstall everything (every harness in the manifest + globals + shell export)
 npx @uluops/setup --uninstall
+
+# Uninstall from a specific harness only — other harnesses + globals preserved
+npx @uluops/setup --uninstall --harness opencode
+
+# Uninstall from a comma-separated subset
+npx @uluops/setup --uninstall --harness opencode,gemini-cli
+
+# Same as no filter — uninstall everything
+npx @uluops/setup --uninstall --all-detected
 ```
 
-Removes only UluOps-managed files: agents, commands, MCP config entries, shell profile export (if `--shell` was used), and the global `@uluops/cli` package (only if this setup installed it — a CLI you installed yourself is left alone). Your custom agents and other MCP servers are preserved. Uninstall iterates all harnesses recorded in the manifest.
+Removes only UluOps-managed files: agents, commands, MCP config entries, shell profile export (if `--shell` was used), and the global `@uluops/cli` package (only if this setup installed it — a CLI you installed yourself is left alone). Your custom agents and other MCP servers are preserved.
+
+**Subset uninstall** (`--uninstall --harness <name>`) removes only the named harness(es) from the manifest and disk. Shared infrastructure (the global `@uluops/cli`, `@uluops/agent-metrics`, and the shell-profile export) is left in place because remaining harnesses still need it. The manifest is updated rather than deleted. A subset uninstall that names a harness not in the manifest fails fast with an error listing what IS in the manifest — no silent no-op.
 
 ## Requirements
 
