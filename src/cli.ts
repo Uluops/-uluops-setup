@@ -6,16 +6,21 @@ import chalk from "chalk";
 import { info, printAgentList } from "./lib/display.js";
 import { getVersion } from "./lib/version.js";
 import {
-  resolveHarnessName,
   listHarnesses,
   detectHarnesses,
+  getProfile,
   HarnessNotTestedError,
 } from "./harnesses/index.js";
+import type { HarnessProfile } from "./harnesses/index.js";
 import { InstallLockHeldError } from "./lib/install-lock.js";
 import { runSetup } from "./commands/setup.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runVerify } from "./commands/verify.js";
 import { ConflictRejectedError } from "./commands/errors.js";
+import {
+  selectHarnesses,
+  HarnessSelectionError,
+} from "./cli/select-harnesses.js";
 
 async function main(): Promise<void> {
   const version = await getVersion();
@@ -31,8 +36,13 @@ async function main(): Promise<void> {
     )
     .option(
       "--harness <name>",
-      `Target harness: ${listHarnesses().join(", ")} (aliases: claude, oc, gemini)`,
+      `Target harness: ${listHarnesses().join(", ")} (aliases: claude, oc, gemini). Accepts comma-separated subset ("claude-code,codex") or "all" to install into every detected stable harness.`,
       "claude-code",
+    )
+    .option(
+      "--all-detected",
+      "Install into every detected stable harness. Canonical form; equivalent to --harness all.",
+      false,
     )
     .option(
       "--scope <mode>",
@@ -76,6 +86,7 @@ async function main(): Promise<void> {
     apiKey?: string;
     signup: boolean;
     harness: string;
+    allDetected: boolean;
     scope: string;
     localDefs: boolean;
     shell: boolean;
@@ -123,52 +134,63 @@ async function main(): Promise<void> {
   }
   const scope = opts.scope === "local" ? "local" : "global";
 
-  // Resolve harness: if --harness was passed explicitly, honor it as-is.
-  // Otherwise auto-detect — single match wins silently, multiple matches
-  // prompt the user, no matches falls back to the default (claude-code)
-  // to preserve the landing-page "just run npx @uluops/setup" promise.
-  const harnessExplicit = program.getOptionValueSource("harness") === "cli";
-  let harnessName: string;
-  if (harnessExplicit) {
-    harnessName = resolveHarnessName(opts.harness);
-  } else {
-    const detected = detectHarnesses();
-    if (detected.length === 1) {
-      harnessName = detected[0]!.name;
-      if (harnessName !== "claude-code") {
-        info(
-          chalk.dim(
-            `Detected ${chalk.cyan(detected[0]!.displayName)} — using as target (pass --harness to override)`,
-          ),
-        );
-      }
-    } else if (detected.length > 1) {
-      const isInteractive =
-        !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"] && process.stdin.isTTY;
-      if (isInteractive) {
-        const { select } = await import("@inquirer/prompts");
-        harnessName = await select({
-          message: "Multiple harnesses detected — which one are you setting up?",
-          choices: detected.map((p) => ({ name: p.displayName, value: p.name })),
-          default: detected[0]!.name,
+  // Resolve harness selection through the pure selection module so the
+  // matrix of (--harness, --all-detected, detection count, TTY) lives in
+  // one tested place. cli.ts only wires the prompt and emit-info callbacks.
+  const detected = detectHarnesses();
+  const isInteractive =
+    !opts.yes &&
+    !opts.apiKey &&
+    !process.env["ULUOPS_API_KEY"] &&
+    !!process.stdin.isTTY;
+
+  let harnessNames: string[];
+  try {
+    harnessNames = await selectHarnesses({
+      harnessArg: opts.harness,
+      harnessFromCli: program.getOptionValueSource("harness") === "cli",
+      allDetected: opts.allDetected,
+      detected,
+      defaultHarness: "claude-code",
+      isInteractive,
+      emitInfo: (msg) => info(chalk.dim(msg)),
+      promptCheckbox: async (profiles: HarnessProfile[]) => {
+        const { checkbox } = await import("@inquirer/prompts");
+        const chosen = await checkbox({
+          message:
+            "Multiple harnesses detected. Which would you like to install into?",
+          instructions: " (use space to toggle, enter to confirm)",
+          choices: profiles.map((p) => ({
+            name: p.displayName,
+            value: p.name,
+            checked: true,
+          })),
         });
         console.log();
-      } else {
-        harnessName = detected[0]!.name;
-        info(
-          chalk.dim(
-            `Multiple harnesses detected (${detected.map((p) => p.displayName).join(", ")}); defaulting to ${chalk.cyan(detected[0]!.displayName)} — pass --harness to choose`,
-          ),
-        );
-      }
-    } else {
-      harnessName = resolveHarnessName(opts.harness);
+        return chosen;
+      },
+    });
+  } catch (err) {
+    if (err instanceof HarnessSelectionError) {
+      console.error(chalk.red(`\n  ${err.message}\n`));
+      process.exit(1);
     }
+    throw err;
   }
 
-  // Phase 1: single-harness call wrapped in [harnessName]. Phase 2 will
-  // replace the selection branch above with comma-split / --all-detected /
-  // checkbox-prompt support producing a real multi-element array.
+  // Resolve every name through getProfile up front. This catches typos
+  // (e.g. `--harness claude-cod,codex`) before any state is touched and
+  // surfaces the canonical "Available: ..." error. Aliases ('claude' →
+  // 'claude-code') are normalized here as a side effect.
+  let resolvedHarnesses: string[];
+  try {
+    resolvedHarnesses = harnessNames.map((n) => getProfile(n).name);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`\n  ${msg}\n`));
+    process.exit(1);
+  }
+
   await runSetup({
     apiKey: opts.apiKey,
     signup: opts.signup ?? false,
@@ -182,7 +204,7 @@ async function main(): Promise<void> {
     skipValidation: opts.skipValidation,
     dryRun: opts.dryRun,
     yes: opts.yes,
-    harnesses: [harnessName],
+    harnesses: resolvedHarnesses,
   });
 }
 
