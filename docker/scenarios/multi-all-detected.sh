@@ -30,8 +30,8 @@ mkdir -p "$HOME/.claude"
 mkdir -p "$HOME/.config/opencode"
 mkdir -p "$HOME/.gemini"
 
-# Capture the install output so we can later assert "Multi-harness run:"
-# aggregate summary line was emitted (the new Phase 1 affordance).
+# Capture the install output so we can later assert the Phase 3 summary
+# block (header + per-harness ✓ lines + combined restart instruction).
 output=$(setup-tgz \
   --all-detected \
   --api-key=ulr_fake_test_key_000000000000000000 \
@@ -43,12 +43,21 @@ output=$(setup-tgz \
 echo "$output"
 
 # Aggregate summary line should appear (signals all three were processed)
-echo "$output" | grep -q "Multi-harness run:" || {
-  echo "FAIL: 'Multi-harness run:' aggregate summary line missing from output"
+echo "$output" | grep -q "Setup complete:" || {
+  echo "FAIL: 'Setup complete:' aggregate header missing from output"
   exit 1
 }
-echo "$output" | grep -q "3 installed" || {
-  echo "FAIL: aggregate summary should report '3 installed' (got: '$(echo "$output" | grep "Multi-harness run:")')"
+echo "$output" | grep -q "3 installed of 3 harnesses" || {
+  echo "FAIL: header should report '3 installed of 3 harnesses' (got: '$(echo "$output" | grep -E "Setup (complete|finished):")')"
+  exit 1
+}
+# Per-harness ✓ section lines
+for label in "[Claude Code] installed" "[OpenCode] installed" "[Gemini CLI] installed"; do
+  echo "$output" | grep -qF "$label" || { echo "FAIL: per-harness summary line missing for $label"; exit 1; }
+done
+# Combined restart instruction
+echo "$output" | grep -q "Restart each of Claude Code, OpenCode, Gemini CLI to load agents" || {
+  echo "FAIL: combined restart line missing or in wrong order"
   exit 1
 }
 

@@ -13,7 +13,6 @@ import { findProjectRoot } from "../lib/paths.js";
 import { info, printSetupSummary, warn } from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 import { getProfile } from "../harnesses/index.js";
-import type { HarnessProfile } from "../harnesses/index.js";
 import {
   acquireInstallLock,
   type LockHandle,
@@ -32,29 +31,19 @@ import {
   configureShell,
 } from "./helpers.js";
 import { ConflictRejectedError } from "./errors.js";
+import {
+  classifyExit,
+  type PerHarnessResult,
+} from "./per-harness.js";
 import type { AgentsResult } from "../steps/agents.js";
 import type { CommandsResult } from "../steps/commands.js";
 import type { SkillsResult } from "../steps/skills.js";
 import type { MetricsResult } from "../steps/metrics.js";
 import type { McpResult } from "../steps/mcp.js";
 
-/**
- * Per-harness outcome captured by the orchestrator loop. The exit-code
- * classifier (spec §7.5) decides the process exit code from the set of
- * statuses across all harnesses in the run.
- */
-export interface PerHarnessResult {
-  harnessName: string;
-  profile: HarnessProfile;
-  status: "ok" | "failed" | "declined";
-  error?: string;
-  mcpResult?: McpResult;
-  agentsResult?: AgentsResult;
-  commandsResult?: CommandsResult;
-  skillsResult?: SkillsResult;
-  metricsResult?: MetricsResult;
-  partial?: PartialStep | null;
-}
+// Re-export so existing import sites that pull PerHarnessResult from
+// setup.ts keep working.
+export type { PerHarnessResult } from "./per-harness.js";
 
 interface RunSetupOpts {
   apiKey?: string;
@@ -351,43 +340,21 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     }
 
     // === Summary ===
-    // Interim per-harness summary for Phase 1. Phase 3.2 replaces this
-    // with the full multi-harness summary block (declined/partial markers,
-    // re-run hints, aggregate counts).
-    for (const r of perHarnessResults) {
-      if (r.status !== "ok") continue;
-      await printSetupSummary({
-        profile: r.profile,
-        agentCount: r.agentsResult?.files.length ?? 0,
-        commandCount: r.commandsResult?.files.length ?? 0,
-        apiKey,
-      });
-    }
+    // Single rendering call producing the full multi-harness block with
+    // per-harness status icons, partial markers, re-run hints, and the
+    // aggregate counts in the header. Single-harness path preserves
+    // today's Setup-complete banner format inside the same function.
+    await printSetupSummary({
+      results: perHarnessResults,
+      apiKey,
+    });
 
-    // Aggregate one-line summary when more than one harness was touched.
-    if (perHarnessResults.length > 1) {
-      const ok = perHarnessResults.filter((r) => r.status === "ok").length;
-      const failed = perHarnessResults.filter((r) => r.status === "failed").length;
-      const declined = perHarnessResults.filter((r) => r.status === "declined").length;
-      const parts = [`${ok} installed`];
-      if (failed) parts.push(`${failed} failed`);
-      if (declined) parts.push(`${declined} declined`);
-      console.log(
-        `  ${chalk.bold(`Multi-harness run:`)} ${parts.join(", ")} of ${perHarnessResults.length}`,
-      );
-      console.log();
-    }
-
-    // Exit-code policy (Phase 1 interim — full classifier comes in Phase 3.2):
-    //   any failed → exit 1
-    //   any declined + zero failed → exit 0
-    //   all ok → exit 0
-    // This matches spec §7.5 for the failed/ok cases. The "declined + 0
-    // failed → 0 with non-zero summary line" case is exit 0; the line above
-    // surfaces the declined count.
-    const anyFailed = perHarnessResults.some((r) => r.status === "failed");
-    if (anyFailed) {
-      process.exit(1);
+    // Exit-code classifier (spec §7.5 4-tier table). One call, one place.
+    // Empty perHarnessResults already short-circuited above with the
+    // "nothing to install" message; classifyExit handles defense-in-depth.
+    const exitCode = classifyExit(perHarnessResults);
+    if (exitCode !== 0) {
+      process.exit(exitCode);
     }
   } finally {
     if (lock) await lock.release();

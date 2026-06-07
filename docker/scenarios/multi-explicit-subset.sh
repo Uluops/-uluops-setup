@@ -51,8 +51,11 @@ echo "$output" | grep -q "▸ OpenCode" && { echo "FAIL: OpenCode section appear
 echo "$output" | grep -q "▸ Gemini CLI" && { echo "FAIL: Gemini CLI section appeared despite not being in --harness list"; exit 1; }
 
 # Aggregate summary "2 installed of 2"
-echo "$output" | grep -q "Multi-harness run:" || { echo "FAIL: aggregate summary missing"; exit 1; }
-echo "$output" | grep -q "2 installed" || { echo "FAIL: should report '2 installed' (got: '$(echo "$output" | grep "Multi-harness run:")')"; exit 1; }
+echo "$output" | grep -q "Setup complete:" || { echo "FAIL: 'Setup complete:' header missing"; exit 1; }
+echo "$output" | grep -q "2 installed of 2 harnesses" || { echo "FAIL: should report '2 installed of 2 harnesses' (got: '$(echo "$output" | grep -E "Setup (complete|finished):")')"; exit 1; }
+echo "$output" | grep -qF "[Claude Code] installed" || { echo "FAIL: per-harness ✓ line for Claude Code missing"; exit 1; }
+echo "$output" | grep -qF "[Codex] installed" || { echo "FAIL: per-harness ✓ line for Codex missing"; exit 1; }
+echo "$output" | grep -q "Restart each of Claude Code, Codex to load agents" || { echo "FAIL: combined restart line missing or wrong order"; exit 1; }
 
 # State assertions
 [ -d "$HOME/.claude/agents" ]   || { echo "FAIL: claude agents missing"; exit 1; }

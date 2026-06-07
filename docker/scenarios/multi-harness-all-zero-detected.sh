@@ -35,8 +35,13 @@ echo "$output" | grep -q "▸ Gemini CLI" && { echo "FAIL: Gemini CLI section ap
 echo "$output" | grep -q "▸ Codex" && { echo "FAIL: Codex section appeared despite no detection"; exit 1; }
 
 # No aggregate summary (only one harness in the run)
-echo "$output" | grep -q "Multi-harness run:" && {
-  echo "FAIL: aggregate summary appeared for fallback single-harness run"
+echo "$output" | grep -q "Setup complete:" && {
+  echo "FAIL: multi-harness 'Setup complete:' header appeared for single-harness fallback run"
+  exit 1
+}
+# Single-harness path uses the legacy 'Setup complete!' banner instead
+echo "$output" | grep -q "Setup complete!" || {
+  echo "FAIL: single-harness banner 'Setup complete!' missing"
   exit 1
 }
 

@@ -53,10 +53,14 @@ echo "$output" | grep -q -- "--all-detected to install into all" || {
 [ ! -d "$HOME/.config/opencode/agents" ] || { echo "FAIL: opencode installed despite non-interactive default"; exit 1; }
 [ ! -f "$HOME/.gemini/settings.json" ] || { echo "FAIL: gemini installed despite non-interactive default"; exit 1; }
 
-# Aggregate summary line should NOT appear (only 1 harness processed —
-# the aggregate is gated on perHarnessResults.length > 1)
-echo "$output" | grep -q "Multi-harness run:" && {
-  echo "FAIL: aggregate summary appeared for single-harness run"
+# Multi-harness summary header should NOT appear (only 1 harness processed)
+echo "$output" | grep -q "Setup complete:" && {
+  echo "FAIL: multi-harness 'Setup complete:' header appeared for single-harness CI-compat run"
+  exit 1
+}
+# Single-harness banner SHOULD appear
+echo "$output" | grep -q "Setup complete!" || {
+  echo "FAIL: single-harness banner 'Setup complete!' missing"
   exit 1
 }
 
