@@ -9,7 +9,6 @@ import {
   detectHarnesses,
   listHarnesses,
   ALL_PROFILES,
-  HarnessNotTestedError,
 } from "../harnesses/index.js";
 import { claudeCodeProfile } from "../harnesses/claude-code.js";
 import { opencodeProfile } from "../harnesses/opencode.js";
@@ -105,6 +104,58 @@ describe("harness registry", () => {
     // When that happens, add a new experimental profile or seed a synthetic
     // one for the filter test.
     expect(codexProfile.status).toBe("experimental");
+  });
+});
+
+describe("codex profile", () => {
+  it("uses Codex-native agent and skill paths", () => {
+    expect(codexProfile.paths.agentsDir).toContain(".codex");
+    expect(codexProfile.paths.skillsDir).toContain(".codex");
+    expect(codexProfile.paths.skillsDir).toContain("skills");
+    expect(codexProfile.paths.commandsDir).toContain("commands");
+  });
+
+  it("merges and removes UluOps MCP servers in TOML config", () => {
+    const existing = [
+      `model = "gpt-5.5"`,
+      ``,
+      `[mcp_servers.other]`,
+      `command = "node"`,
+      ``,
+      `[mcp_servers.uluops-tracker]`,
+      `command = "node"`,
+      `args = ["/local/dev/server.js"]`,
+      ``,
+      `[mcp_servers.uluops-tracker.env]`,
+      `ULUOPS_API_KEY = "old"`,
+      ``,
+      `[mcp_servers.uluops-tracker.tools.query_issues]`,
+      `approval_mode = "approve"`,
+      ``,
+    ].join("\n");
+    const merged = codexProfile.mcpConfig.merge(
+      { "__rawToml": existing },
+      "ulr_test123",
+    );
+
+    expect(codexProfile.mcpConfig.check(merged)).toBe(true);
+    const raw = merged["__rawToml"] as string;
+    expect(raw).toContain("[mcp_servers.other]");
+    expect(raw).toContain('[mcp_servers."uluops-tracker"]');
+    expect(raw).toContain("@uluops/ops-mcp");
+    expect(raw).toContain("ulr_test123");
+    expect(raw).not.toContain("/local/dev/server.js");
+    expect(raw).not.toContain('ULUOPS_API_KEY = "old"');
+    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.query_issues]");
+    expect(raw).toContain('approval_mode = "approve"');
+
+    const cleaned = codexProfile.mcpConfig.remove(merged);
+    const cleanedRaw = cleaned["__rawToml"] as string;
+    expect(codexProfile.mcpConfig.check(cleaned)).toBe(false);
+    expect(cleanedRaw).toContain("[mcp_servers.other]");
+    expect(cleanedRaw).not.toContain("uluops-tracker");
+    expect(cleanedRaw).not.toContain("uluops-registry");
+    expect(cleanedRaw).not.toContain("query_issues");
   });
 });
 
@@ -325,18 +376,20 @@ describe("scaffold profiles", () => {
     expect(servers).toHaveProperty("uluops-registry");
   });
 
-  it("codex mcpConfig.merge throws HarnessNotTestedError", () => {
-    expect(() => codexProfile.mcpConfig.merge({}, "key")).toThrow(
-      HarnessNotTestedError,
-    );
+  it("codex mcpConfig.merge returns TOML with UluOps servers", () => {
+    const result = codexProfile.mcpConfig.merge({}, "ulr_test123");
+    const raw = result["__rawToml"] as string;
+    expect(raw).toContain('[mcp_servers."uluops-tracker"]');
+    expect(raw).toContain('[mcp_servers."uluops-registry"]');
+    expect(codexProfile.mcpConfig.check(result)).toBe(true);
   });
 
   it("gemini-cli check() returns false when servers not present", () => {
     expect(geminiCliProfile.mcpConfig.check({})).toBe(false);
   });
 
-  it("codex check() throws HarnessNotTestedError", () => {
-    expect(() => codexProfile.mcpConfig.check({})).toThrow(HarnessNotTestedError);
+  it("codex check() returns false when servers are not present", () => {
+    expect(codexProfile.mcpConfig.check({ "__rawToml": "" })).toBe(false);
   });
 });
 

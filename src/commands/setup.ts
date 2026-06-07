@@ -19,6 +19,7 @@ import {
   configureMcpStep,
   installAgentsDefs,
   installCommandsDefs,
+  installSkillsDefs,
   configureMetricsStep,
   configureCliStep,
   configureAgentMetricsCliStep,
@@ -106,6 +107,12 @@ export async function runSetup(opts: {
     existingHarness?.commands,
   );
 
+  const skillsResult = await installSkillsDefs(
+    profile,
+    opts,
+    existingHarness?.skills,
+  );
+
   const metricsResult = await configureMetricsStep(profile, opts);
 
   const cliResult = await configureCliStep({
@@ -147,6 +154,7 @@ export async function runSetup(opts: {
         : profile.paths.home,
       agents: agentsResult.files,
       commands: commandsResult.files,
+      skills: skillsResult.files,
       hooksInstalled: metricsResult.hookConfigured,
       hooksInstalledVersion: metricsResult.hooksInstalledVersion,
     };

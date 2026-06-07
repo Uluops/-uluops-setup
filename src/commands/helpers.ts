@@ -10,6 +10,8 @@ import { installAgents } from "../steps/agents.js";
 import type { AgentsResult } from "../steps/agents.js";
 import { installCommands } from "../steps/commands.js";
 import type { CommandsResult } from "../steps/commands.js";
+import { installSkills } from "../steps/skills.js";
+import type { SkillsResult } from "../steps/skills.js";
 import { installMetrics } from "../steps/metrics.js";
 import type { MetricsResult } from "../steps/metrics.js";
 import { installCli, CLI_PACKAGE } from "../steps/cli.js";
@@ -175,6 +177,32 @@ export async function installCommandsDefs(
   // re-running setup will retry the unwritten files.
   for (const f of res.failures) {
     warn(`Failed to copy command ${f.file}: ${f.error} — re-run setup to retry`);
+  }
+  return res;
+}
+
+/** Copy Codex-style skills from assets to the harness directory. */
+export async function installSkillsDefs(
+  profile: HarnessProfile,
+  opts: { localDefs: boolean; dryRun: boolean },
+  prev?: string[],
+): Promise<SkillsResult> {
+  const res = await installSkills(profile, opts.localDefs, opts.dryRun, prev);
+  if (res.skippedReason === "not-supported") {
+    return res;
+  }
+  const parts: string[] = [];
+  if (res.copied > 0) parts.push(`${res.copied} copied`);
+  if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
+  if (res.removed > 0) parts.push(`${res.removed} removed`);
+  const dest = opts.localDefs
+    ? "./uluops/skills/"
+    : `${(profile.paths.skillsDir ?? "").replace(process.env["HOME"] ?? "", "~")}/`;
+  ok(
+    `${res.files.length} skills → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
+  );
+  for (const f of res.failures) {
+    warn(`Failed to copy skill ${f.file}: ${f.error} — re-run setup to retry`);
   }
   return res;
 }

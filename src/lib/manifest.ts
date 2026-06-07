@@ -28,6 +28,7 @@ export interface HarnessManifest {
   defsPath: string;
   agents: string[];
   commands: string[];
+  skills?: string[];
   hooksInstalled: boolean;
   /**
    * Version of @uluops/agent-metrics whose dist/ was copied into the harness tree.
@@ -103,6 +104,7 @@ function isNewManifest(obj: unknown): obj is Manifest {
     const hm = h as Record<string, unknown>;
     if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
     if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
+    if ("skills" in hm && !Array.isArray(hm["skills"])) return false;
   }
   return true;
 }
@@ -192,6 +194,19 @@ export async function validateManifest(
       if (missing.length > 0) {
         warnings.push(
           `[${harnessName}] Command files missing from disk: ${missing.join(", ")}`,
+        );
+      }
+    }
+
+    if ((hm.skills?.length ?? 0) > 0 && defsExists) {
+      const missing = await findMissingFiles(
+        hm.defsPath,
+        "skills",
+        hm.skills ?? [],
+      );
+      if (missing.length > 0) {
+        warnings.push(
+          `[${harnessName}] Skill files missing from disk: ${missing.join(", ")}`,
         );
       }
     }

@@ -11,6 +11,7 @@ import {
 import { uninstallMcp } from "../steps/mcp.js";
 import { uninstallAgents } from "../steps/agents.js";
 import { uninstallCommands } from "../steps/commands.js";
+import { uninstallSkills } from "../steps/skills.js";
 import { removeShellExport } from "../steps/shell.js";
 import { uninstallMetrics } from "../steps/metrics.js";
 import { uninstallCli, CLI_PACKAGE } from "../steps/cli.js";
@@ -87,6 +88,15 @@ export async function runUninstall(opts: { dryRun: boolean }): Promise<void> {
         ok(`Removed ${cmdCount} command(s)`);
       } else {
         ok(`Would remove ${hm.commands.length} command(s)`);
+      }
+    }
+
+    if ((hm.skills?.length ?? 0) > 0) {
+      if (!opts.dryRun) {
+        const skillCount = await uninstallSkills(hm.skills ?? [], hm.defsPath);
+        ok(`Removed ${skillCount} skill file(s)`);
+      } else {
+        ok(`Would remove ${hm.skills?.length ?? 0} skill file(s)`);
       }
     }
 

@@ -66,6 +66,8 @@ export interface HarnessPaths {
   readonly agentsDir: string;
   /** Global commands/skills dir */
   readonly commandsDir: string;
+  /** Global Codex-style skills dir, when the harness supports skills as first-class install assets */
+  readonly skillsDir?: string | null;
   /** Settings file path, or null if harness has no settings file */
   readonly settingsPath: string | null;
   /** Tool installation dir, or null if harness has no tool installation */
