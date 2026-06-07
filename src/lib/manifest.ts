@@ -18,6 +18,15 @@ import { atomicWrite } from "./atomic-write.js";
  */
 export type HarnessInstanceKey = string;
 
+/**
+ * Names of per-harness pipeline steps that can throw before producing a
+ * complete result. Recorded in `HarnessManifest.partial` so verify can warn
+ * and re-runs can re-prompt conflicts (spec §7.6.3). `configureMcpStep` is
+ * NOT in this set — an MCP throw produces no manifest entry at all because
+ * the entry depends on the MCP-derived `mcpConfigPath`.
+ */
+export type PartialStep = "agents" | "commands" | "skills" | "metrics";
+
 /** Per-harness installation state. */
 export interface HarnessManifest {
   installedAt: string;
@@ -37,6 +46,17 @@ export interface HarnessManifest {
    * the shared version ledger across the setup↔agent-metrics seam.
    */
   hooksInstalledVersion?: string | null;
+  /**
+   * When non-null, names the per-harness pipeline step that threw before
+   * producing a complete result. Earlier steps' file lists are accurate;
+   * later steps were never attempted. Verify surfaces this as a WARNING.
+   * Re-run treats a partial entry as "checkConflicts must run again" (the
+   * user never confirmed it on the failing run — spec §7.6.5).
+   *
+   * Absent (undefined) on manifests written by pre-multi-target versions —
+   * those harnesses are assumed fully installed.
+   */
+  partial?: PartialStep | null;
 }
 
 /** Top-level manifest with per-harness entries. */
@@ -105,6 +125,12 @@ function isNewManifest(obj: unknown): obj is Manifest {
     if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
     if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
     if ("skills" in hm && !Array.isArray(hm["skills"])) return false;
+    if ("partial" in hm) {
+      const p = hm["partial"];
+      if (p !== null && p !== "agents" && p !== "commands" && p !== "skills" && p !== "metrics") {
+        return false;
+      }
+    }
   }
   return true;
 }

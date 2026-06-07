@@ -31,6 +31,7 @@ import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import type { HarnessProfile } from "../harnesses/index.js";
+import { ConflictRejectedError } from "./errors.js";
 
 /**
  * Decide whether to ask the user "Are you creating a new account?".
@@ -514,7 +515,11 @@ export async function checkConflicts(
   const { confirm } = await import("@inquirer/prompts");
   const proceed = await confirm({ message: "Continue?", default: true });
   if (!proceed) {
-    process.exit(0);
+    // Throw instead of process.exit so the multi-harness loop can catch and
+    // continue with sibling harnesses. The single-harness CLI top-level
+    // handler catches ConflictRejectedError and exits 0 cleanly, preserving
+    // today's UX. (Spec §7.5; replaces the prior process.exit(0).)
+    throw new ConflictRejectedError(profile.name);
   }
 }
 

@@ -15,6 +15,7 @@ import { InstallLockHeldError } from "./lib/install-lock.js";
 import { runSetup } from "./commands/setup.js";
 import { runUninstall } from "./commands/uninstall.js";
 import { runVerify } from "./commands/verify.js";
+import { ConflictRejectedError } from "./commands/errors.js";
 
 async function main(): Promise<void> {
   const version = await getVersion();
@@ -165,6 +166,9 @@ async function main(): Promise<void> {
     }
   }
 
+  // Phase 1: single-harness call wrapped in [harnessName]. Phase 2 will
+  // replace the selection branch above with comma-split / --all-detected /
+  // checkbox-prompt support producing a real multi-element array.
   await runSetup({
     apiKey: opts.apiKey,
     signup: opts.signup ?? false,
@@ -178,11 +182,22 @@ async function main(): Promise<void> {
     skipValidation: opts.skipValidation,
     dryRun: opts.dryRun,
     yes: opts.yes,
-    harness: harnessName,
+    harnesses: [harnessName],
   });
 }
 
 main().catch((err: unknown) => {
+  if (err instanceof ConflictRejectedError) {
+    // Single-harness path: user declined the conflict prompt. Exit 0
+    // (today's UX — no error). The multi-harness orchestrator catches
+    // this inside its loop and never lets it bubble to here when there
+    // are siblings to install; this handler only fires when the declined
+    // harness was the only target (the loop continues, finds nothing
+    // installed, and... actually the loop swallows it before propagating,
+    // so this handler is defense-in-depth for any future caller of
+    // checkConflicts outside the loop). Either way: exit 0, no message.
+    process.exit(0);
+  }
   if (err instanceof HarnessNotTestedError) {
     console.error(chalk.yellow(`\n  ${err.message}\n`));
     process.exit(1);
