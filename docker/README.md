@@ -153,6 +153,20 @@ from "container env is broken." See the Dockerfile comments for the rationale.
 | `gemini-fresh-install` | Pre-creates `~/.gemini/` to fire detection; runs setup `--harness gemini-cli`; asserts Gemini-shaped MCP config (`mcpServers` key like Claude, but each server has `trust: true`); asserts hooks installed with `AfterTool` event + `invoke_agent` matcher (different from Claude's `SubagentStop`); asserts agents + commands + metrics tools all under `~/.gemini/`; asserts no `~/.claude/` or `~/.config/opencode/` contamination |
 | `gemini-uninstall-roundtrip` | Install with planted user sentinel + third-party MCP entry + user-owned `AfterTool` hook with matcher `user-custom`; assert merge correctness (uluops's `trust:true` server added, third-party preserved, user hook preserved); uninstall; assert setup-owned state (mcp entries, uluops hook, metrics tools dir) removed while user-owned state (sentinel agent, third-party MCP, user-custom hook) survives |
 
+### Multi-target install (`--all-detected`, `--harness all`, comma-split)
+
+Validates the Phase 1/2 multi-harness orchestration end-to-end against a clean-OS container — the path no unit test can fully cover because npx-transient PATH + per-user npm prefix + fresh-state assumptions all interact.
+
+| Scenario | Asserts |
+|---|---|
+| `multi-all-detected` | Pre-creates 3 harness home dirs (claude-code, opencode, gemini-cli) so detection fires; runs `--all-detected`; asserts all three install in ONE invocation; asserts `Multi-harness run: 3 installed of 3` aggregate summary appears; asserts per-harness `▸ <DisplayName>` section labels appear once each (no double-execution of once-per-run steps); asserts manifest contains entries for all three harnesses, all with `partial: null` |
+| `multi-explicit-subset` | Pre-creates 4 harness home dirs to make detection greedy; runs `--harness claude-code,codex`; asserts only the two named harnesses install despite opencode + gemini also being detected (explicit overrides detection); asserts user-typed order honored in section ordering (claude-code section precedes codex); asserts opencode + gemini state untouched (no cross-harness contamination); asserts manifest has exactly the two requested entries |
+| `multi-flag-conflict` | Runs `--harness codex --all-detected` (incompatible flags); asserts exit code non-zero; asserts error message names both the conflict and the offending `--harness` value; asserts NO state was touched (`~/.uluops/`, `~/.claude/`, `~/.codex/` all absent post-run — fail-fast before any install work) |
+| `multi-non-interactive-default` | Pre-creates 3 harness home dirs; runs with `--yes` and no `--harness`/`--all-detected`; asserts spec §10.1 CI compatibility: only the first detected (claude-code) installs; asserts dimmed notice surfaces the others and hints at `--all-detected`; asserts opencode/gemini state untouched; asserts NO aggregate summary line (single-harness run) |
+| `multi-harness-all-zero-detected` | No harness home dirs; runs `--harness all`; asserts the landing-page fallback fires (claude-code installs as the default); asserts only one section label appears; asserts manifest contains only claude-code |
+
+These scenarios uncovered a packaging bug during initial run: `src/cli/select-harnesses.ts` (Phase 2 addition) was missing from the `files` field in `package.json`, so the published tarball would have shipped a broken `cli.js` with an unresolvable import. The unit suite couldn't catch this because it imports from source, not from the packed tarball — exactly the bug class this substrate exists to surface. Fixed by adding `dist/cli/**` to the `files` glob in the same commit that introduced the scenarios.
+
 OpenCode-specific gotcha pinned by these scenarios: as of setup 0.7.1,
 commands are NOT installed for OpenCode — setup prints "Commands not yet
 supported for OpenCode (coming soon)" and skips the dir, but the
@@ -252,10 +266,13 @@ bash /scenarios/agent-metrics-cli.sh
   that is the primary user surface for the bug class. For macOS-specific
   behavior, you'd need a different substrate (and macOS-specific bugs
   haven't been observed yet).
-- No coverage of Gemini CLI or OpenCode harness branches — would require
-  extending the Dockerfile to install those CLIs and adding scenarios that
-  pre-create `~/.gemini/` or `~/.config/opencode/`. Both are doable; not
-  needed yet.
+- No coverage of failure-injection paths yet (post-MCP step throws,
+  EACCES on a single harness in a multi-target run) — Phase 3 of the
+  multi-target install spec adds these alongside the 4-tier exit-code
+  classifier. The current multi-target scenarios cover the happy paths
+  only; failure-isolation will need scenarios that plant pre-conditions
+  causing one harness to fail (e.g., `chmod 000 ~/.config/opencode/`)
+  while siblings succeed.
 - Cleanup on Ctrl-C: the `trap` in `test.sh` removes the tarball even on
   interrupt. The container is `--rm` so it dies cleanly. But if you kill
   `test.sh` between `docker build` and `docker run`, you can be left with
