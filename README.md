@@ -163,7 +163,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.8.1 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.9.5 — available agents and workflows
 
   WORKFLOWS
   /workflows:post-implementation   Iterative validation after coding
@@ -182,7 +182,7 @@ Displays all agents and workflows included in the current version of the setup t
 Validates your current installation against the local manifest and checks API connectivity.
 
 ```text
-  ⟨u⟩ ulu·ops Installation Check v0.8.1
+  ⟨u⟩ ulu·ops Installation Check v0.9.5
 
   ✓ Manifest found (~/.uluops/manifest.json)
   ✓ All 23 agents present in ~/.claude/agents/

@@ -2,6 +2,28 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.5] - 2026-06-08
+
+### Added
+
+- **`--no-metrics` flag opts out of the agent-metrics hook install.** Threaded through `cli.ts` → `runSetup` → `configureMetricsStep`. When set, the metrics step short-circuits with `skippedReason: "no-metrics-flag"` before any I/O and emits a dim `Metrics hook skipped (--no-metrics)` line in the summary. The downstream `@uluops/agent-metrics` CLI prompt is also suppressed because its gate (`anyHookConfigured`) requires at least one harness with a configured hook. Closes the adoption-drift finding that the metrics install lacked an opt-out vocabulary for privacy- or compliance-sensitive environments; the bigger question (default opt-in vs opt-out, data-minimization surface, organizational consent) remains a roadmap item.
+
+### Fixed
+
+- **`--local-defs` README description corrected.** README line 140 said `Save definitions to ./uluops/ for review`, implying a review-only export. The flag actually does a project-scoped install — it redirects `installAgents/Commands/Skills` to write into `./uluops/agents/`, `./uluops/commands/`, etc. instead of the harness's home directory. CLI help text (`"Save agents/commands locally (./uluops/) for project isolation"`) was already correct; README now matches reality. Closes the adoption-drift finding that users could mistake the flag's purpose.
+
+### Changed
+
+- **`asset-catalog.ts` names the canonical-source-of-truth choice via `CATALOG_COMMANDS_DIR` constant.** Two hard-coded `"claude-code"` string literals in `getAgentCommands()` and `getWorkflowCommands()` were replaced by a single named constant with a comment explaining that `assets/claude-code/commands/` is the reference set rendered for all harnesses at install time. Other harnesses (codex, gemini-cli, opencode) do not ship parallel command-markdown trees — the listing is the catalog, not a per-harness manifest. Closes the PRA-MAT finding by making the intentional design choice explicit rather than implicit.
+- **`hintPassword` split into pure `getPasswordHint(): string | null` + I/O wrapper.** The pure function returns the first applicable hint message (or null) and has zero I/O; the wrapper emits the hint via `console.warn` and remains the inquirer `validate` callback. Closes the PRA-MAT finding tangling computation with display. Both functions are exported (internal-only) for testing; 7 new direct tests on the pure path.
+
+### Tests
+
+- **4 new direct unit tests for `installMetrics` orchestration** in `src/test/metrics.test.ts`: the three no-hook-support short-circuit paths (`hooks` null, `toolsDir` null, `settingsPath` null) and the dry-run no-write contract. Previously `installMetrics` was only exercised indirectly via integration tests.
+- **1 new test for `configureMetricsStep` `--no-metrics` short-circuit** asserting the skipped-via-flag outcome with no I/O attempted, even on a profile that fully supports hooks.
+
+Test suite: 348 → **360 passing**.
+
 ## [0.9.4] - 2026-06-07
 
 ### Fixed
