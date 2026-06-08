@@ -1,5 +1,5 @@
-import { readFile, writeFile, mkdir, unlink, access, copyFile, readdir } from "node:fs/promises";
-import { join, basename } from "node:path";
+import { readFile, writeFile, mkdir, unlink, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { fileHash } from "./hash.js";
 
 /**
@@ -164,23 +164,4 @@ export async function syncAssets(opts: {
   }
 
   return { copied, skipped, removed, files: assetFiles };
-}
-
-/**
- * Back up a file to the UluOps backup directory before modifying it.
- * No-op if the source file doesn't exist.
- */
-export async function backupFile(
-  srcPath: string,
-  backupDir: string,
-): Promise<void> {
-  try {
-    await access(srcPath);
-  } catch {
-    return; // Nothing to back up
-  }
-  await mkdir(backupDir, { recursive: true });
-  const filename = basename(srcPath);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  await copyFile(srcPath, join(backupDir, `${filename}.${timestamp}.bak`));
 }

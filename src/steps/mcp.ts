@@ -2,9 +2,8 @@ import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
-import { findProjectRoot, getBackupDir } from "../lib/paths.js";
+import { findProjectRoot } from "../lib/paths.js";
 import { atomicWrite } from "../lib/atomic-write.js";
-import { backupFile } from "../lib/file-ops.js";
 
 export interface McpResult {
   configPath: string;
@@ -25,19 +24,6 @@ export async function installMcp(
       : join(await findProjectRoot(), profile.paths.localMcpConfig);
 
   const config = await profile.mcpConfig.read(configPath);
-
-  // Backup IMMEDIATELY after read, before any other awaits. The prior order
-  // (backup at write-time) had a race: between read and backup we did a
-  // network probe that can take seconds. If anyone modified configPath in
-  // that window, the backup captured their modification, then write below
-  // clobbered it with a merge derived from the pre-modification snapshot —
-  // and the backup we kept represented the now-lost state, not the state
-  // we overwrote. Moving backup here shrinks the race window from seconds
-  // to microseconds without adding a file lock.
-  if (!dryRun) {
-    await backupConfig(profile.name, configPath);
-  }
-
   const merged = profile.mcpConfig.merge(config, apiKey);
 
   const packageWarnings: string[] = [];
@@ -64,17 +50,9 @@ export async function uninstallMcp(
   profile: HarnessProfile,
   configPath: string,
 ): Promise<void> {
-  await backupConfig(profile.name, configPath);
   const config = await profile.mcpConfig.read(configPath);
   const cleaned = profile.mcpConfig.remove(config);
   await profile.mcpConfig.write(configPath, cleaned);
-}
-
-async function backupConfig(
-  harnessName: string,
-  configPath: string,
-): Promise<void> {
-  await backupFile(configPath, getBackupDir(harnessName));
 }
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {

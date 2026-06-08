@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { readdir } from "node:fs/promises";
 import { detect } from "../steps/detect.js";
 import { signup } from "../steps/signup.js";
-import { resolveApiKey, hasCredentialsFile } from "../steps/auth.js";
+import { resolveApiKey, hasCredentialsFile, writeCredentialsFile } from "../steps/auth.js";
 import { installMcp } from "../steps/mcp.js";
 import type { McpResult } from "../steps/mcp.js";
 import { installAgents } from "../steps/agents.js";
@@ -66,9 +66,14 @@ export async function initContext(opts: {
   signup: boolean;
   skipValidation: boolean;
   yes: boolean;
+  dryRun?: boolean;
 }): Promise<{ env: Awaited<ReturnType<typeof detect>>; apiKey: string }> {
   const env = await detect();
   let apiKey: string;
+  let resolvedEmail: string | null = null;
+  // Capture before auth runs — a successful resolve via the credentials file
+  // would otherwise create the appearance of "no prior file" after the fact.
+  const credsExistedAtStart = await hasCredentialsFile();
 
   let creatingAccount = opts.signup;
   if (!opts.signup && (await shouldPromptForAccount(opts))) {
@@ -80,21 +85,28 @@ export async function initContext(opts: {
     console.log();
   }
 
+  let credsSource: "signup" | "flag" | "prompt" = "flag";
   try {
     if (creatingAccount) {
       info("Create your UluOps account\n");
       const auth = await signup();
       apiKey = auth.apiKey;
+      resolvedEmail = auth.email;
+      credsSource = "signup";
       ok(`Account created (${auth.email})`);
       ok(`API key generated`);
     } else {
+      const interactive =
+        !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"];
       const auth = await resolveApiKey({
         apiKeyFlag: opts.apiKey,
         skipValidation: opts.skipValidation,
-        interactive:
-          !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"],
+        interactive,
       });
       apiKey = auth.apiKey;
+      resolvedEmail = auth.email;
+      credsSource =
+        opts.apiKey || process.env["ULUOPS_API_KEY"] ? "flag" : "prompt";
       if (auth.email) ok(`Key validated (${auth.email})`);
       else if (opts.skipValidation) ok("Key accepted (validation skipped)");
       else ok("Key validated");
@@ -103,6 +115,38 @@ export async function initContext(opts: {
     fail(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
+
+  // Persist the key locally so @uluops/cli and the SDK can read it from disk.
+  // Always write after signup (key was just minted, nothing else holds it).
+  // Otherwise write only if there was no prior file — avoids churning
+  // createdAt on every returning-user invocation.
+  if (credsSource === "signup" || !credsExistedAtStart) {
+    try {
+      await writeCredentialsFile(apiKey, {
+        email: resolvedEmail,
+        source: credsSource,
+        dryRun: opts.dryRun,
+      });
+      if (!opts.dryRun) ok("Credentials saved → ~/.uluops/credentials.json");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warn(`Could not save credentials to ~/.uluops/credentials.json: ${msg}`);
+      // On signup, the warn() above is the ONLY surface that names the failure.
+      // The key was just minted; if we don't persist it and don't surface it,
+      // the user has no path back to it short of minting another one.
+      // Print recovery context so the message is actionable, not just a flag.
+      if (credsSource === "signup") {
+        warn(
+          "  Your key was generated but is not on disk for @uluops/cli to read.",
+        );
+        warn(
+          "  Copy it from the MCP config block written above (look for ULUOPS_API_KEY)",
+        );
+        warn("  or pass --skip-validation --api-key <key> on the next run.");
+      }
+    }
+  }
+
   return { env, apiKey };
 }
 

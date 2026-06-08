@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { writeFile, mkdir, mkdtemp } from "node:fs/promises";
+import { writeFile, mkdir, mkdtemp, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -22,7 +22,7 @@ vi.mock("node:os", async (importOriginal) => {
   };
 });
 
-import { resolveApiKey, hasCredentialsFile } from "../steps/auth.js";
+import { resolveApiKey, hasCredentialsFile, writeCredentialsFile } from "../steps/auth.js";
 
 let tmpDir: string;
 
@@ -217,5 +217,98 @@ describe("hasCredentialsFile", () => {
   it("returns false when the file does not exist", async () => {
     mockHomeDir = tmpDir;
     expect(await hasCredentialsFile()).toBe(false);
+  });
+});
+
+describe("writeCredentialsFile", () => {
+  it("creates ~/.uluops/credentials.json with the apiKey", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_minted", {
+      email: "user@example.com",
+      source: "signup",
+    });
+
+    const raw = await readFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      "utf-8",
+    );
+    const creds = JSON.parse(raw);
+    expect(creds.default.type).toBe("api_key");
+    expect(creds.default.apiKey).toBe("ulr_minted");
+    expect(creds.default.email).toBe("user@example.com");
+    expect(creds.default.source).toBe("signup");
+    expect(creds.default.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("round-trips with readCredentialsFile via resolveApiKey", async () => {
+    mockHomeDir = tmpDir;
+    vi.stubEnv("ULUOPS_API_KEY", "");
+    await writeCredentialsFile("ulr_roundtrip", { email: null });
+
+    const result = await resolveApiKey({ skipValidation: true });
+    expect(result.apiKey).toBe("ulr_roundtrip");
+  });
+
+  it("writes the file with mode 0o600", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_perms");
+
+    const s = await stat(join(tmpDir, ".uluops", "credentials.json"));
+    expect(s.mode & 0o777).toBe(0o600);
+  });
+
+  it("preserves non-default profiles when merging into an existing file", async () => {
+    const credsDir = join(tmpDir, ".uluops");
+    await mkdir(credsDir, { recursive: true });
+    await writeFile(
+      join(credsDir, "credentials.json"),
+      JSON.stringify({
+        default: { apiKey: "ulr_old", email: "old@example.com" },
+        work: { apiKey: "ulr_work_key", email: "alex@company.com" },
+      }),
+    );
+
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_new", { email: "new@example.com" });
+
+    const raw = await readFile(join(credsDir, "credentials.json"), "utf-8");
+    const creds = JSON.parse(raw);
+    expect(creds.default.apiKey).toBe("ulr_new");
+    expect(creds.default.email).toBe("new@example.com");
+    expect(creds.work).toEqual({
+      apiKey: "ulr_work_key",
+      email: "alex@company.com",
+    });
+  });
+
+  it("starts fresh when the existing file is unparseable", async () => {
+    const credsDir = join(tmpDir, ".uluops");
+    await mkdir(credsDir, { recursive: true });
+    await writeFile(join(credsDir, "credentials.json"), "{not json");
+
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_recover");
+
+    const raw = await readFile(join(credsDir, "credentials.json"), "utf-8");
+    const creds = JSON.parse(raw);
+    expect(creds.default.apiKey).toBe("ulr_recover");
+  });
+
+  it("skips writing entirely on dryRun", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_dry", { dryRun: true });
+
+    expect(await hasCredentialsFile()).toBe(false);
+  });
+
+  it("defaults source to 'flag' when not specified", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_default");
+
+    const raw = await readFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      "utf-8",
+    );
+    expect(JSON.parse(raw).default.source).toBe("flag");
   });
 });

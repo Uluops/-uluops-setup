@@ -1,7 +1,8 @@
-import { readFile, access } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, access, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { extractEmail } from "../lib/json-guards.js";
+import { atomicWrite } from "../lib/atomic-write.js";
 
 export interface AuthResult {
   apiKey: string;
@@ -28,6 +29,56 @@ export async function hasCredentialsFile(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Persist an API key to ~/.uluops/credentials.json so @uluops/cli and the SDK
+ * can resolve it from disk without ULUOPS_API_KEY in the shell environment.
+ *
+ * Merges into the existing file when present: only the `default` profile is
+ * replaced; any other named profiles are preserved. Creates ~/.uluops/ with
+ * mode 0o700 if missing. Writes the file at 0o600 via atomicWrite.
+ */
+export async function writeCredentialsFile(
+  apiKey: string,
+  opts?: { email?: string | null; source?: "signup" | "flag" | "prompt"; dryRun?: boolean },
+): Promise<void> {
+  if (opts?.dryRun) return;
+
+  const credsPath = credentialsPath();
+  await mkdir(dirname(credsPath), { recursive: true, mode: 0o700 });
+
+  // Merge: preserve any non-default profiles already on disk.
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = await readFile(credsPath, "utf-8");
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      existing = parsed as Record<string, unknown>;
+    }
+  } catch {
+    // No existing file, or unparseable — start fresh.
+  }
+
+  const merged = {
+    ...existing,
+    default: {
+      // type discriminant must match the shape @uluops/cli writes via
+      // saveCredentials and the shape @uluops/sdk-core's StoredProfile expects.
+      // Without it, `ulu auth logout` reads creds.type !== 'api_key' and
+      // dispatches the revocation call with no bearer header — the server-side
+      // key survives a "successful" logout.
+      type: "api_key" as const,
+      apiKey,
+      email: opts?.email ?? null,
+      createdAt: new Date().toISOString(),
+      source: opts?.source ?? "flag",
+    },
+  };
+
+  await atomicWrite(credsPath, JSON.stringify(merged, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }
 
 /**

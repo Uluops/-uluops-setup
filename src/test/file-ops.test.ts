@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { writeFile, readFile, mkdir, mkdtemp, readdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { copyIfChanged, unlinkFiles, syncAssets, writeIfChanged, backupFile } from "../lib/file-ops.js";
+import { copyIfChanged, unlinkFiles, syncAssets, writeIfChanged } from "../lib/file-ops.js";
 import { atomicWrite } from "../lib/atomic-write.js";
 
 let tmpDir: string;
@@ -160,26 +160,6 @@ describe("writeIfChanged", () => {
     const result = await writeIfChanged(dest, "content", true);
     expect(result).toBe("copied");
     await expect(access(dest)).rejects.toThrow();
-  });
-});
-
-describe("backupFile", () => {
-  it("creates backup with timestamp suffix", async () => {
-    const src = join(srcDir, "config.json");
-    await writeFile(src, '{"key": "value"}');
-    const backupDir = join(tmpDir, "backups");
-
-    await backupFile(src, backupDir);
-
-    const files = await readdir(backupDir);
-    expect(files.length).toBe(1);
-    expect(files[0]).toMatch(/^config\.json\.\d{4}-\d{2}-\d{2}T.*\.bak$/);
-  });
-
-  it("no-ops when source does not exist", async () => {
-    const backupDir = join(tmpDir, "backups");
-    await backupFile(join(srcDir, "missing.json"), backupDir);
-    await expect(access(backupDir)).rejects.toThrow();
   });
 });
 

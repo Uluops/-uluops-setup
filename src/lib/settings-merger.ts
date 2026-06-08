@@ -114,7 +114,9 @@ export async function writeSettings(
   path: string,
   settings: HarnessSettings,
 ): Promise<void> {
-  await atomicWrite(path, JSON.stringify(settings, null, 2) + "\n");
+  await atomicWrite(path, JSON.stringify(settings, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }
 
 /**
