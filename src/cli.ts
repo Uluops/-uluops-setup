@@ -71,6 +71,10 @@ async function main(): Promise<void> {
       "--no-agent-metrics-cli",
       "Skip @uluops/agent-metrics install without prompting (takes precedence over --with-agent-metrics-cli)",
     )
+    .option(
+      "--no-metrics",
+      "Skip the agent-metrics hook install (no hook configured, no tool files copied)",
+    )
     .option("--skip-validation", "Accept API key without verifying", false)
     .option(
       "--list",
@@ -94,6 +98,7 @@ async function main(): Promise<void> {
     cli: boolean;
     withAgentMetricsCli?: boolean;
     agentMetricsCli: boolean;
+    metrics: boolean;
     skipValidation: boolean;
     list: boolean;
     verify: boolean;
@@ -211,6 +216,7 @@ async function main(): Promise<void> {
     cli: opts.cli,
     withAgentMetricsCli: opts.withAgentMetricsCli,
     agentMetricsCli: opts.agentMetricsCli,
+    noMetrics: !opts.metrics,
     skipValidation: opts.skipValidation,
     dryRun: opts.dryRun,
     yes: opts.yes,

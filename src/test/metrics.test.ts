@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { readSettings, writeSettings, mergeUluopsHook, removeUluopsHook, hasUluopsHook } from "../lib/settings-merger.js";
 import { getHookCommand, installMetrics } from "../steps/metrics.js";
+import { configureMetricsStep } from "../commands/helpers.js";
 import type { HarnessProfile } from "../harnesses/index.js";
 
 let tmpDir: string;
@@ -141,6 +142,30 @@ describe("installMetrics — orchestration", () => {
 
     const result = await installMetrics(profile, false);
     expect(result.skippedReason).toBe("no-hook-support");
+  });
+
+  it("short-circuits when --no-metrics is set, regardless of hook support", async () => {
+    // Profile fully supports hooks, but noMetrics: true must override and
+    // produce the skipped-via-flag outcome with no I/O attempted.
+    const profile = {
+      displayName: "Claude Code",
+      hooks: {
+        install: async () => {
+          throw new Error("hooks.install must not run when --no-metrics is set");
+        },
+        remove: async () => {},
+      },
+      paths: {
+        toolsDir: join(tmpDir, "should-not-touch"),
+        settingsPath: join(tmpDir, "settings.json"),
+      },
+    } as unknown as HarnessProfile;
+
+    const result = await configureMetricsStep(profile, { dryRun: false, noMetrics: true });
+
+    expect(result.skippedReason).toBe("no-metrics-flag");
+    expect(result.hookConfigured).toBe(false);
+    expect(result.toolFilesCopied).toBe(0);
   });
 
   it("does not write to disk in dry-run mode", async () => {

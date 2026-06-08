@@ -255,8 +255,22 @@ export async function installSkillsDefs(
 /** Install agent-metrics hook and tool files (Claude Code only). */
 export async function configureMetricsStep(
   profile: HarnessProfile,
-  opts: { dryRun: boolean },
+  opts: { dryRun: boolean; noMetrics?: boolean },
 ): Promise<MetricsResult> {
+  if (opts.noMetrics) {
+    info(
+      chalk.dim(
+        `Metrics hook skipped (--no-metrics)`,
+      ),
+    );
+    return {
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-metrics-flag",
+    };
+  }
+
   if (!profile.hooks) {
     info(
       chalk.dim(

@@ -59,6 +59,12 @@ interface RunSetupOpts {
   cli?: boolean;
   withAgentMetricsCli?: boolean;
   agentMetricsCli?: boolean;
+  /**
+   * When true, skip the agent-metrics hook step entirely. configureMetricsStep
+   * short-circuits with a "skipped via --no-metrics" status. The agent-metrics
+   * CLI prompt is also suppressed downstream (no hook → no CLI gate).
+   */
+  noMetrics?: boolean;
 }
 
 export async function runSetup(opts: RunSetupOpts): Promise<void> {

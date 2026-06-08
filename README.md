@@ -137,10 +137,14 @@ npx @uluops/setup [options]
                        --harness <single-name> (fail-fast conflict error).
   --signup             Create account from terminal (email + password)
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
-  --local-defs         Save definitions to ./uluops/ for review
+  --local-defs         Install definitions into ./uluops/ (project-scoped)
+                       instead of the harness's home directory
   --shell              Write API key export to shell profile
   --with-cli           Install @uluops/cli globally (skip prompt)
   --no-cli             Skip @uluops/cli install (skip prompt)
+  --no-metrics         Skip the agent-metrics hook install (no hook
+                       configured, no tool files copied). The downstream
+                       @uluops/agent-metrics CLI prompt is also suppressed.
   --skip-validation    Accept API key without server verification
   --list               Show available agents and workflows without installing
   --verify             Check installation health: manifest, files, MCP config, API connectivity (no changes)
