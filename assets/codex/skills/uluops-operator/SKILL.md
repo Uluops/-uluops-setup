@@ -1,6 +1,6 @@
 ---
 name: uluops-operator
-description: Use when operating inside UluOps from Codex: using UluOps MCP tools or the ulu CLI; rendering or running registry agents, commands, workflows, or pipelines; saving Codex subagent runs to tracker projects; querying, triaging, or closing tracker issues; inspecting analysis records; or deciding how UluOps definitions should map onto Codex skills, agents, and local assets.
+description: "Use when operating inside UluOps from Codex: using UluOps MCP tools or the ulu CLI; rendering or running registry agents, commands, workflows, or pipelines; saving Codex subagent runs to tracker projects; querying, triaging, or closing tracker issues; inspecting analysis records; or deciding how UluOps definitions should map onto Codex skills, agents, and local assets."
 ---
 
 # UluOps Operator
