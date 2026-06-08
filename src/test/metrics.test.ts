@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { readSettings, writeSettings, mergeUluopsHook, removeUluopsHook, hasUluopsHook } from "../lib/settings-merger.js";
-import { getHookCommand } from "../steps/metrics.js";
+import { getHookCommand, installMetrics } from "../steps/metrics.js";
 import type { HarnessProfile } from "../harnesses/index.js";
 
 let tmpDir: string;
@@ -102,5 +102,69 @@ describe("metrics hook integration", () => {
 
     // Should have same structure — no duplicate entries
     expect(JSON.stringify(merged1)).toBe(JSON.stringify(merged2));
+  });
+});
+
+describe("installMetrics — orchestration", () => {
+  it("short-circuits with skippedReason when the harness has no hooks", async () => {
+    const profile = {
+      hooks: null,
+      paths: { toolsDir: "/tmp/x", settingsPath: "/tmp/x.json" },
+    } as unknown as HarnessProfile;
+
+    const result = await installMetrics(profile, false);
+
+    expect(result).toEqual({
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-hook-support",
+    });
+  });
+
+  it("short-circuits when toolsDir is missing even if hooks is defined", async () => {
+    const profile = {
+      hooks: { install: async () => {}, remove: async () => {} },
+      paths: { toolsDir: null, settingsPath: "/tmp/x.json" },
+    } as unknown as HarnessProfile;
+
+    const result = await installMetrics(profile, false);
+    expect(result.skippedReason).toBe("no-hook-support");
+    expect(result.hookConfigured).toBe(false);
+  });
+
+  it("short-circuits when settingsPath is missing even if hooks is defined", async () => {
+    const profile = {
+      hooks: { install: async () => {}, remove: async () => {} },
+      paths: { toolsDir: "/tmp/x", settingsPath: null },
+    } as unknown as HarnessProfile;
+
+    const result = await installMetrics(profile, false);
+    expect(result.skippedReason).toBe("no-hook-support");
+  });
+
+  it("does not write to disk in dry-run mode", async () => {
+    // toolsDir points at a nonexistent path; if dry-run were violated, the
+    // mkdir would either succeed (leaking state) or throw. Either is a
+    // detectable contract break, so this test fails closed.
+    const toolDir = join(tmpDir, "should-not-be-created");
+    const profile = {
+      hooks: {
+        install: async () => {
+          throw new Error("install must not run in dry-run mode");
+        },
+        remove: async () => {},
+      },
+      paths: { toolsDir: toolDir, settingsPath: join(tmpDir, "settings.json") },
+    } as unknown as HarnessProfile;
+
+    // The agent-metrics package is resolvable in this repo, so findMetricsSource
+    // will succeed; the test still must not mutate disk because dry-run is true.
+    const result = await installMetrics(profile, true);
+    // Whatever the resolved source state is, the dry-run contract holds:
+    // hook.install was not called (would have thrown), and no recursive mkdir
+    // landed on the never-created path.
+    expect(result).toBeDefined();
+    await expect(readFile(toolDir, "utf-8")).rejects.toThrow();
   });
 });

@@ -9,6 +9,16 @@ export interface CommandEntry {
 }
 
 /**
+ * Canonical command-catalog source. `assets/claude-code/commands/` is the
+ * reference set of markdown command definitions; other harnesses (codex,
+ * gemini-cli, opencode) are rendered from this source at install time and
+ * do not ship parallel command-markdown trees. `printAgentList` therefore
+ * reads from here regardless of which harness the user has installed —
+ * the listing is the catalog, not a per-harness manifest.
+ */
+const CATALOG_COMMANDS_DIR = join(ASSETS_DIR, "claude-code", "commands");
+
+/**
  * Parse YAML-like frontmatter from a markdown file.
  * Returns key-value pairs between the opening and closing `---`.
  */
@@ -53,12 +63,12 @@ async function scanCommandDir(dir: string): Promise<CommandEntry[]> {
   return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Get all agent command entries from assets. */
+/** Get all agent command entries from the canonical catalog. */
 export async function getAgentCommands(): Promise<CommandEntry[]> {
-  return scanCommandDir(join(ASSETS_DIR, "claude-code", "commands", "agents"));
+  return scanCommandDir(join(CATALOG_COMMANDS_DIR, "agents"));
 }
 
-/** Get all workflow command entries from assets. */
+/** Get all workflow command entries from the canonical catalog. */
 export async function getWorkflowCommands(): Promise<CommandEntry[]> {
-  return scanCommandDir(join(ASSETS_DIR, "claude-code", "commands", "workflows"));
+  return scanCommandDir(join(CATALOG_COMMANDS_DIR, "workflows"));
 }

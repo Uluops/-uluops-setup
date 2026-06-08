@@ -3,16 +3,29 @@ import type { AuthResult } from "./auth.js";
 const API_BASE = "https://api.uluops.ai/api/v1";
 
 /**
- * Advisory password hints. Returns warning strings for inquirer display,
- * but all are non-blocking — server validation is the authority.
+ * Pure advisory check: returns the first hint message that applies to the
+ * password, or null if none apply. No I/O. Server validation remains the
+ * authority — hints exist only to nudge the user toward likely-acceptable
+ * inputs before round-tripping to the server.
+ * @internal Exported for testing only — not part of the public API.
+ */
+function getPasswordHint(password: string): string | null {
+  if (password.length < 8) return "  ⚠ Hint: server may require at least 8 characters";
+  if (password.length > 128) return "  ⚠ Hint: server may reject passwords over 128 characters";
+  if (!/[a-z]/.test(password)) return "  ⚠ Hint: server may require a lowercase letter";
+  if (!/[A-Z]/.test(password)) return "  ⚠ Hint: server may require an uppercase letter";
+  if (!/[0-9]/.test(password)) return "  ⚠ Hint: server may require a number";
+  return null;
+}
+
+/**
+ * Inquirer validate wrapper. Always returns true (hints are non-blocking)
+ * and emits the pure-computed hint via console.warn for display.
  * @internal Exported for testing only — not part of the public API.
  */
 function hintPassword(password: string): true {
-  if (password.length < 8) console.warn("  ⚠ Hint: server may require at least 8 characters");
-  else if (password.length > 128) console.warn("  ⚠ Hint: server may reject passwords over 128 characters");
-  else if (!/[a-z]/.test(password)) console.warn("  ⚠ Hint: server may require a lowercase letter");
-  else if (!/[A-Z]/.test(password)) console.warn("  ⚠ Hint: server may require an uppercase letter");
-  else if (!/[0-9]/.test(password)) console.warn("  ⚠ Hint: server may require a number");
+  const hint = getPasswordHint(password);
+  if (hint !== null) console.warn(hint);
   return true;
 }
 
@@ -166,4 +179,4 @@ async function callApi<T extends object>(
 }
 
 /** @internal Exported for testing only — not part of the public API. */
-export { hintPassword, validateEmail };
+export { hintPassword, getPasswordHint, validateEmail };

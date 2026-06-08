@@ -1,5 +1,37 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { hintPassword, validateEmail } from "../steps/signup.js";
+import { hintPassword, getPasswordHint, validateEmail } from "../steps/signup.js";
+
+describe("getPasswordHint", () => {
+  it("returns null for a valid password", () => {
+    expect(getPasswordHint("GoodPass1")).toBeNull();
+  });
+
+  it("returns the length hint for short passwords", () => {
+    expect(getPasswordHint("Short1A")).toContain("at least 8");
+  });
+
+  it("returns the length hint for over-long passwords", () => {
+    expect(getPasswordHint("Aa1" + "x".repeat(126))).toContain("128");
+  });
+
+  it("returns the lowercase hint when missing", () => {
+    expect(getPasswordHint("ALLCAPS123")).toContain("lowercase");
+  });
+
+  it("returns the uppercase hint when missing", () => {
+    expect(getPasswordHint("alllower123")).toContain("uppercase");
+  });
+
+  it("returns the number hint when missing", () => {
+    expect(getPasswordHint("NoNumbersHere")).toContain("number");
+  });
+
+  it("returns only the first applicable hint", () => {
+    // Length is checked first — shouldn't surface the missing-lowercase hint
+    // for a too-short ALL-CAPS password.
+    expect(getPasswordHint("AB1")).toContain("at least 8");
+  });
+});
 
 describe("hintPassword", () => {
   it("accepts a valid password", () => {
