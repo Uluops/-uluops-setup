@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { mergeUluopsMcp, removeUluopsMcp } from "../lib/config-merger.js";
+import {
+  OPS_MCP_SPEC,
+  OPS_MCP_VERSION,
+  REGISTRY_MCP_SPEC,
+  REGISTRY_MCP_VERSION,
+} from "../lib/mcp-packages.js";
 
 describe("mergeUluopsMcp", () => {
   it("adds both MCP servers to empty config", () => {
@@ -7,18 +13,32 @@ describe("mergeUluopsMcp", () => {
     expect(result.mcpServers).toBeDefined();
     expect(result.mcpServers!["uluops-tracker"]).toMatchObject({
       command: "npx",
-      args: ["-y", "@uluops/ops-mcp"],
+      args: ["-y", OPS_MCP_SPEC],
       env: {
         ULUOPS_API_KEY: "ulr_test123",
       },
     });
     expect(result.mcpServers!["uluops-registry"]).toMatchObject({
       command: "npx",
-      args: ["-y", "@uluops/registry-mcp"],
+      args: ["-y", REGISTRY_MCP_SPEC],
       env: {
         ULUOPS_API_KEY: "ulr_test123",
       },
     });
+  });
+
+  it("pins MCP server versions (locks the release contract)", () => {
+    // Explicit pin assertion so a future edit that accidentally drops the
+    // version suffix (back to bare `@uluops/ops-mcp`) fails loudly here.
+    // The pin makes a setup release self-contained — what users get on
+    // first launch is what the package was tested against.
+    const result = mergeUluopsMcp({}, "ulr_test123");
+    expect(result.mcpServers!["uluops-tracker"]!.args).toContain(
+      `@uluops/ops-mcp@${OPS_MCP_VERSION}`,
+    );
+    expect(result.mcpServers!["uluops-registry"]!.args).toContain(
+      `@uluops/registry-mcp@${REGISTRY_MCP_VERSION}`,
+    );
   });
 
   it("does not stamp backend URLs (resolved by MCP SDKs)", () => {

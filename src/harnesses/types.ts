@@ -138,9 +138,12 @@ export class HarnessNotTestedError extends Error {
   constructor(harnessName: string) {
     super(
       // Keep this list in sync with profiles whose `status === "stable"`.
-      // Today: claude-code, opencode, gemini-cli. When a new stable profile
-      // lands, add it here so the error stays actionable.
-      `${harnessName} harness is not yet tested. Use --harness claude-code, --harness opencode, or --harness gemini-cli.`,
+      // Today: claude-code, opencode, gemini-cli, codex. When a new stable
+      // profile lands, add it here so the error stays actionable. (As of
+      // 0.9.0 every shipped profile is stable, so this constructor is
+      // currently unreachable — kept as a structural slot for the next
+      // experimental harness scaffold.)
+      `${harnessName} harness is not yet tested. Use --harness claude-code, --harness opencode, --harness gemini-cli, or --harness codex.`,
     );
     this.name = "HarnessNotTestedError";
   }

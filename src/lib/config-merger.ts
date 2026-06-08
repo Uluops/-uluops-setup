@@ -1,5 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
+import {
+  MCP_PACKAGES,
+  OPS_MCP_SPEC,
+  REGISTRY_MCP_SPEC,
+} from "./mcp-packages.js";
 
 interface McpServerConfig {
   command: string;
@@ -12,8 +17,6 @@ export interface ClaudeConfig {
   mcpServers?: Record<string, McpServerConfig>;
   [key: string]: unknown;
 }
-
-const MCP_PACKAGES = ["@uluops/ops-mcp", "@uluops/registry-mcp"];
 
 interface AvailabilityResult {
   available: string[];
@@ -134,7 +137,7 @@ export function mergeUluopsMcp(
       ...existing,
       "uluops-tracker": {
         command: "npx",
-        args: ["-y", "@uluops/ops-mcp"],
+        args: ["-y", OPS_MCP_SPEC],
         env: {
           ULUOPS_API_KEY: apiKey,
         },
@@ -142,7 +145,7 @@ export function mergeUluopsMcp(
       },
       "uluops-registry": {
         command: "npx",
-        args: ["-y", "@uluops/registry-mcp"],
+        args: ["-y", REGISTRY_MCP_SPEC],
         env: {
           ULUOPS_API_KEY: apiKey,
         },

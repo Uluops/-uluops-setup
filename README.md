@@ -19,7 +19,9 @@ npx @uluops/setup
 | Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
 | OpenCode | Fully supported | `oc` | `~/.config/opencode/opencode.json` |
 | Gemini CLI | Fully supported | `gemini` | `~/.gemini/settings.json` |
-| Codex | Experimental (opt-in via `--harness codex`) | — | `~/.codex/config.toml` |
+| Codex | Fully supported | — | `~/.codex/config.toml` |
+
+> **Codex note:** the TOML writer seeds `approval_mode = "approve"` for every read-side MCP tool exported by `@uluops/ops-mcp` and `@uluops/registry-mcp` so interactive sessions don't surface an approval prompt on every `list_*`/`get_*`/`query_*` call. Write-side tools (`save_run`, `bulk_update_status`, `publish_definition`, etc.) are intentionally NOT pre-approved — Codex still asks before any state-changing operation. A re-install over a hand-tuned config (any `[mcp_servers.<server>.tools.*]` block present) preserves your customizations verbatim and skips the seed step.
 
 ```bash
 # Install for Claude Code (default)
@@ -45,7 +47,7 @@ If you don't pass `--harness` or `--all-detected`, setup probes your home direct
 - **Multiple harnesses detected (non-interactive — `--yes`, `--api-key`, piped stdin)** — to keep CI scripts predictable, this preserves earlier behavior: the first detected harness installs and a dimmed notice lists the others. CI users who want multi-install opt in explicitly with `--all-detected`.
 - **No harnesses detected** — falls back to the default (`claude-code`) so `npx @uluops/setup` always does something useful on a fresh machine.
 
-Passing `--harness <name>` always wins — auto-detection is skipped entirely. Experimental harnesses are excluded from auto-detection (an explicit `--harness` is the only way to opt in).
+Passing `--harness <name>` always wins — auto-detection is skipped entirely. Auto-detection only returns harnesses marked stable; when a future harness ships as experimental, an explicit `--harness <name>` will remain the only way to opt in.
 
 ### Multi-harness install
 
@@ -92,7 +94,7 @@ Each harness gets its own per-section block in the summary:
 | Pipeline commands | 2 | `~/.claude/commands/pipelines/` |
 | Agent metrics hook | 1 | `~/.claude/tools/agent-metrics/` |
 
-> Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Agent definitions and commands are transformed to the target harness format at install time from a single source.
+> Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Codex installs agents as `.toml` to `~/.codex/agents/` and ships a single `uluops-operator` skill under `~/.codex/skills/` instead of slash commands. Agent definitions and commands are transformed to the target harness format at install time from a single source.
 
 The installer runs these steps in sequence:
 
@@ -157,7 +159,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.6.0 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.8.1 — available agents and workflows
 
   WORKFLOWS
   /workflows:post-implementation   Iterative validation after coding
@@ -176,7 +178,7 @@ Displays all agents and workflows included in the current version of the setup t
 Validates your current installation against the local manifest and checks API connectivity.
 
 ```text
-  ⟨u⟩ ulu·ops Installation Check v0.6.0
+  ⟨u⟩ ulu·ops Installation Check v0.8.1
 
   ✓ Manifest found (~/.uluops/manifest.json)
   ✓ All 23 agents present in ~/.claude/agents/

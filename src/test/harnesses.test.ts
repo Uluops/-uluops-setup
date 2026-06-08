@@ -69,41 +69,27 @@ describe("harness registry", () => {
   });
 
   /**
-   * Locks the experimental-filter contract: even when an experimental
-   * profile's home directory exists on disk, detectHarnesses() must NOT
-   * include it. Auto-detection that returned an experimental profile would
-   * break the relational promise "in the detected list = safe to install"
-   * — the next step would call into a profile that throws
-   * HarnessNotTestedError.
+   * Locks the stable-only contract for auto-detection: every profile
+   * returned by detectHarnesses() must have status === "stable", regardless
+   * of how detection criteria evolve. Auto-detection that returned an
+   * experimental profile would break the relational promise "in the
+   * detected list = safe to install" — the next step would call into a
+   * profile that throws HarnessNotTestedError.
    *
-   * Codex is the only experimental profile today (status: "experimental").
-   * We confirm it is excluded; we also confirm every returned profile has
-   * status === "stable" so the contract holds for any future experimental
-   * additions.
+   * As of 0.9.0 every shipped profile is stable (Codex was promoted from
+   * experimental), so this test currently exercises the loop body on every
+   * profile rather than a filtered subset. When the next experimental
+   * profile lands, the filter branch comes back online and this assertion
+   * still holds without modification.
    *
    * See tracker issue EPI-GRN/M ("detectHarnesses experimental-filter
    * contract untested").
    */
-  it("detectHarnesses never returns experimental profiles even when their home dir exists", () => {
-    // The codex profile points at ~/.codex/. On a real dev machine this dir
-    // may or may not exist; either way, codex must NOT appear in the result
-    // because its status is "experimental".
+  it("detectHarnesses returns only stable profiles", () => {
     const detected = detectHarnesses();
-    expect(detected.find((p) => p.name === "codex")).toBeUndefined();
-
-    // Stronger guarantee: every detected profile is stable, no matter how
-    // detection criteria evolve.
     for (const p of detected) {
       expect(p.status).toBe("stable");
     }
-  });
-
-  it("codex profile is registered as experimental (so the filter has something to filter)", () => {
-    // Anchor: if codex is ever promoted to stable, this assertion flips and
-    // the "experimental filter" coverage above stops exercising the branch.
-    // When that happens, add a new experimental profile or seed a synthetic
-    // one for the filter test.
-    expect(codexProfile.status).toBe("experimental");
   });
 });
 
@@ -115,7 +101,51 @@ describe("codex profile", () => {
     expect(codexProfile.paths.commandsDir).toContain("commands");
   });
 
-  it("merges and removes UluOps MCP servers in TOML config", () => {
+  it("seeds read-tool approval_mode entries on a fresh merge", () => {
+    // Empty starting config — no prior UluOps MCP entries — exercises the
+    // "first install" path. Bare-key form (no quotes) matches what Codex's
+    // own config writer emits, and the seed list includes representative
+    // read tools from both servers.
+    const merged = codexProfile.mcpConfig.merge(
+      { "__rawToml": "" },
+      "ulr_test123",
+    );
+    expect(codexProfile.mcpConfig.check(merged)).toBe(true);
+    const raw = merged["__rawToml"] as string;
+
+    // Bare keys, not JSON-quoted. Codex itself writes these unquoted because
+    // `uluops-tracker` is a valid TOML bare key.
+    expect(raw).toContain("[mcp_servers.uluops-tracker]");
+    expect(raw).toContain("[mcp_servers.uluops-registry]");
+    expect(raw).not.toContain('[mcp_servers."uluops-tracker"]');
+    expect(raw).not.toContain('[mcp_servers."uluops-registry"]');
+
+    // Server identity + auth must round-trip.
+    expect(raw).toContain("@uluops/ops-mcp");
+    expect(raw).toContain("@uluops/registry-mcp");
+    expect(raw).toContain('ULUOPS_API_KEY = "ulr_test123"');
+
+    // Representative read tools from both servers receive
+    // `approval_mode = "approve"` so Codex auto-allows them on first use.
+    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.list_projects]");
+    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.query_issues]");
+    expect(raw).toContain("[mcp_servers.uluops-registry.tools.list_definitions]");
+    expect(raw).toContain("[mcp_servers.uluops-registry.tools.search_definitions]");
+    expect(raw).toContain('approval_mode = "approve"');
+
+    // Write-side tools MUST NOT be auto-approved — the user keeps a choice
+    // point on every state-changing call.
+    expect(raw).not.toContain(".tools.save_run]");
+    expect(raw).not.toContain(".tools.bulk_update_status]");
+    expect(raw).not.toContain(".tools.publish_definition]");
+  });
+
+  it("preserves user-customized tool approvals on re-install", () => {
+    // Hand-tuned starting config: user has explicitly denied a tool we'd
+    // otherwise seed (`list_projects`) and approved a write tool we don't
+    // seed (`save_run`). A re-install must NOT seed our defaults — the
+    // presence of ANY `[mcp_servers.NAME.tools.*]` block under a server
+    // signals user intent for the whole server.
     const existing = [
       `model = "gpt-5.5"`,
       ``,
@@ -129,7 +159,10 @@ describe("codex profile", () => {
       `[mcp_servers.uluops-tracker.env]`,
       `ULUOPS_API_KEY = "old"`,
       ``,
-      `[mcp_servers.uluops-tracker.tools.query_issues]`,
+      `[mcp_servers.uluops-tracker.tools.list_projects]`,
+      `approval_mode = "deny"`,
+      ``,
+      `[mcp_servers.uluops-tracker.tools.save_run]`,
       `approval_mode = "approve"`,
       ``,
     ].join("\n");
@@ -140,22 +173,51 @@ describe("codex profile", () => {
 
     expect(codexProfile.mcpConfig.check(merged)).toBe(true);
     const raw = merged["__rawToml"] as string;
+
+    // Unrelated entries survive.
     expect(raw).toContain("[mcp_servers.other]");
-    expect(raw).toContain('[mcp_servers."uluops-tracker"]');
+
+    // Main + env are replayed with the new API key + canonical package args.
+    expect(raw).toContain("[mcp_servers.uluops-tracker]");
     expect(raw).toContain("@uluops/ops-mcp");
-    expect(raw).toContain("ulr_test123");
+    expect(raw).toContain('ULUOPS_API_KEY = "ulr_test123"');
     expect(raw).not.toContain("/local/dev/server.js");
     expect(raw).not.toContain('ULUOPS_API_KEY = "old"');
-    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.query_issues]");
-    expect(raw).toContain('approval_mode = "approve"');
 
+    // User's per-tool entries survive verbatim — including the denial of a
+    // tool we'd otherwise seed.
+    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.list_projects]");
+    expect(raw).toContain('approval_mode = "deny"');
+    expect(raw).toContain("[mcp_servers.uluops-tracker.tools.save_run]");
+
+    // Because the user touched tracker's tools, we did NOT seed our other
+    // tracker reads on top — `query_issues` etc. are absent.
+    expect(raw).not.toContain("[mcp_servers.uluops-tracker.tools.query_issues]");
+
+    // Registry was untouched by the user, so it DID get the seed.
+    expect(raw).toContain("[mcp_servers.uluops-registry.tools.list_definitions]");
+  });
+
+  it("removes the full server subtree on uninstall", () => {
+    // Build a config via merge, then verify remove() strips main + env +
+    // every per-tool entry (seeded or user-set) cleanly.
+    const merged = codexProfile.mcpConfig.merge(
+      {
+        "__rawToml": [
+          `[mcp_servers.other]`,
+          `command = "node"`,
+          ``,
+        ].join("\n"),
+      },
+      "ulr_test123",
+    );
     const cleaned = codexProfile.mcpConfig.remove(merged);
     const cleanedRaw = cleaned["__rawToml"] as string;
     expect(codexProfile.mcpConfig.check(cleaned)).toBe(false);
     expect(cleanedRaw).toContain("[mcp_servers.other]");
     expect(cleanedRaw).not.toContain("uluops-tracker");
     expect(cleanedRaw).not.toContain("uluops-registry");
-    expect(cleanedRaw).not.toContain("query_issues");
+    expect(cleanedRaw).not.toContain("approval_mode");
   });
 });
 
@@ -379,8 +441,8 @@ describe("scaffold profiles", () => {
   it("codex mcpConfig.merge returns TOML with UluOps servers", () => {
     const result = codexProfile.mcpConfig.merge({}, "ulr_test123");
     const raw = result["__rawToml"] as string;
-    expect(raw).toContain('[mcp_servers."uluops-tracker"]');
-    expect(raw).toContain('[mcp_servers."uluops-registry"]');
+    expect(raw).toContain("[mcp_servers.uluops-tracker]");
+    expect(raw).toContain("[mcp_servers.uluops-registry]");
     expect(codexProfile.mcpConfig.check(result)).toBe(true);
   });
 

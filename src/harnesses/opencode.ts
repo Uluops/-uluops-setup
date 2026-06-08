@@ -17,6 +17,7 @@ import { join, isAbsolute } from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
 import { ULUOPS_SERVERS, ConfigParseError, type HarnessProfile, type McpConfigStrategy } from "./types.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { OPS_MCP_SPEC, REGISTRY_MCP_SPEC } from "../lib/mcp-packages.js";
 
 interface OpenCodeMcpServer {
   type: string;
@@ -65,7 +66,7 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     // their bundled SDKs. See lib/config-merger.ts for rationale.
     const tracker: OpenCodeMcpServer = {
       type: "local",
-      command: ["npx", "-y", "@uluops/ops-mcp"],
+      command: ["npx", "-y", OPS_MCP_SPEC],
       enabled: true,
       timeout: 30000,
       environment: {
@@ -74,7 +75,7 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
     };
     const registry: OpenCodeMcpServer = {
       type: "local",
-      command: ["npx", "-y", "@uluops/registry-mcp"],
+      command: ["npx", "-y", REGISTRY_MCP_SPEC],
       enabled: true,
       timeout: 30000,
       environment: {
