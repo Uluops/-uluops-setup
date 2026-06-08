@@ -2,6 +2,73 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.4] - 2026-06-07
+
+### Fixed
+
+- **Quoted `description` in bundled `assets/codex/skills/uluops-operator/SKILL.md`.** The skill's YAML frontmatter contained `description: Use when operating inside UluOps from Codex: using UluOps MCP tools…` — the second unquoted colon (inside the description value) caused Codex's skill loader to throw `invalid YAML: mapping values are not allowed in this context at line 2` and silently skip the skill on startup. Every user installed via `@uluops/setup` ≤ 0.9.3 received the malformed file. The install summary's `✓ 1 skills → ~/.codex/skills/` line actively masked the failure — the skill landed on disk but never loaded. Wrapping the description in double quotes is the minimal fix; the value is unchanged.
+- **Added bundled-asset frontmatter scanner** (`src/test/asset-frontmatter.test.ts`). Recursively enumerates every `.md` under `assets/`, extracts each file's YAML frontmatter, and asserts no frontmatter line contains more than one top-level (unquoted) colon. Catches the same class of bug for any future asset addition — the scanner is structural, not allow-listed to a specific file. The current asset surface (76 markdown files across all four harnesses) clears the check.
+
+## [0.9.3] - 2026-06-07
+
+### Fixed
+
+- **Bumped `REGISTRY_MCP_VERSION` 0.2.6 → 0.2.7** (`src/lib/mcp-packages.ts:27`) to pin every harness's MCP config at `@uluops/registry-mcp@0.2.7`. The new registry-mcp version pulls in `mcp-secure-server@0.0.15-security`, which closes a `top`/`whoami` false-positive in the COMMAND_INJECTION layer. Pre-fix symptom — calling `get_ecosystem_overview({ fields: ["topPerformers"] })` from Codex or Claude Code was rejected by layer 2 as `Top Process Monitor` before reaching the registry's subscription-tier check. The bug affected every harness simultaneously because the pinned spec lives in the shared `mcp-packages.ts` constants module — the same property that amplified the 0.2.5 silent-exit incident in 0.9.1. Verified end-to-end via Verdaccio: mcp-secure-server 0.0.15-security published locally → installed into registry-mcp → live regex probe confirmed `topPerformers` and friends pass through while real shell invocations remain blocked.
+
+## [0.9.2] - 2026-06-07
+
+### Fixed
+
+- **Bumped `REGISTRY_MCP_VERSION` 0.2.5 → 0.2.6** (`src/lib/mcp-packages.ts:27`). The 0.9.1 pin to `@uluops/registry-mcp@0.2.5` exposed a silent-exit bug in that version's ESM entry-point guard — `argv[1] === fileURLToPath(import.meta.url)` returned false under `npx -y` symlink invocation, so `main()` never ran and the process exited 0 with no output on either stream. Every harness (Claude Code, OpenCode, Gemini CLI, Codex) inherited the broken pin from the shared spec constant and silently failed to connect to the registry MCP server post-setup. `@uluops/registry-mcp@0.2.6` resolves both sides of the entry-guard comparison through `realpathSync` before equality testing; the npx symlink case now succeeds.
+
+### Known gap (deferred)
+
+- **No npx smoke gate before config-write.** `runHealthCheck` in `src/commands/helpers.ts` probes the API endpoints, not the MCP binaries it's about to stamp into harness configs. A `npx -y <pinned-spec> --version` probe per server would have caught 0.2.5's silent-exit bug before setup declared success — the silent-exit symptom is structurally indistinguishable from a working server until a real handshake is attempted. Tracked for 0.9.3.
+
+## [0.9.1] - 2026-06-07
+
+### Changed
+
+- **Pinned MCP server versions stamped into every harness config.** All four harness writers now emit `@uluops/ops-mcp@0.3.1` and `@uluops/registry-mcp@0.2.5` in their `npx -y …` argument lists instead of bare package names. Pinning makes a `@uluops/setup` release self-contained — what users get on first MCP launch is the exact combination the setup release was tested against, regardless of when later MCP server versions ship. A downstream regression in `@uluops/ops-mcp@0.3.2` or `@uluops/registry-mcp@0.2.6` cannot silently land on a setup user the day after publish; the next setup release picks up the new combination explicitly. Surfaced on 2026-06-07 when `@uluops/registry-mcp@0.2.4` shipped with a stale `@uluops/definition-factory` dep that blocked external connections — without pinning, every setup user picked up the broken version automatically on the first `npx -y` resolution.
+- **Single source of truth for MCP package + version constants** (`src/lib/mcp-packages.ts`). `OPS_MCP_PACKAGE`, `OPS_MCP_VERSION`, `OPS_MCP_SPEC`, `REGISTRY_MCP_PACKAGE`, `REGISTRY_MCP_VERSION`, `REGISTRY_MCP_SPEC` exported from one module. Each harness writer (`config-merger.ts` for Claude Code / Gemini CLI, `opencode.ts`, `codex.ts`) imports the spec constants instead of literal strings. A version bump is now one edit in one file; the prior layout had three independent literal sites that could drift. The npm availability probe still uses the bare package names (`MCP_PACKAGES`) — that probe asks "does this name exist on the registry," not "does this version exist," so a temporary registry blip on an older version cannot fail setup when the latest version is reachable.
+
+## [0.9.0] - 2026-06-07
+
+### Added
+
+- **Codex promoted to stable.** `--all-detected` (and the interactive multi-select checkbox) now includes Codex when `~/.codex/` exists on disk, matching the relational promise made by the other three stable harnesses (Claude Code, OpenCode, Gemini CLI). Previously `codexProfile.status = "experimental"` filtered Codex out of `detectHarnesses()`, so a WSL user with all four harnesses installed had to run `npx @uluops/setup --harness codex` separately to pick it up — silently defeating the multi-target install positioning. The HarnessNotTestedError surface is preserved as a structural slot for the next experimental scaffold; its message now lists all four stable harnesses.
+- **Codex MCP config writer auto-approves read-side tools.** First-time installs now seed `[mcp_servers.uluops-tracker.tools.<NAME>]` and `[mcp_servers.uluops-registry.tools.<NAME>]` blocks with `approval_mode = "approve"` for every `sideEffects: "read"` tool exported by `@uluops/ops-mcp` and `@uluops/registry-mcp` (29 tracker reads + 32 registry reads). Without these, Codex prompts the user on every read call — making interactive sessions hostile to inspection workflows that the harness was specifically promoted to support. Write-side tools (`save_run`, `bulk_update_status`, `publish_definition`, etc.) are deliberately NOT seeded, so state-changing operations retain a per-call approval gate.
+
+### Changed
+
+- **Codex TOML uses bare keys, not JSON-quoted keys.** `[mcp_servers.uluops-tracker]` rather than `[mcp_servers."uluops-tracker"]`. Both are valid TOML (hyphens are permitted in bare keys per the TOML v1.0.0 spec), but the unquoted form is what Codex's own writer emits — matching it keeps re-merge diffs minimal for users who interleave `npx @uluops/setup` with Codex's interactive config edits. The merge logic accepts either form on read so existing 0.8.x-installed configs are upgraded in place without re-quoting; the strip step continues to match both quoted and unquoted variants.
+- **Re-install preserves user-customized tool approvals.** When the merge detects ANY `[mcp_servers.<SERVER>.tools.*]` block already present under one of the UluOps server names, it treats the whole tools surface for that server as user-managed and skips seeding — leaving denials, additions, and write-tool approvals untouched. A re-install over a hand-tuned config replays only the main + env blocks (with the current API key + canonical package args), preserving every per-tool choice the user made between installs.
+
+### Known issues (deferred from 0.8.1)
+
+- **Gemini settings.json double-write race** (`src/harnesses/gemini-cli.ts`). Still tracked for a future patch — fix is to extend `HookStrategy` with an optional `installWithMcp` that coalesces the MCP-config write and the hook-settings write into a single atomic boundary.
+
+## [0.8.1] - 2026-06-07
+
+### Added
+
+- **API key persistence on signup and first-key-via-flag/prompt runs.** `signup()` previously returned a freshly-minted key that was embedded in MCP config blocks but never written to `~/.uluops/credentials.json` — the file `@uluops/cli` and the SDK read first when resolving keys. A new user running `npx @uluops/setup --signup` without `--shell` (default off) would open a fresh terminal and discover their account did not exist as far as `ulu` was concerned, with no recovery path short of minting another key. `initContext` now captures `hasCredentialsFile()` before auth runs and calls the new `writeCredentialsFile(apiKey, { email, source })` exporter after a successful signup OR when no prior credentials file was found. File is created with mode `0o600` under a `0o700` parent dir; merging into an existing file preserves any non-`default` profiles. Round-trip with `readCredentialsFile` verified in `src/test/auth.test.ts` (7 new tests).
+
+### Security
+
+- **Bumped vitest 3.2.4 → 4.1.8** to close GHSA-5xrq-8626-4rwp (CVSS 9.8 — unauthenticated arbitrary file read/exec via Vitest UI server). devDependency only; npm-published artifact (controlled by `files` glob) was never exposed, but local dev/CI machines running `npm test` were. `npm audit` now reports 0 vulnerabilities. 340/340 → 345/345 tests pass on the new major.
+- **Atomic-write symlink race closed** (`src/lib/atomic-write.ts`). Temp filenames are now `${path}.uluops-tmp.${randomBytes(8).hex}` (unpredictable) instead of the fixed `.uluops-tmp` suffix, and `writeFile` opens with `flag: "wx"` (O_CREAT|O_EXCL) so a pre-positioned symlink or file at the temp path causes an atomic failure instead of a follow-through write to the attacker's target. CWE-377 resolved.
+- **Shell profile permission preservation** (`src/steps/shell.ts`). The update-block, append-new-block, and remove-block paths now all pass `{ mode: 0o600 }` to `atomicWrite`. Previously, rewriting an existing `~/.zshrc` that contained the UluOps fence downgraded the file from whatever mode it had (often `0o600` on hardened dotfiles) to the umask default (`0o644`/`0o666`), exposing any other secrets in the profile to group/world readers. CWE-732 resolved on three call sites.
+- **`writeSettings` mode tightened** (`src/lib/settings-merger.ts:117`). Now passes `{ mode: 0o600 }`, matching the security level `config-merger.writeConfig` already applied to MCP config files. Aligns the hook-settings write path with the rest of the credential-bearing file writes.
+
+### Removed
+
+- **Backup machinery deleted** — `backupFile` from `src/lib/file-ops.ts`, `getBackupDir` from `src/lib/paths.ts`, internal `backupConfig`/`backupProfile` helpers from `src/steps/mcp.ts` and `src/steps/shell.ts`, plus the related test block. The mechanism wrote timestamped `.bak` copies into `~/.uluops/backups/<harness>/` on every install/uninstall, but **no code path in the package ever read them** — backups were forensic-only archaeology that accumulated unboundedly with each install. Recovery was always intended to flow through the manifest's `partial: "<step>"` marker plus idempotent re-run (the path documented in the README), which remains in place. Aligning implementation with the README's actual recovery promise removes ~80 lines of unused-by-the-tool code and closes the unbounded disk accumulation issue.
+
+### Known issues (deferred)
+
+- **Gemini settings.json double-write race** (`src/harnesses/gemini-cli.ts`). `installMcp` and `installMetrics` both read-merge-atomic-write the same `~/.gemini/settings.json` file sequentially with a tool-file copy in between (Gemini's vendor consolidated MCP config and hook settings into one file; Claude Code's two-step sequence was extended mechanically without recognizing the invariant collapse). A process kill or ENOSPC between the two writes leaves Gemini with MCP-but-no-hooks while the manifest, saved post-loop, has no record of partial state. Tracked for v0.9.0 — fix is to extend `HookStrategy` with an optional `installWithMcp` that coalesces both writes into a single atomic boundary.
+
 ## [0.8.0] - 2026-06-07
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "@uluops/setup",
-  "version": "0.8.0",
+  "version": "0.9.4",
   "description": "Zero-friction installer for UluOps agentic harnesses",
   "license": "MIT",
   "repository": {
@@ -58,6 +58,6 @@
     "@types/node": "22.19.15",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
-    "vitest": "3.2.4"
+    "vitest": "4.1.8"
   }
 }
