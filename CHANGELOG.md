@@ -2,6 +2,16 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.7] - 2026-06-08
+
+### Changed
+
+- **Bumped `OPS_MCP_VERSION` 0.4.3 → 0.4.4** in `src/lib/mcp-packages.ts`. Picks up the `@uluops/ops-mcp@0.4.4` ship: `validate_run` tool now accepts and previews `analysis_records` and `analysis_summary` (mirrors `save_run` shape), tool description advertises the new return fields (`would_create_analysis_records`, `would_create_analysis_summaries`), and the SDK dep moves to `@uluops/ops-sdk@3.2.2` for the matching wire-side forwarding + response parsing. The change cascades through the harness reattestation flow — fresh `npx -y @uluops/setup` installs and existing `npx @uluops/setup` reattestations after 0.9.7 will stamp `@uluops/ops-mcp@0.4.4` into Claude Code / Codex / Gemini / OpenCode harness configs, replacing the prior 0.4.3 pin. Harness configs already on disk continue resolving 0.4.3 until reattestation runs.
+
+  Companion releases shipped same day: `ops-uluops-api@1.58.1` (dry-run completeness on `/runs/validate` + enriched Zod error envelope with `code`/`expected`/`received` per issue), `@uluops/ops-sdk@3.2.2`. Together these close the Codex friction surfaced on the 2026-06-08 foundations skill run where `validate_run` accepted runs that `save_run` later rejected on analysis-record shape. Tracker: `ops-uluops-api` `c29dd21e` (PRA-DRI/H — dry-run incomplete), `f5a04d90` (EPI-OPA/M — Zod error opacity); `ops-uluops-mcp` `6f3e5b4c` (SEM-VAL/M — analysis_records advertised as any[]), `a2dda4d5` (EPI-OPA/M — record_id maxLength undocumented). All four resolved with this wave.
+
+  `REGISTRY_MCP_VERSION` remains 0.2.9 — no changes in this release.
+
 ## [0.9.6] - 2026-06-08
 
 ### Changed

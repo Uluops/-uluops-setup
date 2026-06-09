@@ -22,7 +22,7 @@
  */
 
 export const OPS_MCP_PACKAGE = "@uluops/ops-mcp";
-export const OPS_MCP_VERSION = "0.4.3";
+export const OPS_MCP_VERSION = "0.4.4";
 export const OPS_MCP_SPEC = `${OPS_MCP_PACKAGE}@${OPS_MCP_VERSION}` as const;
 
 export const REGISTRY_MCP_PACKAGE = "@uluops/registry-mcp";
