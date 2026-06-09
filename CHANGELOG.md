@@ -2,6 +2,20 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.6] - 2026-06-08
+
+### Changed
+
+- **Bumped MCP pins to pick up the live-tests T2 wave.** `src/lib/mcp-packages.ts`:
+  - `OPS_MCP_VERSION` 0.3.1 → **0.4.3** — F10 `get_issue_history` description rewrite + dropped dead `include_diffs` parameter; F8 `get_analytics` `cross_project_patterns` placeholder note; @uluops/ops-sdk 3.0.4 → 3.2.1 (CWE-20 `.max()` bounds on history-event fields, BREAKING `IssueHistoryEnvelope` return shape for `getHistory` with `transitionType`/`revertedChangeId` tombstone fields); vitest dev pin 2.1.9 → 3.2.6 (closes CVSS 9.8 UI server file-read/exec); description-text anchor tests; `prepublishOnly` safety net added.
+  - `REGISTRY_MCP_VERSION` 0.2.7 → **0.2.9** — @uluops/registry-sdk 0.30.2 → 0.31.1 (R12 envelope rewrite — `DependencyGraphResponse` recursive graph + `flat[]` + `totalCount` + `maxDepth`; `DependentsResponse` with `Dependent[].context`; CWE-674 pre-parse depth guard at `MAX_SAFE_GRAPH_DEPTH=50`; CWE-20 `.max()` bounds on `name`/`version`/`context`); `prepublishOnly` safety net added.
+
+  Fresh `npx -y @uluops/setup` installs and harness reattestations after 0.9.6 will stamp these specs into Claude Code / Codex / Gemini / OpenCode harness configs, replacing the prior 0.3.1 / 0.2.7 pins. Existing installs need a re-attestation (`npx @uluops/setup`) to pick up the new specs — harness configs already on disk continue resolving the old versions.
+
+  `@uluops/cli` install (`src/steps/cli.ts:56`) remains unpinned (`npm install -g @uluops/cli`) — intentional, since the CLI is a user-installable global tool managed via `npm update -g`, not a harness-stamped MCP spec. Users who want the 0.13.2 CLI run `npm update -g @uluops/cli` independently.
+
+Suite 360/360 pass on the bumped pins.
+
 ## [0.9.5] - 2026-06-08
 
 ### Added
