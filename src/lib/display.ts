@@ -186,15 +186,15 @@ export async function printAgentList(): Promise<void> {
 
   if (agents.length > 0) {
     info(
-      `${chalk.bold("AGENTS")} (run individually)${" ".repeat(26)}${chalk.dim("MODEL")}`,
+      `${chalk.bold("AGENTS")} (run individually)${" ".repeat(30)}${chalk.dim("MODEL")}`,
     );
     for (const agent of agents) {
       const cmd = `/agents:${agent.name}`;
-      const desc = agent.description.length > 17
-        ? agent.description.slice(0, 14) + "..."
+      const desc = agent.description.length > 21
+        ? agent.description.slice(0, 18) + "..."
         : agent.description;
       info(
-        `  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(17)}${chalk.dim(agent.model)}`,
+        `  ${chalk.cyan(cmd.padEnd(34))}${desc.padEnd(22)}${chalk.dim(agent.model)}`,
       );
     }
     console.log();

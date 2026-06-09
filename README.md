@@ -142,6 +142,10 @@ npx @uluops/setup [options]
   --shell              Write API key export to shell profile
   --with-cli           Install @uluops/cli globally (skip prompt)
   --no-cli             Skip @uluops/cli install (skip prompt)
+  --with-agent-metrics-cli
+                       Install @uluops/agent-metrics globally (skip prompt)
+  --no-agent-metrics-cli
+                       Skip @uluops/agent-metrics install (skip prompt)
   --no-metrics         Skip the agent-metrics hook install (no hook
                        configured, no tool files copied). The downstream
                        @uluops/agent-metrics CLI prompt is also suppressed.
@@ -221,8 +225,8 @@ npx @uluops/setup --api-key ulr_abc123 --all-detected -y
 # Local MCP config (project-scoped)
 npx @uluops/setup --scope local
 
-# Preview without changes
-npx @uluops/setup --dry-run --api-key ulr_abc123
+# Preview without changes while offline
+npx @uluops/setup --dry-run --api-key ulr_abc123 --skip-validation
 
 # Persist API key in shell profile (~/.zshrc, ~/.bashrc, etc.)
 npx @uluops/setup --shell
@@ -232,6 +236,12 @@ npx @uluops/setup --with-cli
 
 # Skip the CLI prompt entirely (interactive runs default to asking)
 npx @uluops/setup --no-cli
+
+# Install the agent-metrics CLI globally alongside the metrics hook
+npx @uluops/setup --with-agent-metrics-cli
+
+# Skip the agent-metrics CLI prompt entirely
+npx @uluops/setup --no-agent-metrics-cli
 ```
 
 ## How updates work
@@ -277,7 +287,7 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, shell p
 
 - **Node.js:** >= 20.0.0
 - **Platform:** Linux, macOS, or WSL2 (native Windows not supported)
-- **Harness:** Claude Code, OpenCode, or Gemini CLI
+- **Harness:** Claude Code, OpenCode, Gemini CLI, or Codex
 - **Auth:** UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))
 
 ---

@@ -23,9 +23,6 @@
   "bin": {
     "uluops-setup": "./dist/cli.js"
   },
-  "exports": {
-    "./cli": "./dist/cli.js"
-  },
   "files": [
     "dist/cli.js",
     "dist/cli.d.ts",
