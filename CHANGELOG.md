@@ -2,6 +2,25 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.8] - 2026-06-17
+
+### Changed
+
+- **Bumped MCP pins to current** in `src/lib/mcp-packages.ts`:
+  - `OPS_MCP_VERSION` 0.4.4 → **0.4.7**
+  - `REGISTRY_MCP_VERSION` 0.2.9 → **0.2.13** — picks up the `@uluops/registry-mcp@0.2.13` `get_language` `format` parameter (compact digest default | full), an MCP-layer transform that cuts the ADL signature-string payload substantially without dropping conditionals/enums/forbidden fields.
+
+  Fresh `npx -y @uluops/setup` installs and harness reattestations after 0.9.8 will stamp these specs into Claude Code / Codex / Gemini / OpenCode harness configs, replacing the prior 0.4.4 / 0.2.9 pins. Existing installs need a re-attestation (`npx @uluops/setup`) to pick up the new specs — harness configs already on disk continue resolving the old versions.
+
+  `@uluops/cli` install (`src/steps/cli.ts:56`) remains unpinned (`npm install -g @uluops/cli`) — intentional; the CLI is a user-installable global managed via `npm update -g`, not a harness-stamped MCP spec.
+
+- **Dependency + toolchain bumps to current.** Two were breaking majors requiring code/config changes:
+  - `@inquirer/prompts` 7.10.1 → **8.5.2** — v8 removed the `instructions` option on `checkbox`. Dropped the one usage in `src/cli.ts`; v8 auto-renders the equivalent "space to toggle, enter to confirm" help tip by default via `theme.style.keysHelpTip`, so behavior is preserved.
+  - `typescript` 5.9.3 → **6.0.3** — TS 6.0 no longer auto-includes `@types/*` the way 5.x did, which broke the build with `Cannot find name 'process'` across every Node-importing module. Fixed by adding `"types": ["node"]` to `tsconfig.json`.
+  - `commander` 12.1.0 → **15.0.0** (3 majors; CLI `--version`/`--help` parse verified), `@types/node` 22.19.15 → **25.9.3**, `tsx` 4.21.0 → **4.22.4**, `vitest` 4.1.8 → **4.1.9**.
+
+Suite 360/360 pass on the bumped deps and pins. Published tarball validated via clean-room install before going live (shasum `fdc83ac0…`, identical npm↔local).
+
 ## [0.9.7] - 2026-06-08
 
 ### Changed

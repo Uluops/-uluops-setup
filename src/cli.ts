@@ -174,7 +174,6 @@ async function main(): Promise<void> {
         const chosen = await checkbox({
           message:
             "Multiple harnesses detected. Which would you like to install into?",
-          instructions: " (use space to toggle, enter to confirm)",
           choices: profiles.map((p) => ({
             name: p.displayName,
             value: p.name,
