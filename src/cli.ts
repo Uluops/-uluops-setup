@@ -83,11 +83,16 @@ async function main(): Promise<void> {
     .option("--verify", "Check existing installation health")
     .option("--uninstall", "Remove all UluOps artifacts")
     .option("--dry-run", "Show what would happen", false)
+    .option(
+      "--username <name>",
+      "Set your registry username (slug, required to publish) without prompting",
+    )
     .option("-y, --yes", "Skip confirmations", false);
 
   program.parse();
   const opts = program.opts<{
     apiKey?: string;
+    username?: string;
     signup: boolean;
     harness: string;
     allDetected: boolean;
@@ -207,6 +212,7 @@ async function main(): Promise<void> {
 
   await runSetup({
     apiKey: opts.apiKey,
+    username: opts.username,
     signup: opts.signup ?? false,
     scope,
     localDefs: opts.localDefs,

@@ -40,6 +40,7 @@ import type { CommandsResult } from "../steps/commands.js";
 import type { SkillsResult } from "../steps/skills.js";
 import type { MetricsResult } from "../steps/metrics.js";
 import type { McpResult } from "../steps/mcp.js";
+import { maybeSetUsername } from "../steps/username.js";
 
 // Re-export so existing import sites that pull PerHarnessResult from
 // setup.ts keep working.
@@ -65,6 +66,8 @@ interface RunSetupOpts {
    * CLI prompt is also suppressed downstream (no hook → no CLI gate).
    */
   noMetrics?: boolean;
+  /** Explicit registry username (slug). Set + confirmed non-interactively when provided. */
+  username?: string;
 }
 
 export async function runSetup(opts: RunSetupOpts): Promise<void> {
@@ -103,6 +106,18 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
 
   // === Once-per-run: BEFORE the per-harness loop ===
   const { env, apiKey } = await initContext(opts);
+  console.log();
+
+  // Optional, never-forced: offer to set a registry username (the one-time
+  // prerequisite for creating/publishing definitions). Skipped silently in
+  // non-interactive runs unless --username is supplied.
+  await maybeSetUsername({
+    apiKey,
+    username: opts.username,
+    interactive: !opts.yes && Boolean(process.stdin.isTTY),
+    dryRun: opts.dryRun,
+    emit: (msg) => info(msg),
+  });
   console.log();
 
   // Acquire the install lock before touching any shared state. Skipped on
