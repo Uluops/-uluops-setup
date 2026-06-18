@@ -2,6 +2,27 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.9.9] - 2026-06-17
+
+### Added
+
+- **Optional `--username` step.** Offers to set a registry username during setup —
+  the one-time prerequisite for creating/publishing definitions — via native
+  fetch `PATCH /auth/profile` with the resolved api key (no SDK dependency).
+  Allow, never force: `--username <slug>` sets it non-interactively; an
+  interactive run prompts once (Enter skips); non-interactive runs with no flag
+  skip silently. Failures warn and never abort setup.
+
+### Changed
+
+- **Bumped MCP pins** in `src/lib/mcp-packages.ts`:
+  - `OPS_MCP_VERSION` 0.4.7 → **0.5.0** — adds the `update_profile` tool (set/confirm registry username from an MCP client).
+  - `REGISTRY_MCP_VERSION` 0.2.13 → **0.2.14** — raises the per-string cap so full definition YAML passes through direct MCP fields.
+
+  Fresh `npx -y @uluops/setup` installs and harness reattestations after 0.9.9
+  stamp these specs into Claude Code / Codex / Gemini / OpenCode configs,
+  replacing the prior 0.4.7 / 0.2.13 pins.
+
 ## [0.9.8] - 2026-06-17
 
 ### Changed
