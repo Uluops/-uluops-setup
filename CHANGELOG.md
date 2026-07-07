@@ -12,6 +12,8 @@ All notable changes to `@uluops/setup` will be documented in this file.
   fresh setup install now resolves the tracker/registry MCP servers users are
   actually tested against — including the dataset-export-era tracker tooling — instead
   of a months-old pin. Single source of truth: `src/lib/mcp-packages.ts`.
+- **Codex agent assets regenerated to `gpt-5.5`** (all 23 `assets/codex/agents/*.toml`
+  bumped `gpt-5.3` → `gpt-5.5`, with refreshed scoring-calibration examples).
 
 ## [0.9.9] - 2026-06-17
 
