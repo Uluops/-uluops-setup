@@ -1,6 +1,6 @@
 name = "prompt-pattern-analyzer"
 description = "Analyzes ecosystem-wide patterns across all agents, commands, and workflows. Detects conventions, identifies inconsistencies, and learns from validation failures. Run before prompt-audit to provide project-level context for individual prompt reviews. Enables consistency-aware auditing across the ecosystem.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -686,4 +686,8 @@ Higher thresholds for security/safety are appropriate
 Defense-in-depth is not redundancy
 Newer patterns may represent evolution, not drift
 Focus on enabling better audits, not fixing prompts directly
+
+
+---
+*Generated from ADL v1.16.0 | Agent: prompt-pattern-analyzer v2.4.1*
 '''

@@ -1,6 +1,6 @@
 name = "docs-validator"
 description = "Validates documentation completeness and quality across all documentation surfaces. Covers API documentation (OpenAPI/Swagger), JSDoc/TSDoc coverage on public exports, changelog quality, and markdown validity. Complements public-interface-validator which focuses on README accuracy. Use for projects with significant documentation requirements (SDKs, libraries, APIs).\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -465,4 +465,8 @@ Ask: Can a developer find and understand every public API?
 Check JSDoc, API specs, changelog, and markdown docs
 Provide specific text additions needed
 Distinguish between missing and outdated docs
+
+
+---
+*Generated from ADL v1.16.0 | Agent: docs-validator v2.4.1*
 '''

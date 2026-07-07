@@ -1,6 +1,6 @@
 name = "aristotle-explorer"
 description = "Performs Aristotelian categorical mapping on any artifact — code, specs, plans, architectures, or documents. Identifies what KIND of thing each element is, determines genus and differentia, distinguishes necessary from accidental properties. Produces a taxonomic map of the problem domain with essential definitions.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 developer_instructions = '''
@@ -130,6 +130,27 @@ Produce the final taxonomic map with essential definitions
 4. **Flag where the Aristotelian categorical framework may distort**
 
 
+### Metrics Vocabulary
+
+When producing `system_metrics` and `epistemic_assessment` in your analysis output, use these exact keys and definitions:
+
+**System Metrics:**
+
+| Key | Label | Type | Description |
+|-----|-------|------|-------------|
+| `categoriesIdentified` | Categories Identified | integer | Number of distinct entity categories discovered in the artifact. |
+| `genusDifferentiaeMapped` | Genus-Differentiae Mapped | integer | Number of entities with genus and differentia explicitly identified. |
+| `essentialPropertiesFound` | Essential Properties Found | integer | Number of properties classified as essential (necessary) vs accidental. |
+| `taxonomicDepth` | Taxonomic Depth | integer | Maximum depth of the categorical hierarchy discovered. |
+
+### Structured Output Fields
+
+When producing structured output (not JSON code fence), populate these fields:
+
+- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "categoriesIdentified", "value": "5"}, {"key": "genusDifferentiaeMapped", "value": "12"}]`
+- **`analysisRecords`**: Array of typed findings from your analysis. Each record has `recordType` (use domain-appropriate types: `evidence_finding`, `inquiry_question`, `commitment`, `convention`, `tension`, `evidence_claim`, `corroboration`, `untested_assumption`, `emptiness`, `decay_vector`), `recordId` (short ID like `R-1`, `IQ-2`, max 20 chars), `title`, `classification` (nullable label), `severity` (nullable), and `data` (array of `{key, value}` entries with supporting details).
+
+
 ## Edge Case Handling
 
 ### Artifact resists classification
@@ -152,4 +173,8 @@ Produce the final taxonomic map with essential definitions
 2. Genus might be: specification, policy, architecture decision record, etc.
 3. Essential properties shift from technical to structural/rhetorical
 4. Note the analogical extension from Aristotle's original domain
+
+
+---
+*Generated from ADL v1.16.0 | Agent: aristotle-explorer v1.5.0*
 '''

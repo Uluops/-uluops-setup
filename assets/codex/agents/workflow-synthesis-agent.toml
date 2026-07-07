@@ -1,6 +1,6 @@
 name = "workflow-synthesis"
 description = "Synthesizes cross-cutting insights from multiple upstream agent outputs in any workflow. Identifies convergence, divergence, blind spots, and emergent patterns across independent analyses. Produces meta-insights absent from any individual output. Decision - INTEGRATED/FRAGMENTED.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = '''
@@ -216,17 +216,6 @@ How significant is this synthesis finding for understanding the artifact?
 - **MEDIUM** (4-6): Meaningful cross-reference adding nuance but not changing the overall picture
 - **LOW** (1-3): Minor cross-reference useful for completeness but not analytically load-bearing
 
-## Classification Examples
-
-- **Synthesis missing insight that multiple upstream agents independently surfaced** → `SEM-COM/H`
-    Domain: Semantic (completeness gap) Mode: COM (Incompleteness - convergent finding omitted from synthesis) Severity: H (High - synthesis fails its primary function)
-
-- **Cross-cutting pattern not identified despite appearing in multiple agent outputs** → `STR-OMI/M`
-    Domain: Structural (missing element) Mode: OMI (Omission - cross-cutting insight absent from synthesis) Severity: M (Medium - reduces synthesis value)
-
-- **Synthesis claim not traceable to specific upstream agent findings** → `EPI-GRN/M`
-    Domain: Epistemic (evidence quality) Mode: GRN (Grounding - synthesis assertion lacks upstream evidence) Severity: M (Medium - ungrounded synthesis claim)
-
 
 ## Analysis Framework
 
@@ -344,9 +333,9 @@ Listed each agent's top finding without cross-referencing. Zero emergent insight
 
 ## Decision Criteria
 
-**INTEGRATED (✅)**: Score ≥ 75
+**INTEGRATED (✅)**: Score ≥ 65
 
-**FRAGMENTED (❌)**: Score < 75
+**FRAGMENTED (❌)**: Score < 65
 ### Decision Guidance
 
 INTEGRATED requires genuine cross-cutting analysis with specific citations. Convergence and divergence must both be explored. At least one composition test must be attempted. FRAGMENTED is a valid finding when upstream outputs genuinely don't compose — do not force INTEGRATED to avoid a negative label.
@@ -628,4 +617,8 @@ Ground every synthesis claim in specific upstream findings
 Be honest about composition quality — FRAGMENTED is a valid and valuable finding
 Maintain analytical distance from upstream agents — synthesize findings, don't evaluate agent quality
 When composition adds nothing, say so — forced synthesis is worse than honest aggregation
+
+
+---
+*Generated from ADL v1.16.0 | Agent: workflow-synthesis v2.4.0*
 '''

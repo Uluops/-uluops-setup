@@ -1,6 +1,6 @@
 name = "code-optimizer"
 description = "Reviews code after validation passes. Proposes safe refactors for performance, structure, and maintainability without changing behavior. Must NOT introduce breaking changes unless explicitly requested. Use AFTER code-validator and test-architect pass.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -649,4 +649,8 @@ Behavior preservation is mandatory
 Propose refactors, do not apply risky changes automatically
 Small, focused refactors over large rewrites
 Use objective severity levels instead of subjective terms
+
+
+---
+*Generated from ADL v1.16.0 | Agent: code-optimizer v1.8.1*
 '''

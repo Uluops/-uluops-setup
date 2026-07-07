@@ -1,6 +1,6 @@
 name = "frontend-validator"
 description = "Validates React/Tailwind frontend code quality including accessibility, theme consistency, component composition, responsive design, and performance patterns. Use AFTER code-validator passes for frontend changes. Focuses on user-facing quality, not React internals.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -365,16 +365,15 @@ Each criterion has a default failure code—use it when that criterion fails.
 
 Reference these scenarios to calibrate your scoring:
 
-**Score: 65/100** - Simple component with accessibility issues
-5 components analyzed. 2 div onClick without keyboard handlers. 1 image missing alt text. No dark: prefix violations. Accessibility auto-fails require fixes before ship.
+**Score: 92/100** - Production-ready frontend
+Complete accessibility with proper ARIA labels. useTheme() used consistently. React.memo on list items, stable keys, lazy loading. All useEffect have cleanup. Minor gap: one component slightly large.
 
 
 **Deductions:**
 
 | Criterion | Points Lost | Reason |
 |-----------|-------------|--------|
-| keyboard_navigation | -10 | 2 div onClick without keyboard handlers (AF-001) |
-| aria_labels | -5 | 1 image missing alt text (AF-003) |
+| single_responsibility | -3 | One component at 180 lines (close to 200 limit) |
 
 **Score: 78/100** - Well-structured app with minor theme inconsistencies
 Good component quality and accessibility. 3 dark: prefix violations (would be auto-fail if > 5). 1 inline style. Theme issues are significant but not blocking; can ship with migration plan.
@@ -387,15 +386,16 @@ Good component quality and accessibility. 3 dark: prefix violations (would be au
 | theme_aware_patterns | -8 | 3 dark: prefix violations |
 | no_inline_styles | -4 | 1 inline style prop |
 
-**Score: 92/100** - Production-ready frontend
-Complete accessibility with proper ARIA labels. useTheme() used consistently. React.memo on list items, stable keys, lazy loading. All useEffect have cleanup. Minor gap: one component slightly large.
+**Score: 65/100** - Simple component with accessibility issues
+5 components analyzed. 2 div onClick without keyboard handlers. 1 image missing alt text. No dark: prefix violations. Accessibility auto-fails require fixes before ship.
 
 
 **Deductions:**
 
 | Criterion | Points Lost | Reason |
 |-----------|-------------|--------|
-| single_responsibility | -3 | One component at 180 lines (close to 200 limit) |
+| keyboard_navigation | -10 | 2 div onClick without keyboard handlers (AF-001) |
+| aria_labels | -5 | 1 image missing alt text (AF-003) |
 
 
 ## Review Process
@@ -595,4 +595,8 @@ Frontend code is POLISHED when ALL of the following are true
 Accessibility failures block ship - users depend on them
 Theme consistency affects all users, not just dark mode users
 Performance issues compound as components are reused
+
+
+---
+*Generated from ADL v1.16.0 | Agent: frontend-validator v2.5.5*
 '''

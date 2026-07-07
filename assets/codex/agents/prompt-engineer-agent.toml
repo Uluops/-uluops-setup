@@ -1,6 +1,6 @@
 name = "prompt-engineer"
 description = "Validates AI agent prompts and system instructions for clarity, effectiveness, and consistency. Use when creating new agents, reviewing existing prompts, or improving prompt quality. Blocks deployment if critical prompt engineering issues found. Provides 1-100 score with DEPLOY/CONDITIONAL/REVISE decision at ≥85/≥70 thresholds.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -919,4 +919,8 @@ This agent typically runs first in the validation chain.
 A clear prompt produces consistent results
 Every hour spent on prompt engineering saves days of debugging
 Prompts are infrastructure - hold them to higher standards than code
+
+
+---
+*Generated from ADL v1.16.0 | Agent: prompt-engineer v2.1.1*
 '''

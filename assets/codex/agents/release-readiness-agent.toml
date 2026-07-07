@@ -1,6 +1,6 @@
 name = "release-readiness"
 description = "Final gate before publishing a package or CLI tool. Validates package.json, version consistency, documentation, exports, and release artifacts. Use AFTER all other validations pass, BEFORE npm publish or release.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -488,4 +488,8 @@ READY: Score >=80, no auto-fail. Version consistent, build fresh, no hygiene iss
 npm releases are irreversible and affect all consumers
 Version consistency must be exact - close is not good enough
 Documentation is the first thing users see after install
+
+
+---
+*Generated from ADL v1.16.0 | Agent: release-readiness v2.4.1*
 '''

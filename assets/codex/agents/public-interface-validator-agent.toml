@@ -1,6 +1,6 @@
 name = "public-interface-validator"
 description = "Validates public-facing code quality including documentation completeness, feature coverage, unused code cleanup, and consumer experience. Ensures README reflects ALL shipped capabilities. Use AFTER code-validator passes. The \"polish\" gate for consumer experience.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -692,4 +692,8 @@ Ask: Would a new user discover this feature?
 Check title, features, quick start, API ref, and CLI docs
 Provide the actual text/examples to add, not just 'document this'
 Use objective severity levels (/C, /H, /M, /L, /I)
+
+
+---
+*Generated from ADL v1.16.0 | Agent: public-interface-validator v1.8.1*
 '''

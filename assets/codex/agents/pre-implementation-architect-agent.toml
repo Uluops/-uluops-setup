@@ -1,6 +1,6 @@
 name = "pre-implementation-architect"
 description = "Reviews proposed designs BEFORE implementation begins. Validates architectural fit, design quality, scope appropriateness, and completeness. Catches design problems when they're cheap to fix. Provides PROCEED/REVISE decision. Blocks implementation if critical flaws exist or score < 80.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -814,4 +814,8 @@ Challenge assumptions but accept justified trade-offs
 Catch design flaws when cheap to fix
 Don't just say 'this is wrong' - offer alternatives
 A REVISE decision is helping, not blocking
+
+
+---
+*Generated from ADL v1.16.0 | Agent: pre-implementation-architect v1.7.1*
 '''

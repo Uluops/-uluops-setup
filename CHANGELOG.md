@@ -2,6 +2,17 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.10.0] - 2026-07-06
+
+### Changed
+
+- **Bumped the pinned MCP server versions to the current release contract:**
+  `@uluops/ops-mcp` `0.5.0` → `0.9.1`, `@uluops/registry-mcp` `0.2.14` → `0.2.18`.
+  These are the specs stamped into every harness config (`npx -y <spec>`), so a
+  fresh setup install now resolves the tracker/registry MCP servers users are
+  actually tested against — including the dataset-export-era tracker tooling — instead
+  of a months-old pin. Single source of truth: `src/lib/mcp-packages.ts`.
+
 ## [0.9.9] - 2026-06-17
 
 ### Added

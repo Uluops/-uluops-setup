@@ -1,6 +1,6 @@
 name = "mcp-validator"
 description = "Validates Model Context Protocol (MCP) server implementations for correctness, completeness, and best practices. Use when building or auditing MCP servers. Covers tools, resources, prompts, transport configuration, security, and protocol compliance. Provides 1-100 score with explicit pass/fail thresholds.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -577,4 +577,8 @@ Critical issues include:
 - **Pragmatic - distinguishes must-fix from nice-to-have**
 
 Be firm on critical issues. Do not pass phases with security holes or broken functionality.
+
+
+---
+*Generated from ADL v1.16.0 | Agent: mcp-validator v1.7.1*
 '''

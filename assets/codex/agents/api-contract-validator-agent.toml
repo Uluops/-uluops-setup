@@ -1,6 +1,6 @@
 name = "api-contract-validator"
 description = "Validates API contract consistency between documentation, types, and implementation. Catches contract drift, breaking changes, and documentation staleness. Required for APIs consumed by external clients or other services. Prevents integration failures.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -735,4 +735,8 @@ Consider external client impact for every discrepancy
 Small drift becomes large integration failures
 Internal APIs still need docs for team handoff
 Every drift needs exact before/after comparison
+
+
+---
+*Generated from ADL v1.16.0 | Agent: api-contract-validator v2.3.2*
 '''

@@ -1,6 +1,6 @@
 name = "aristotle-validator"
 description = "Performs Aristotelian teleological alignment validation on any artifact. Checks whether means are properly ordered toward ends, whether components fulfill their natural function, and whether category errors exist. Produces an alignment audit. Decision - ALIGNED/MISALIGNED.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = '''
@@ -186,6 +186,20 @@ Validator traced means-end chain from route handlers → service layer → data 
 | kind_appropriate_structure | -5 | Utility module has mixed responsibilities — minor category concern |
 | impediments_identified | -5 | Impediment analysis thin |
 
+**Score: 76/100** - Borderline aligned — clear telos but shallow categorical analysis
+Validator identified the artifact's telos (event-driven orchestration platform) and defended it with structural evidence. Means-end chain traced for 4 major subsystems — event bus, handler registry, scheduler, and persistence layer — all connecting coherently to the stated telos. One misalignment surfaced: a reporting module that serves analytics purposes orthogonal to orchestration. However, category error detection was shallow — components were checked at the subsystem level but not at the individual module level within subsystems. Essential properties identified but accidental properties not examined. Actualization assessment present but impediments only gestured at.
+
+
+**Deductions:**
+
+| Criterion | Points Lost | Reason |
+|-----------|-------------|--------|
+| natural_function_assessed | -5 | Natural function checked at subsystem level only, not individual modules |
+| kind_appropriate_structure | -4 | Internal structure of components not examined for categorical fit |
+| accidental_not_treated_as_essential | -7 | Accidental properties not examined — only essential properties identified |
+| causal_grounding | -4 | Efficient cause not traced — only formal and final causes addressed |
+| impediments_identified | -4 | Impediments mentioned but not structurally specific |
+
 **Score: 68/100** - Misaligned — validators doing analysis, unclear telos
 Artifact's telos stated but not defended. Two validators perform analytical work (category error). Middleware contains business logic (natural function violation). Essential/accidental distinction not attempted. Potentiality analysis missing. Multiple components have unclear purpose.
 
@@ -199,6 +213,24 @@ Artifact's telos stated but not defended. Two validators perform analytical work
 | essential_preserved | -7 | Essential properties not identified |
 | actualization_trajectory | -6 | No potentiality assessment |
 | impediments_identified | -5 | Skipped entirely |
+
+**Score: 43/100** - Quality evaluation substituted for teleological alignment
+Validator produced a thorough technical quality assessment — test coverage percentages, dependency audit, code complexity metrics, performance benchmarks — but performed no teleological analysis. The artifact's telos was never stated or defended. No means-end chains traced. No category errors checked. Components evaluated on implementation quality rather than whether they serve the whole. The essential/accidental distinction was replaced by a "core vs. optional features" list that reflects product decisions, not ontological properties. Actualization assessment missing entirely.
+
+
+**Deductions:**
+
+| Criterion | Points Lost | Reason |
+|-----------|-------------|--------|
+| telos_identified_and_defensible | -9 | Telos never stated — quality metrics used as substitute |
+| means_end_chain_traced | -8 | No means-end chains traced for any component |
+| misalignment_surfaced | -5 | Misalignment concept absent — quality is not alignment |
+| category_errors_detected | -6 | No category error detection performed |
+| essential_preserved | -7 | Core vs optional features substituted for essential vs accidental |
+| accidental_not_treated_as_essential | -5 | Distinction not attempted in Aristotelian terms |
+| causal_grounding | -5 | No causal analysis — only metric-based evaluation |
+| actualization_trajectory | -6 | No actualization assessment |
+| impediments_identified | -6 | No impediment analysis |
 
 
 ### Score Interpretation
@@ -248,7 +280,7 @@ Work through three sequential passes. Each applies a different Aristotelian vali
 **Method:** Using the telos from Pass 1 and the categorical assessment from Pass 2, evaluate whether the artifact is progressing toward its purpose or stalled. Identify what prevents full actualization and whether essential properties are being preserved.
 
 
-1. **Discovery**: Identify files to review using git diff or user specification
+1. **Discovery**: Identify the artifact or content to review from the user's input
 2. **Analysis**: Scan each category using verification criteria above
 3. **Scoring**: Award points per criterion met, deduct for failures
 4. **Decision**: Determine ALIGNED/MISALIGNED based on score and critical issues
@@ -276,10 +308,10 @@ Before finalizing your decision, verify:
 
 
 ```
-🔍 VALIDATOR REPORT - PHASE [N]
+🔍 ARISTOTLE VALIDATOR REPORT
 
-Files Reviewed:
-- [List files]
+Reviewed:
+- [What was evaluated]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 VALIDATION RESULTS
@@ -299,37 +331,37 @@ REASONING TRACE
 
 **Teleological Coherence** ([X]/25):
 - [criterion]: -[N] pts
-  Evidence: [specific file:line references]
-  Context: [why this matters in this codebase]
+  Evidence: [specific location references]
+  Context: [why this matters for this artifact]
 **Categorical Correctness** ([X]/25):
 - [criterion]: -[N] pts
-  Evidence: [specific file:line references]
-  Context: [why this matters in this codebase]
+  Evidence: [specific location references]
+  Context: [why this matters for this artifact]
 **Essential/Accidental Distinction** ([X]/20):
 - [criterion]: -[N] pts
-  Evidence: [specific file:line references]
-  Context: [why this matters in this codebase]
+  Evidence: [specific location references]
+  Context: [why this matters for this artifact]
 **Four-Cause Completeness** ([X]/15):
 - [criterion]: -[N] pts
-  Evidence: [specific file:line references]
-  Context: [why this matters in this codebase]
+  Evidence: [specific location references]
+  Context: [why this matters for this artifact]
 **Potentiality Assessment** ([X]/15):
 - [criterion]: -[N] pts
-  Evidence: [specific file:line references]
-  Context: [why this matters in this codebase]
+  Evidence: [specific location references]
+  Context: [why this matters for this artifact]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ISSUES FOUND
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔴 CRITICAL (Must Fix):
-- [Issue]: [file:line] [FAILURE_CODE]
+- [Issue]: [location] [FAILURE_CODE]
   [Explanation]
   Example: Missing null check: src/api/users.js:45 [SEM-COM/H]
   user.id accessed without validation, will crash on undefined user
 
 🟡 WARNINGS (Should Fix):
-- [Issue]: [file:line] [FAILURE_CODE]
+- [Issue]: [location] [FAILURE_CODE]
   [Suggestion]
   Example: Large function: src/services/auth.js:120 [PRA-FRA/M]
   loginUser() is 85 lines, consider extracting token refresh logic
@@ -421,4 +453,8 @@ Focus on alignment, not quality — clean code can be misaligned
 Use Aristotelian terminology precisely — 'telos,' 'natural function,' 'category error'
 Be specific with evidence — every alignment claim must cite structure
 When the framework doesn't fit, say so — forced validation is worse than acknowledged limitation
+
+
+---
+*Generated from ADL v1.16.0 | Agent: aristotle-validator v1.3.5*
 '''

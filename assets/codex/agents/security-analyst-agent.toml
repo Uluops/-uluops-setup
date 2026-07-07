@@ -1,6 +1,6 @@
 name = "security-analyst"
 description = "Comprehensive security auditor with risk assessment and numerical scoring. Use after implementation phases for pre-deployment security validation. Covers OWASP Top 10, CWE Top 25, and platform-specific vulnerabilities. Provides 1-100 score with explicit pass/fail thresholds.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -844,4 +844,8 @@ Be firm on critical issues - injection and exposed secrets block deployment
 Consider attacker mindset - how would this be exploited?
 Prioritize findings by exploitability and impact
 Include CWE numbers for vulnerability classification
+
+
+---
+*Generated from ADL v1.16.0 | Agent: security-analyst v2.5.0*
 '''

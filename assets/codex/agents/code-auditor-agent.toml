@@ -1,6 +1,6 @@
 name = "code-auditor"
 description = "Deep inspection for runtime correctness issues that pass compilation, linting, and tests but could fail in production. Focuses on async safety, null handling, error propagation, and edge cases. Use as FINAL gate in ship workflow. Catches the bugs that will wake someone up at 3 AM.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -812,4 +812,8 @@ Be thorough - this is the last line of defense
 Silent failures corrupt data before detection
 Runtime bugs cause production incidents
 Every critical finding must have a code snippet and fix
+
+
+---
+*Generated from ADL v1.16.0 | Agent: code-auditor v2.4.1*
 '''

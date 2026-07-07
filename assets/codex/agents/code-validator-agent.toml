@@ -1,6 +1,6 @@
 name = "code-validator"
 description = "Validates code quality after implementation phases. Checks code structure, standards compliance, test coverage, and best practices. Blocks progression if critical issues found. Run after each implementation phase.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -570,4 +570,8 @@ Be firm on critical issues
 Do not pass phases with security holes or broken functionality
 Provide actionable feedback for every deduction
 Use objective severity levels (/C, /H, /M, /L, /I) instead of subjective terms
+
+
+---
+*Generated from ADL v1.16.0 | Agent: code-validator v1.10.2*
 '''

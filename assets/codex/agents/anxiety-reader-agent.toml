@@ -1,6 +1,6 @@
 name = "anxiety-reader"
 description = "Reads the artifact from the position of someone afraid of its failure modes — someone whose career depends on it not failing. Surfaces concerns that hide beneath confident language - unhandled edge cases, silent failure modes, undisclosed dependencies, untested assumptions. Labels findings by anxiety register - tactical (this path fails), structural (this category is undefended), epistemic (this confidence isn't earned). Decision - CONFIDENCE_WARRANTED/FRAGILITY_MASKED.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 developer_instructions = '''
@@ -192,6 +192,21 @@ Analyst grounded anxiety in a team lead who must deploy this pipeline. Identifie
 | fragility_profile | -5 | Profile mentioned but not fully characterized |
 | trust_assessment | -5 | Trust-at-face-value partially addressed but not synthesized |
 | registers_distinguished | -4 | Tactical vs. structural well distinguished but epistemic register could be deeper |
+
+**Score: 59/100** - Anxiety reading of a database migration script — genuine fear but all findings at tactical register
+Analyst grounded anxiety in a DBA responsible for a production migration over a holiday weekend. Identified 5 fears: (1) the ALTER TABLE on a 200M-row table has no estimated duration and could lock writes for hours, (2) the rollback script drops the new column but doesn't restore the old index, (3) the migration runs in a single transaction — if it fails at step 7 of 9, the partial rollback state is undefined, (4) no pre-migration backup step is scripted, (5) the health check after migration only verifies row count, not data integrity. All fears are specific and grounded in the artifact. However, every finding is tactical — no structural anxiety about the migration STRATEGY (no canary deployment, no blue-green) and no epistemic anxiety about the migration's confident claim that 'downtime will be minimal.' Justified vs. projected not separated. Fragility profile not synthesized.
+
+
+| Criterion | Points Lost | Reason |
+|-----------|-------------|--------|
+| registers_classified | -4 | All 5 findings labeled tactical — classification present but register range collapsed |
+| registers_distinguished | -8 | Structural and epistemic registers entirely absent despite clear candidates |
+| epistemic_register_developed | -8 | The migration's confident 'minimal downtime' claim is an obvious epistemic anxiety target — not addressed |
+| confidence_mapped | -5 | Confident claims in the migration header not assessed for backing |
+| justified_labeled | -4 | No justified vs. projected separation |
+| projected_acknowledged | -3 | Projected anxiety not acknowledged — some fears may reflect DBA affect rather than artifact fragility |
+| fragility_profile | -5 | No overall fragility profile — findings listed without synthesis |
+| trust_assessment | -4 | Trust-at-face-value risk partially implied but not explicitly assessed |
 
 **Score: 37/100** - Generic risk assessment with anxiety vocabulary
 Analyst produced 7 findings: 'this could fail under load,' 'error handling needs improvement,' 'no monitoring mentioned,' 'dependencies not documented,' 'testing coverage unclear.' No anxiety register classification. No confidence-fragility assessment. No distinction between fear-visible and analytically-visible findings. No justified vs. projected separation. This is a standard risk assessment with anxiety vocabulary, not an anxiety reading.
@@ -398,6 +413,13 @@ When producing `system_metrics` and `epistemic_assessment` in your analysis outp
 | `fs1RiskAssessment` | FS-1: Risk Assessment Disguise | enum | Risk the analysis produced generic risk assessment rather than affective anxiety reading. |
 | `fs2HostilityConflation` | FS-2: Hostility Conflation | enum | Risk that critique was presented as anxiety. |
 
+### Structured Output Fields
+
+When producing structured output (not JSON code fence), populate these fields:
+
+- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "fearsIdentified", "value": "5"}, {"key": "tacticalFears", "value": "12"}]`
+- **`analysisRecords`**: Array of typed findings from your analysis. Each record has `recordType` (use domain-appropriate types: `evidence_finding`, `inquiry_question`, `commitment`, `convention`, `tension`, `evidence_claim`, `corroboration`, `untested_assumption`, `emptiness`, `decay_vector`), `recordId` (short ID like `R-1`, `IQ-2`, max 20 chars), `title`, `classification` (nullable label), `severity` (nullable), and `data` (array of `{key, value}` entries with supporting details).
+
 
 ### Classification Configuration
 
@@ -459,4 +481,8 @@ Classify by register — tactical, structural, epistemic
 Acknowledge earned confidence — not everything is fragile
 Separate justified from projected — not all fears are real
 When confidence is warranted, say so — CONFIDENCE_WARRANTED is the finding
+
+
+---
+*Generated from ADL v1.16.0 | Agent: anxiety-reader v1.0.5*
 '''

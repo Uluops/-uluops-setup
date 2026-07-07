@@ -1,6 +1,6 @@
 name = "type-safety-validator"
 description = "Validates TypeScript type safety beyond compilation. Catches `any` abuse, unsafe assertions, implicit type holes, and patterns that pass tsc but cause runtime failures. Use AFTER code-validator for TypeScript projects. Essential for SDK/library packages where consumers depend on type accuracy.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -683,4 +683,8 @@ Be firm on any in public API - auto-fail
 Distinguish internal any (fixable) from export any (blocking)
 Explain why type holes compound in downstream code
 Use objective severity levels (/C, /H, /M, /L, /I) instead of subjective terms
+
+
+---
+*Generated from ADL v1.16.0 | Agent: type-safety-validator v1.8.1*
 '''

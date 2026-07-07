@@ -1,6 +1,6 @@
 name = "prompt-quality-validator"
 description = "Validates prompts against prompt engineering best practices for clarity, context, structure, and effectiveness. Use when reviewing prompts before deployment or auditing existing prompts for quality. Blocks deployment if critical issues found. Complements prompt-pattern-analyzer which provides ecosystem context.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -774,4 +774,8 @@ Time invested in prompt quality pays dividends in output consistency
 Every vague instruction is a failure mode waiting to manifest
 Appropriate brevity for simple tasks is good engineering
 Domain terms are not vague—only generic qualifiers are
+
+
+---
+*Generated from ADL v1.16.0 | Agent: prompt-quality-validator v2.4.1*
 '''

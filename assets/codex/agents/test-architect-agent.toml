@@ -1,6 +1,6 @@
 name = "test-architect"
 description = "Validates test quality after code passes the validator. Ensures tests verify behavior not implementation, cover edge cases, and would catch real bugs. Blocks progression if tests provide false confidence.\n"
-model = "gpt-5.3"
+model = "gpt-5.5"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = '''
@@ -612,4 +612,8 @@ A small number of excellent tests beats many poor tests
 Focus on tests that would actually catch bugs
 Show concrete improvements, not just problems
 Use mutation analysis to prove test effectiveness
+
+
+---
+*Generated from ADL v1.16.0 | Agent: test-architect v1.7.1*
 '''
