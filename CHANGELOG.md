@@ -2,6 +2,24 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [0.11.0] - 2026-07-18
+
+### Changed
+
+- **Bumped the pinned MCP server versions to the current release contract:**
+  `@uluops/ops-mcp` 0.9.1 → 0.11.0, `@uluops/registry-mcp` 0.2.18 → 0.3.5.
+  These are the specs stamped into every harness config (`npx -y <spec>`), so a
+  fresh setup install now resolves the current MCP servers — including the
+  registry MCP's list-grain risk scalars + `analyzerStale` verdict-currency
+  passthrough (registry-sdk 0.45.0) and the mcp-secure-server
+  0.0.19-security hardening — instead of a six-week-old pin. Single source of
+  truth: `src/lib/mcp-packages.ts`.
+- **Bumped `@uluops/agent-metrics` 0.4.0 → 0.8.0** (exact pin): the installed
+  metrics hook now carries run-scoped token attribution (`[run:]` tag →
+  `run_id` on buffer entries → `--run` queries), symlink/TOCTOU hardening, and
+  the CODEX guards. The hook a fresh install wires is the one current
+  pipelines (pdl-executor Phase 4b `--run` collection) are written against.
+
 ## [0.10.0] - 2026-07-06
 
 ### Changed
