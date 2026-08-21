@@ -55,8 +55,33 @@ All notable changes to `@uluops/setup` will be documented in this file.
   build stamps the executable bit on `dist/cli.js` directly (`postbuild
   chmod +x`) instead of relying on npm's bin-link chmod at install time.
 
+### Known gap (deferred)
+
+- **`process.exit` immediately after console output can truncate piped
+  stdout** (`npx @uluops/setup | tee` may lose the tail of the summary).
+  Converting the exit paths to `process.exitCode` requires an open-handle
+  audit first — a lingering inquirer/stdin handle would turn a truncated
+  log into a hung process, which is the worse failure. Tracked for its own
+  pass; uninstall's filter-error path already rides `process.exitCode`
+  (safe there: no prompt has run).
+
 ### Fixed
 
+- **The install manifest can no longer be silently replaced or misread as
+  absent.** `readManifestFile` collapsed every read error AND malformed
+  JSON into "no manifest" — after which a save would overwrite the file it
+  couldn't read, orphaning every recorded agent/command/hook, and uninstall
+  would report "nothing to uninstall". Unreadable-but-present now refuses
+  loudly; malformed JSON refuses with the recovery path named. (Behavior
+  change: malformed manifests previously read as absent.)
+- **`writeCredentialsFile` honors its preserve promise.** The merge only
+  starts fresh on genuine absence now — an unreadable or unparseable
+  credentials file (which may hold other profiles shared with @uluops/cli)
+  refuses instead of being overwritten. (Behavior change: unparseable files
+  previously read as absent.)
+- **`--uninstall` with an invalid harness filter exits 1 again** — the
+  previous fix's in-try `return` made the trailing exit unreachable, so the
+  fatal error exited 0; the path now rides `process.exitCode`.
 - **An unreadable-but-present config can no longer be silently replaced.**
   Every read-then-overwrite path (Claude config, harness settings, Codex
   TOML, OpenCode JSONC, shell profile) treated ANY read error as "file

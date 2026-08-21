@@ -281,17 +281,22 @@ describe("writeCredentialsFile", () => {
     });
   });
 
-  it("starts fresh when the existing file is unparseable", async () => {
+  it("REFUSES to overwrite an unparseable existing file (may hold other profiles)", async () => {
+    // Behavior change (code-auditor finding, 2026-08-21): the old
+    // start-fresh-on-unparseable path destroyed non-default profiles a
+    // corrupt-but-recoverable file might hold. The preserve promise means
+    // fresh writes are only allowed over genuine absence.
     const credsDir = join(tmpDir, ".uluops");
     await mkdir(credsDir, { recursive: true });
     await writeFile(join(credsDir, "credentials.json"), "{not json");
 
     mockHomeDir = tmpDir;
-    await writeCredentialsFile("ulr_recover");
-
+    await expect(writeCredentialsFile("ulr_recover")).rejects.toThrow(
+      /will not be overwritten/,
+    );
+    // The corrupt file's bytes survive for hand-recovery.
     const raw = await readFile(join(credsDir, "credentials.json"), "utf-8");
-    const creds = JSON.parse(raw);
-    expect(creds.default.apiKey).toBe("ulr_recover");
+    expect(raw).toBe("{not json");
   });
 
   it("skips writing entirely on dryRun", async () => {

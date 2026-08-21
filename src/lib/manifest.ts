@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { getManifestPath, getLegacyManifestPath, getUluopsDir } from "./paths.js";
 import { fileHash } from "./hash.js";
 import { atomicWrite } from "./atomic-write.js";
+import { isEnoent } from "./file-ops.js";
 
 /**
  * Identifier for a single harness installation in the manifest.
@@ -250,8 +251,17 @@ export async function validateManifest(
     try {
       raw = await readFile(candidate, "utf-8");
       break;
-    } catch {
-      // Try next candidate
+    } catch (err) {
+      if (!isEnoent(err)) {
+        // Warning-only path (hash tamper check) — an unreadable candidate
+        // must not masquerade as "no manifest on disk"; name it and skip
+        // the hash check rather than silently treating it as absent.
+        warnings.push(
+          `Cannot read manifest at ${candidate} to verify content hash (${err instanceof Error ? err.message : String(err)})`,
+        );
+        break;
+      }
+      // Absent — try next candidate.
     }
   }
   if (raw !== null) {
@@ -309,11 +319,27 @@ async function findMissingFiles(
 }
 
 async function readManifestFile(path: string): Promise<unknown | null> {
+  let raw: string;
   try {
-    const raw = await readFile(path, "utf-8");
+    raw = await readFile(path, "utf-8");
+  } catch (err) {
+    if (isEnoent(err)) return null; // genuinely absent
+    // Unreadable-but-PRESENT must never read as "no manifest": loadManifest's
+    // null flows into saveManifest overwriting the file we couldn't read,
+    // orphaning every recorded agent/command/hook — and into uninstall's
+    // "nothing to uninstall". Same class, same rule as the config readers.
+    throw new Error(
+      `Could not read the install manifest at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite the record of what is installed. Nothing was modified.`,
+    );
+  }
+  try {
     return JSON.parse(raw);
   } catch {
-    return null;
+    // Malformed is not absent either: proceeding would rewrite the file and
+    // orphan everything it recorded. Name the path and the way out.
+    throw new Error(
+      `The install manifest at ${path} contains invalid JSON — fix or remove it and re-run. (Detected before any UluOps change; nothing was modified. Removing it makes setup treat this as a fresh install; previously installed files will not be tracked for uninstall.)`,
+    );
   }
 }
 

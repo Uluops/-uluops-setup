@@ -64,7 +64,6 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
   // Same lock as runSetup — concurrent setup+uninstall would race the same
   // shared state. Skipped on dry-run (read-only).
   let lock: LockHandle | null = null;
-  let exitCode = 0;
   if (!opts.dryRun) {
     lock = await acquireInstallLock();
   }
@@ -106,9 +105,10 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
         fail(err.message);
         console.log();
         // Same rule as runSetup: never process.exit inside the lock-guarded
-        // try — the finally that releases the lock would be skipped. Record
-        // the code and exit after cleanup, outside the try.
-        exitCode = 1;
+        // try. A plain `return` here makes any statement after the finally
+        // unreachable, so the code must ride process.exitCode — safe at this
+        // point because no prompt has run (no lingering stdin handle).
+        process.exitCode = 1;
         return;
       }
       throw err;
@@ -285,8 +285,5 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
     console.log();
   } finally {
     if (lock) await lock.release();
-  }
-  if (exitCode !== 0) {
-    process.exit(exitCode);
   }
 }

@@ -139,3 +139,15 @@ describe("removeShellExport", () => {
     expect(content).not.toContain("UluOps");
   });
 });
+
+describe("writeShellExport unreadable-but-present discrimination", () => {
+  it("throws (refusing) when the profile path exists but is not readable as a file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-shell-dir-"));
+    // A directory gives a deterministic non-ENOENT read error on every OS —
+    // this pins that an EACCES-class error can never fall through to the
+    // fresh-file write that would replace the user's rc.
+    await expect(writeShellExport(dir, "ulr_key", false)).rejects.toThrow(
+      /refusing to write/,
+    );
+  });
+});

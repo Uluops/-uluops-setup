@@ -101,10 +101,11 @@ describe("loadManifest", () => {
     );
   });
 
-  it("returns null on malformed JSON", async () => {
+  it("throws loudly on malformed JSON instead of reading as absent", async () => {
+    // The old behavior (null) let saveManifest overwrite a manifest it
+    // couldn't parse, orphaning every recorded agent/command/hook.
     await writeFile(manifestPath, "{ invalid json }");
-    const result = await loadManifest();
-    expect(result).toBeNull();
+    await expect(loadManifest()).rejects.toThrow(/invalid JSON/);
   });
 });
 

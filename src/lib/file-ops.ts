@@ -32,8 +32,10 @@ export async function copyIfChanged(
     if (srcHash === fileHash(destContent)) {
       return "skipped";
     }
-  } catch {
-    // File doesn't exist yet
+  } catch (err) {
+    // Only genuine absence means "copy fresh" — an unreadable-but-present
+    // destination should surface, not be silently overwritten (isEnoent doc).
+    if (!isEnoent(err)) throw err;
   }
 
   if (!dryRun) {
@@ -61,8 +63,8 @@ export async function writeIfChanged(
     if (newHash === fileHash(existing)) {
       return "skipped";
     }
-  } catch {
-    // File doesn't exist yet
+  } catch (err) {
+    if (!isEnoent(err)) throw err; // see copyIfChanged
   }
 
   if (!dryRun) {

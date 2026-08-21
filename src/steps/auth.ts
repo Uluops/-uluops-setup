@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { extractEmail } from "../lib/json-guards.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { isEnoent } from "../lib/file-ops.js";
 
 export interface AuthResult {
   apiKey: string;
@@ -59,16 +60,34 @@ export async function writeCredentialsFile(
   const credsPath = credentialsPath();
   await mkdir(dirname(credsPath), { recursive: true, mode: 0o700 });
 
-  // Merge: preserve any non-default profiles already on disk.
+  // Merge: preserve any non-default profiles already on disk. The preserve
+  // promise means we may only start fresh when the file is genuinely ABSENT
+  // — an unreadable or unparseable file may hold profiles (e.g. @uluops/cli's
+  // `work` profile) that a fresh write would destroy.
   let existing: Record<string, unknown> = {};
+  let raw: string | null = null;
   try {
-    const raw = await readFile(credsPath, "utf-8");
-    const parsed: unknown = JSON.parse(raw);
+    raw = await readFile(credsPath, "utf-8");
+  } catch (err) {
+    if (!isEnoent(err)) {
+      throw new Error(
+        `Could not read ${credsPath} (${err instanceof Error ? err.message : String(err)}) — refusing to write credentials over a file that exists but could not be read. Nothing was modified.`,
+      );
+    }
+    // Absent — fresh file.
+  }
+  if (raw !== null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `Existing credentials file at ${credsPath} contains invalid JSON — it may hold other profiles, so it will not be overwritten. Fix or remove it and re-run. Nothing was modified.`,
+      );
+    }
     if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       existing = parsed as Record<string, unknown>;
     }
-  } catch {
-    // No existing file, or unparseable — start fresh.
   }
 
   const merged = {
