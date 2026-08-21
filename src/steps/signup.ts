@@ -132,7 +132,9 @@ async function callApi<T extends object>(
       signal: AbortSignal.timeout(15000),
     });
   } catch (err) {
-    if (err instanceof TypeError) {
+    // TypeError = network failure; TimeoutError = AbortSignal.timeout — both
+    // deserve the friendly message, not a raw DOMException.
+    if (err instanceof TypeError || (err as Error)?.name === "TimeoutError") {
       throw new Error(
         "Can't reach api.uluops.ai — check your connection.",
       );
@@ -141,7 +143,18 @@ async function callApi<T extends object>(
   }
 
   if (res.ok) {
-    const body: unknown = await res.json();
+    // A 200 with a non-JSON body (proxy, captive portal) must not surface as
+    // a raw SyntaxError — mirror auth.ts's guarded decode. Worst case here is
+    // register: the account may exist server-side while the user sees a
+    // parse error, so the message must say what to do next.
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error(
+        "API returned a non-JSON response. If this was a signup, the account may already exist — re-run and choose 'existing API key', or check app.uluops.ai.",
+      );
+    }
     if (typeof body !== "object" || body === null) {
       throw new Error("Unexpected API response shape");
     }

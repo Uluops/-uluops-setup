@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { isEnoent } from "../lib/file-ops.js";
 
 const FENCE_START = "# --- UluOps (managed by @uluops/setup) ---";
 const FENCE_END = "# --- /UluOps ---";
@@ -24,7 +25,14 @@ export async function writeShellExport(
   let content: string;
   try {
     content = await readFile(profilePath, "utf-8");
-  } catch {
+  } catch (err) {
+    if (!isEnoent(err)) {
+      // An unreadable-but-present shell profile must never be treated as
+      // absent — the fresh-file write below would replace the user's rc.
+      throw new Error(
+        `Could not read ${profilePath} (${err instanceof Error ? err.message : String(err)}) — refusing to write the API-key export over a file that exists but could not be read. Nothing was modified.`,
+      );
+    }
     if (!dryRun) {
       await atomicWrite(profilePath, block + "\n", { mode: 0o600 });
     }

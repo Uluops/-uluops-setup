@@ -103,3 +103,17 @@ describe("readConfig shape gate", () => {
     expect((config as Record<string, unknown>)["keep"]).toBe(true);
   });
 });
+
+describe("readConfig unreadable-but-present discrimination", () => {
+  // The clobber class: EACCES/EISDIR must throw, never read as fresh-{} —
+  // {} would be merged and renamed over the file we could not read.
+  // A directory gives a deterministic non-ENOENT read error on every OS.
+  it("throws (refusing to continue) when the path exists but is not readable as a file", async () => {
+    await expect(readConfig(tmpDir)).rejects.toThrow(/refusing to continue/);
+  });
+
+  it("still returns {} for a genuinely missing file", async () => {
+    const result = await readConfig(join(tmpDir, "definitely-missing.json"));
+    expect(result).toEqual({});
+  });
+});

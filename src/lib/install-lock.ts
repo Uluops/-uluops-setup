@@ -232,7 +232,6 @@ function registerHandle(lockDir: string): LockHandle {
     async release(): Promise<void> {
       if (released) return;
       released = true;
-      heldLockDirs.delete(lockDir);
       try {
         await unlink(join(lockDir, META_FILENAME));
       } catch {
@@ -243,6 +242,10 @@ function registerHandle(lockDir: string): LockHandle {
       } catch {
         // Best-effort; do not throw from release().
       }
+      // Deregister only AFTER the dir is actually gone: a signal landing
+      // mid-release must still find the dir in the set so the sync handler
+      // can clean it (deleting first opened a leak window).
+      heldLockDirs.delete(lockDir);
     },
   };
 }

@@ -16,6 +16,7 @@ import {
   type McpConfigStrategy,
 } from "./types.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { isEnoent } from "../lib/file-ops.js";
 import { OPS_MCP_SPEC, REGISTRY_MCP_SPEC } from "../lib/mcp-packages.js";
 
 const RAW_TOML = "__rawToml";
@@ -170,9 +171,15 @@ function removeServerConfigBlocks(raw: string, name: string): string {
   let skipping = false;
 
   for (const line of lines) {
-    const table = line.trim().match(/^\[([^\]]+)\]$/)?.[1];
+    const trimmed = line.trim();
+    const table = trimmed.match(/^\[([^\]]+)\]$/)?.[1];
     if (table) {
       skipping = isServerTableFor(name, table) || isServerEnvTableFor(name, table);
+    } else if (trimmed.startsWith("[")) {
+      // Any header the regex can't parse (array-of-tables [[x]], quoted ']')
+      // still STARTS a new table — the skip must end, or the user's next
+      // block is dropped along with ours.
+      skipping = false;
     }
     if (!skipping) kept.push(line);
   }
@@ -186,9 +193,13 @@ function removeServerSubtree(raw: string, name: string): string {
   let skipping = false;
 
   for (const line of lines) {
-    const table = line.trim().match(/^\[([^\]]+)\]$/)?.[1];
+    const trimmed = line.trim();
+    const table = trimmed.match(/^\[([^\]]+)\]$/)?.[1];
     if (table) {
       skipping = isServerTableFor(name, table) || isServerSubtableFor(name, table);
+    } else if (trimmed.startsWith("[")) {
+      // See removeServerConfigBlocks: an unparseable header still ends the skip.
+      skipping = false;
     }
     if (!skipping) kept.push(line);
   }
@@ -208,8 +219,13 @@ class CodexMcpConfig implements McpConfigStrategy {
   async read(path: string): Promise<Record<string, unknown>> {
     try {
       return { [RAW_TOML]: await readFile(path, "utf-8") };
-    } catch {
-      return { [RAW_TOML]: "" };
+    } catch (err) {
+      if (isEnoent(err)) return { [RAW_TOML]: "" };
+      // Unreadable-but-PRESENT must never read as fresh: write() replaces
+      // the whole file, so an EACCES here would erase the user's config.
+      throw new Error(
+        `Could not read Codex config at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite a file that exists but could not be read. Nothing was modified.`,
+      );
     }
   }
 

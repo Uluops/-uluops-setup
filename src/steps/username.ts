@@ -56,14 +56,21 @@ export async function setUsername(apiKey: string, username: string): Promise<str
       signal: AbortSignal.timeout(15000),
     });
   } catch (err) {
-    if (err instanceof TypeError) {
+    if (err instanceof TypeError || (err as Error)?.name === "TimeoutError") {
       throw new Error("Can't reach api.uluops.ai — check your connection.");
     }
     throw err;
   }
 
   if (res.ok) {
-    const body: unknown = await res.json();
+    // Guarded decode — a 200 with a non-JSON body must not throw a raw
+    // SyntaxError (mirrors auth.ts / signup.ts).
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error("API returned a non-JSON response — try again, or set the username later at app.uluops.ai.");
+    }
     if (typeof body !== "object" || body === null) {
       throw new Error("Unexpected API response shape");
     }

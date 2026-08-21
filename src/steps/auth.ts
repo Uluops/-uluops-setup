@@ -217,9 +217,11 @@ async function validateKey(
     }
     return { email: extractEmail(body) };
   } catch (err) {
-    // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED).
+    // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED);
+    // AbortSignal.timeout rejects with a DOMException named "TimeoutError" —
+    // the slow-network case this friendly message was written for.
     // Re-thrown errors from the res.status checks above are plain Error instances.
-    if (err instanceof TypeError) {
+    if (err instanceof TypeError || (err as Error)?.name === "TimeoutError") {
       throw new Error(
         "Can't reach api.uluops.ai — check your connection. Use --skip-validation to continue offline.",
       );

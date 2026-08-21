@@ -428,3 +428,14 @@ describe("ownership predicate consistency on malformed matcher shapes", () => {
     expect(hasUluopsHook(bad)).toBe(false);
   });
 });
+
+describe("readSettings unreadable-but-present discrimination", () => {
+  it("throws (refusing to continue) when the path exists but is not readable as a file", async () => {
+    const d = await mkdtemp(join(tmpdir(), "uluops-settings-dir-"));
+    try {
+      await expect(readSettings(d)).rejects.toThrow(/refusing to continue/);
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  });
+});

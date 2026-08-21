@@ -61,16 +61,19 @@ describe("extractEmail", () => {
 });
 
 describe("stripDangerousKeys", () => {
-  it("removes __proto__/constructor/prototype own keys at every depth", () => {
+  it("removes __proto__ own keys at every depth, PRESERVES constructor/prototype user keys", () => {
     const parsed = JSON.parse(
-      '{"__proto__":{"polluted":1},"a":{"constructor":{"x":1},"list":[{"prototype":2,"keep":3}]},"keep":true}',
+      '{"__proto__":{"polluted":1},"a":{"constructor":{"x":1},"list":[{"prototype":2,"keep":3,"__proto__":{"p":1}}]},"keep":true}',
     ) as Record<string, unknown>;
     stripDangerousKeys(parsed);
     expect(Object.prototype.hasOwnProperty.call(parsed, "__proto__")).toBe(false);
     const a = parsed["a"] as Record<string, unknown>;
-    expect(Object.prototype.hasOwnProperty.call(a, "constructor")).toBe(false);
+    // Legit user keys named constructor/prototype must survive the
+    // round-trip: assign-semantics pollution only runs through __proto__.
+    expect(Object.prototype.hasOwnProperty.call(a, "constructor")).toBe(true);
     const item = (a["list"] as Record<string, unknown>[])[0]!;
-    expect(Object.prototype.hasOwnProperty.call(item, "prototype")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(item, "prototype")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(item, "__proto__")).toBe(false);
     expect(item["keep"]).toBe(3);
     expect(parsed["keep"]).toBe(true);
   });

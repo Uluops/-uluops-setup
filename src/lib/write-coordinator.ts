@@ -13,10 +13,14 @@
  *
  * 2. **Write attestation** — `recordWrite` keeps a sha-256 of the last bytes
  *    this process wrote to each path (called from `atomicWrite`, so every
- *    config write is attested with no call-site churn). `fileMatchesLastWrite`
- *    is the restore guard: on failure-rollback, a backup is restored ONLY
- *    over content we ourselves wrote — a file the user or another tool
- *    touched since is left alone and reported, never clobbered.
+ *    config write is attested with no call-site churn). NOTE:
+ *    `fileMatchesLastWrite`/`hasRecordedWrite` have NO production consumer
+ *    today — the package deliberately has no backup/rollback mechanism
+ *    (see CHANGELOG: backups were removed as never-read). They exist as the
+ *    guard any future rollback MUST use before writing over a file: only
+ *    content this process provably wrote may be replaced. Until such a
+ *    caller exists, attestation is bookkeeping, not an active safety
+ *    property.
  *
  * Why not coalesce to one physical write per file per run: the hook entry
  * can only be written after the metrics tool files land on disk (a hook
@@ -78,8 +82,12 @@ export async function fileMatchesLastWrite(path: string): Promise<boolean> {
   let current: string;
   try {
     current = await readFile(key, "utf-8");
-  } catch {
-    return true; // missing file: nothing of anyone else's to clobber
+  } catch (err) {
+    // ONLY a missing file means "nothing of anyone else's to clobber". An
+    // unreadable-but-present file (EACCES/EIO) is unverifiable — a guard
+    // that answers true on an error it never inspected authorizes exactly
+    // the clobber it exists to prevent.
+    return (err as NodeJS.ErrnoException)?.code === "ENOENT";
   }
   return sha256(current) === expected;
 }

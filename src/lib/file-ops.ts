@@ -4,6 +4,19 @@ import { fileHash } from "./hash.js";
 import { atomicWrite } from "./atomic-write.js";
 
 /**
+ * True when `err` is fs ENOENT — the ONLY read error that means "absent".
+ * Every read-then-overwrite path must use this before treating a file as
+ * fresh: EACCES/EISDIR/EIO also land in a catch, and inferring "absent" from
+ * them turns an unreadable-but-present config into a fresh-file overwrite
+ * that destroys the user's content. (This class was fixed once at
+ * steps/mcp.ts's gitignore path and recurred at five other sites — hence a
+ * shared predicate rather than five inline checks.)
+ */
+export function isEnoent(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException)?.code === "ENOENT";
+}
+
+/**
  * Copy a file if its content has changed (hash comparison). Returns "copied" or "skipped".
  */
 export async function copyIfChanged(

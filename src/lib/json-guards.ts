@@ -21,12 +21,18 @@
  * papered over as "logged in with no email."
  */
 /**
- * Recursively delete `__proto__` / `constructor` / `prototype` OWN keys from
- * parsed-JSON data. Our own merges are spread-based (CreateDataProperty
- * semantics — they cannot be polluted), but a config we read and write BACK
- * would hand a `__proto__` own-key to every other consumer of the file, some
- * of which merge with assign semantics. Strip at the read boundary so the
- * hazard never round-trips. Mutates in place and returns the input.
+ * Recursively delete `__proto__` OWN keys from parsed-JSON data. Our own
+ * merges are spread-based (CreateDataProperty semantics — they cannot be
+ * polluted), but a config we read and write BACK would hand a `__proto__`
+ * own-key to every other consumer of the file, some of which merge with
+ * assign semantics. Strip at the read boundary so the hazard never
+ * round-trips. Mutates in place and returns the input.
+ *
+ * Deliberately __proto__ ONLY: assign-semantics pollution runs through the
+ * `__proto__` setter; own-property `constructor`/`prototype` keys assigned
+ * by Object.assign land as plain data properties and pollute nothing —
+ * while stripping them would silently eat legitimate keys from user configs
+ * (JSON-schema fragments, template maps) on the round-trip.
  */
 export function stripDangerousKeys<T>(value: T): T {
   if (typeof value !== "object" || value === null) return value;
@@ -35,10 +41,8 @@ export function stripDangerousKeys<T>(value: T): T {
     return value;
   }
   const record = value as Record<string, unknown>;
-  for (const key of ["__proto__", "constructor", "prototype"]) {
-    if (Object.prototype.hasOwnProperty.call(record, key)) {
-      delete record[key];
-    }
+  if (Object.prototype.hasOwnProperty.call(record, "__proto__")) {
+    delete record["__proto__"];
   }
   for (const v of Object.values(record)) stripDangerousKeys(v);
   return value;

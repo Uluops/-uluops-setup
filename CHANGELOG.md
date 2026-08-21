@@ -57,6 +57,49 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **An unreadable-but-present config can no longer be silently replaced.**
+  Every read-then-overwrite path (Claude config, harness settings, Codex
+  TOML, OpenCode JSONC, shell profile) treated ANY read error as "file
+  absent" and proceeded to write a fresh file over it — an EACCES on a
+  root-owned `~/.claude.json` or `~/.zshrc` would have destroyed the user's
+  content with a green checkmark. All five sites now discriminate via a
+  shared `isEnoent` predicate: only a genuinely missing file reads as
+  fresh; anything else refuses loudly with nothing modified. (This class
+  was fixed once before at the gitignore path — the predicate exists so it
+  cannot recur site-by-site.)
+- **Malformed OpenCode JSONC is refused instead of silently truncated.**
+  `jsonc-parser`'s `parse()` is error-recovering and never throws, so the
+  previous guard was unreachable: everything after a syntax error was
+  dropped, merged, and written back. Parse errors are now collected via
+  the errors out-param and refuse the file by name.
+- **`--uninstall` no longer leaks the install lock on an invalid harness
+  filter** — same exit-inside-try defect fixed for `runSetup` earlier,
+  now fixed as the class: the exit is recorded and fired after the
+  `finally` releases the lock.
+- **npm failures diagnose themselves**: a spawn failure (npm not on PATH)
+  now reports the real cause instead of `exit null`, with the timeout
+  diagnosis taking precedence when both signals are present.
+- **Slow-network timeouts get the friendly message**: `AbortSignal.timeout`
+  rejections (DOMException `TimeoutError`) are now classified alongside
+  network `TypeError`s in auth, signup, and username flows — previously the
+  exact case the "check your connection / --skip-validation" messages were
+  written for never triggered them. A 200 with a non-JSON body (captive
+  portal) is also handled in signup/username, matching auth.
+- **Codex TOML removal no longer drops a user's block after an unparseable
+  header** — array-of-tables (`[[x]]`) and quoted-`]` headers now end the
+  skip region instead of leaving it sticky.
+- **`stripDangerousKeys` strips `__proto__` only** — own-property
+  `constructor`/`prototype` keys assigned by `Object.assign` are inert data
+  properties, and stripping them silently ate legitimate user keys
+  (JSON-schema fragments) on the round-trip.
+- **Install-lock release deregisters the dir only after removal completes**,
+  closing a signal-window leak; the coordinator's `fileMatchesLastWrite`
+  now answers true only on ENOENT (an unverifiable read must never
+  authorize a write), and its docblock states plainly that attestation has
+  no production consumer until a rollback mechanism exists.
+- **A verify API-key decode failure no longer suppresses the npm
+  resolvability check**, and `getVersion` wraps its own JSON parse in the
+  deliberate broken-publish error.
 - **Hook ownership is now decided by one predicate across merge/remove/has.**
   The merge tolerated malformed matcher entries while `removeUluopsHook` and
   `hasUluopsHook` dereferenced them unguarded — the same hand-edited

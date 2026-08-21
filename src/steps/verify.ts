@@ -315,6 +315,9 @@ export async function verify(): Promise<VerifyResult> {
         // object at all (surfaced below as a check failure) and returns null
         // when data/email are absent or wrong-typed.
         let email: string | null;
+        // No early return on a bad body: failing this check must not
+        // suppress the unrelated npm-resolvability check below.
+        let emailDecodeFailed = false;
         try {
           email = extractEmail(await res.json());
         } catch (err) {
@@ -325,12 +328,15 @@ export async function verify(): Promise<VerifyResult> {
               err instanceof Error ? err.message : "Unexpected response shape",
           });
           allOk = false;
-          return { ok: allOk, checks };
+          emailDecodeFailed = true;
+          email = null;
         }
-        checks.push({
-          label: `API key valid${email ? ` (user: ${email})` : ""}`,
-          passed: true,
-        });
+        if (!emailDecodeFailed) {
+          checks.push({
+            label: `API key valid${email ? ` (user: ${email})` : ""}`,
+            passed: true,
+          });
+        }
       } else {
         checks.push({
           label: "API key valid",

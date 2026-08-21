@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
 import { stripDangerousKeys } from "./json-guards.js";
+import { isEnoent } from "./file-ops.js";
 import {
   MCP_PACKAGES,
   OPS_MCP_SPEC,
@@ -107,8 +108,13 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
-  } catch {
-    return {}; // File doesn't exist — fresh config
+  } catch (err) {
+    if (isEnoent(err)) return {}; // File doesn't exist — fresh config
+    // Unreadable-but-PRESENT (EACCES/EISDIR/EIO) must never read as fresh:
+    // the {} would be merged and renamed over the file we couldn't read.
+    throw new Error(
+      `Could not read config at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite a file that exists but could not be read. Nothing was modified.`,
+    );
   }
   let parsed: unknown;
   try {
