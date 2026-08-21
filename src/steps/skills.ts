@@ -132,6 +132,7 @@ export async function uninstallSkills(
   const removed = await unlinkFiles(skillsDir, files);
   const skillDirs = new Set(
     files
+      .filter((file) => file.includes("/")) // top-level assets have no dir to prune
       .map((file) => file.split("/")[0])
       .filter((dir): dir is string => typeof dir === "string" && dir.length > 0),
   );

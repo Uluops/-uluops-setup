@@ -427,10 +427,19 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     // per-harness status icons, partial markers, re-run hints, and the
     // aggregate counts in the header. Single-harness path preserves
     // today's Setup-complete banner format inside the same function.
-    await printSetupSummary({
-      results: perHarnessResults,
-      apiKey,
-    });
+    try {
+      await printSetupSummary({
+        results: perHarnessResults,
+        apiKey,
+      });
+    } catch (err) {
+      // A render failure must not invert the run outcome: the install and
+      // manifest write already happened — classifyExit below is the
+      // authority, not the pretty-printer.
+      warn(
+        `Could not render the setup summary: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     // Exit-code classifier (spec §7.5 4-tier table). One call, one place.
     // Empty perHarnessResults already short-circuited above with the

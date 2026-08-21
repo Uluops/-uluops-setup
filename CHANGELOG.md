@@ -67,6 +67,17 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **Round-7: unknown is never observed.** When `hook.js` is absent and the
+  settings file cannot be read, the metrics step now returns
+  `skippedReason: "hook-state-unknown"` (with a named warning) instead of an
+  observed `false` — the manifest keeps its prior hook record and uninstall
+  keeps removing the hook. The hookless short-circuit gained the same
+  `skippedReason` for shape parity; `defsScope` is validated at manifest
+  load (the inheritance gate branches on it); a summary-render failure can
+  no longer report a completed install as exit-1 (render is advisory,
+  `classifyExit` is the authority) and the catalog's per-file read names
+  unreadable bundled files instead of throwing; the skill-dir prune skips
+  top-level assets.
 - **Round-6 gate corrections (the falsified-state class, final ring).**
   The defs-scope inheritance gate no longer covers the scope-INDEPENDENT
   hook fields — a `--local-defs` re-run of a global install can no longer

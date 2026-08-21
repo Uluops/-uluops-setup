@@ -285,7 +285,14 @@ export async function configureMetricsStep(
         `Metrics hooks not supported for ${profile.displayName}`,
       ),
     );
-    return { toolFilesCopied: 0, hookConfigured: false, hooksInstalledVersion: null };
+    // skippedReason for shape parity with installMetrics' own hookless
+    // branch — metricsObserved must read this run as non-observing.
+    return {
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-hook-support",
+    };
   }
 
   const probe = probeHookSupport();

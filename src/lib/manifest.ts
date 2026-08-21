@@ -124,6 +124,10 @@ function isNewManifest(obj: unknown): obj is Manifest {
     if (typeof h !== "object" || h === null) return false;
     const hm = h as Record<string, unknown>;
     if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
+    // defsScope is load-bearing (the prev-list inheritance gate branches on
+    // it) — an absent/invalid value reads as a permanent scope flip that
+    // orphans every recorded file. Refuse-by-name like every other shape.
+    if (hm["defsScope"] !== "global" && hm["defsScope"] !== "local") return false;
     if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
     // Element typing: a hand-edited agents: [1,2] otherwise reaches
     // join(dir, file) in uninstall and TypeErrors mid-removal.

@@ -241,9 +241,22 @@ export async function installMetrics(
     // verify already consults.
     try {
       hookConfigured = await profile.hooks.check(settingsPath);
-    } catch {
-      // Unreadable settings: leave false — installMetrics cannot improve
-      // on it, and readSettings' loud path already covers the write side.
+    } catch (err) {
+      // Unreadable settings = hook state UNKNOWN, not false. Recording an
+      // observed false here would make uninstall skip hook removal over a
+      // possibly-live hook — return unobserved so the manifest keeps its
+      // prior record (the metricsObserved gate exists for exactly this).
+      warn(
+        `Could not read ${settingsPath} (${err instanceof Error ? err.message : String(err)}) — hook state unknown; keeping the previously recorded value`,
+      );
+      const hooksInstalledVersionUnknown =
+        source?.version ?? (await readInstalledMetricsVersion(toolDir));
+      return {
+        toolFilesCopied,
+        hookConfigured: false,
+        hooksInstalledVersion: hooksInstalledVersionUnknown,
+        skippedReason: "hook-state-unknown",
+      };
     }
   }
 

@@ -50,7 +50,17 @@ async function scanCommandDir(dir: string): Promise<CommandEntry[]> {
 
   const entries: CommandEntry[] = [];
   for (const file of files.filter((f) => f.endsWith(".md"))) {
-    const content = await readFile(join(dir, file), "utf-8");
+    let content: string;
+    try {
+      content = await readFile(join(dir, file), "utf-8");
+    } catch (err) {
+      // Display/catalog path: an unreadable bundled file (truncated npx
+      // cache) must not throw out of the summary — name it and move on.
+      console.warn(
+        `  ⚠ Could not read bundled ${file}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      continue;
+    }
     const fm = parseFrontmatter(content);
     if (fm["name"]) {
       entries.push({
