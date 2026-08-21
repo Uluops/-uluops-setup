@@ -172,8 +172,13 @@ async function copyToolFiles(
       await copyFile(join(srcRoot, "package.json"), join(destRoot, "package.json"));
     }
     filesCopied++;
-  } catch {
-    // Not critical
+  } catch (err) {
+    // Non-fatal, but not silent: this file is what
+    // readInstalledMetricsVersion reads — a silent miss surfaces later as
+    // "version unknown" / spurious drift in verify.
+    warn(
+      `Could not copy agent-metrics package.json: ${err instanceof Error ? err.message : String(err)} — installed-version detection will be degraded`,
+    );
   }
 
   return filesCopied;
@@ -229,6 +234,17 @@ export async function installMetrics(
     hookConfigured = true;
   } else if (hookJsExists && dryRun) {
     hookConfigured = true;
+  } else {
+    // hook.js absent: the SETTINGS entry may still exist (externally
+    // cleared tool dir) — recording false from disk-existence alone would
+    // falsify a live hook. Ask the settings file, which is the authority
+    // verify already consults.
+    try {
+      hookConfigured = await profile.hooks.check(settingsPath);
+    } catch {
+      // Unreadable settings: leave false — installMetrics cannot improve
+      // on it, and readSettings' loud path already covers the write side.
+    }
   }
 
   // Prefer the source version (from import.meta.resolve); fall back to reading

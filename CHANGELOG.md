@@ -67,6 +67,18 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **Round-6 gate corrections (the falsified-state class, final ring).**
+  The defs-scope inheritance gate no longer covers the scope-INDEPENDENT
+  hook fields — a `--local-defs` re-run of a global install can no longer
+  record `hooksInstalled: false` over a live hook (uninstall/verify branch
+  on that field); a scope flip now warns naming the old, now-untracked
+  defsPath. An operational conflict-check failure (unreadable destination,
+  non-TTY refusal) is classified per-harness and the run continues —
+  previously it escaped the loop, leaving installed sibling harnesses with
+  no manifest record at all. `skills` entries are element-typed like
+  agents/commands; `hookConfigured` consults the settings file when
+  hook.js is absent instead of recording false from disk-existence alone;
+  the metrics package.json copy and skill-dir prune failures are named.
 - **Failed copies are no longer deleted as "stale", and skipped steps no
   longer falsify the record** (fifth audit round — the falsified-state
   class one ring further out). Stale reconciliation now compares against

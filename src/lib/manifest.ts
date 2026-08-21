@@ -129,7 +129,10 @@ function isNewManifest(obj: unknown): obj is Manifest {
     // join(dir, file) in uninstall and TypeErrors mid-removal.
     if (!(hm["agents"] as unknown[]).every((x) => typeof x === "string")) return false;
     if (!(hm["commands"] as unknown[]).every((x) => typeof x === "string")) return false;
-    if ("skills" in hm && !Array.isArray(hm["skills"])) return false;
+    if ("skills" in hm) {
+      if (!Array.isArray(hm["skills"])) return false;
+      if (!(hm["skills"] as unknown[]).every((x) => typeof x === "string")) return false;
+    }
     if ("partial" in hm) {
       const p = hm["partial"];
       if (p !== null && p !== "agents" && p !== "commands" && p !== "skills" && p !== "metrics") {

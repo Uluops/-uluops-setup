@@ -189,7 +189,22 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
             blank();
             continue;
           }
-          throw err;
+          // Operational failure (e.g. unreadable dest dir, non-TTY refusal):
+          // classify-and-continue like the MCP branch below — rethrowing
+          // escaped the per-harness loop, leaving installed siblings with NO
+          // manifest record and skipping later harnesses (audit pass 6,
+          // PROBE D). classifyExit yields 1 for a failed result.
+          perHarnessResults.push({
+            harnessName,
+            profile,
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+          });
+          warn(
+            `[${harnessName}] conflict check failed — continuing with remaining harnesses`,
+          );
+          blank();
+          continue;
         }
       }
 
@@ -335,13 +350,25 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         // prior record; the `partial` marker names what didn't complete.
         const prevEntry = existingManifest?.harnesses[r.harnessName];
         const newDefsScope = opts.localDefs ? "local" : "global";
-        // Inherit prior lists ONLY within the same defs scope: a global
-        // install's file list against a fresh local defsPath (or vice versa)
-        // would point uninstall at the wrong tree.
-        const prev =
+        // TWO gates, deliberately: the FILE LISTS live under defsPath and
+        // may only be inherited within the same scope (a global list against
+        // a local path points uninstall at the wrong tree). The HOOK fields
+        // live in settings.json under profile.paths — scope-independent —
+        // and gating them on defsScope falsified hooksInstalled on a scope
+        // flip (audit pass 6, PROBE C).
+        const prevLists =
           prevEntry && prevEntry.defsScope === newDefsScope
             ? prevEntry
             : undefined;
+        const prevHooks = prevEntry;
+        if (prevEntry && !prevLists) {
+          // Scope flip: the prior tree at the old defsPath is no longer
+          // tracked by this manifest — say so rather than dropping it
+          // silently (cross-scope cleanup is not implemented).
+          warn(
+            `[${r.harnessName}] defs scope changed (${prevEntry.defsScope} → ${newDefsScope}): previously installed files remain untracked at ${prevEntry.defsPath}`,
+          );
+        }
         // A metrics result whose skippedReason is set NEVER OBSERVED the
         // hook state ("--no-metrics" means don't touch metrics; unsupported
         // harnesses too) — `??` alone can't express that because false is a
@@ -357,15 +384,15 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
           defsPath: opts.localDefs
             ? join(await findProjectRoot(), "uluops")
             : r.profile.paths.home,
-          agents: r.agentsResult?.files ?? prev?.agents ?? [],
-          commands: r.commandsResult?.files ?? prev?.commands ?? [],
-          skills: r.skillsResult?.files ?? prev?.skills ?? [],
+          agents: r.agentsResult?.files ?? prevLists?.agents ?? [],
+          commands: r.commandsResult?.files ?? prevLists?.commands ?? [],
+          skills: r.skillsResult?.files ?? prevLists?.skills ?? [],
           hooksInstalled: metricsObserved
             ? (r.metricsResult?.hookConfigured ?? false)
-            : (prev?.hooksInstalled ?? false),
+            : (prevHooks?.hooksInstalled ?? false),
           hooksInstalledVersion: metricsObserved
             ? (r.metricsResult?.hooksInstalledVersion ?? null)
-            : (prev?.hooksInstalledVersion ?? null),
+            : (prevHooks?.hooksInstalledVersion ?? null),
           partial: r.partial ?? null,
         };
         manifest.harnesses[r.harnessName] = harnessEntry;

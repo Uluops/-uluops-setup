@@ -143,7 +143,7 @@ export async function acquireInstallLock(
     }
     // "held" — present but unverifiable (unreadable meta). Never reclaim:
     // stealing a possibly-live lock disarms the mutual exclusion.
-    throw new InstallLockHeldError({ pid: -1, hostname: "unverifiable", ageMs: 0 });
+    throw new InstallLockHeldError({ pid: -1, hostname: verdict.reason, ageMs: 0 });
   }
 
   // Both attempts exhausted without acquiring.

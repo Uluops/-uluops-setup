@@ -138,8 +138,15 @@ export async function uninstallSkills(
   for (const dir of skillDirs) {
     try {
       await rmdir(join(skillsDir, dir));
-    } catch {
-      // Already gone or non-empty due to user files.
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code !== "ENOENT" && code !== "ENOTEMPTY") {
+        // ENOENT (already gone) and ENOTEMPTY (user files present) are the
+        // expected outcomes; anything else is a real cleanup failure.
+        console.warn(
+          `  ⚠ Could not remove skill dir ${join(skillsDir, dir)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   }
   return removed;

@@ -302,3 +302,82 @@ describe("runSetup partial-state preservation over a prior install", () => {
     exitSpy.mockRestore();
   });
 });
+
+describe("runSetup gate-split and isolation regressions (audit pass 6)", () => {
+  it("scope flip preserves hook fields (settings-scoped) while NOT inheriting file lists (defs-scoped)", async () => {
+    mockLoadManifest.mockResolvedValue({
+      version: "0.10.0",
+      installedAt: "2026-08-01T00:00:00.000Z",
+      shellModified: false,
+      harnesses: {
+        "claude-code": {
+          installedAt: "2026-08-01T00:00:00.000Z",
+          setupVersion: "0.10.0",
+          mcpScope: "global" as const,
+          mcpConfigPath: "/fake/claude.json",
+          defsScope: "global" as const,
+          defsPath: "/fake/home",
+          agents: ["global-a.md"],
+          commands: [],
+          skills: [],
+          hooksInstalled: true,
+          hooksInstalledVersion: "0.8.0",
+          partial: null,
+        },
+      },
+    });
+    // --local-defs (scope flip) + metrics skipped (never observed)
+    h.configureMetricsStep.mockResolvedValue({
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-metrics-flag",
+    } as never);
+    // agents step throws so the list fallback is exercised on the flip
+    h.installAgentsDefs.mockRejectedValue(new Error("EACCES"));
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined as never) as never);
+
+    await runSetup({ ...baseOpts, localDefs: true, noMetrics: true });
+
+    const saved = mockSaveManifest.mock.calls[0]![0] as Manifest;
+    const entry = saved.harnesses["claude-code"]!;
+    // Hook fields survive the flip: settings.json is scope-independent.
+    expect(entry.hooksInstalled).toBe(true);
+    expect(entry.hooksInstalledVersion).toBe("0.8.0");
+    // File lists do NOT inherit across the flip (wrong tree).
+    expect(entry.agents).toEqual([]);
+    expect(entry.defsScope).toBe("local");
+    exitSpy.mockRestore();
+  });
+
+  it("an operational conflict-check failure is isolated per-harness and the sibling's manifest is written", async () => {
+    h.checkConflicts
+      .mockRejectedValueOnce(new Error("Cannot verify conflicts in /x — EACCES"))
+      .mockResolvedValueOnce(undefined);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(((code?: number) => {
+        events.push(`exit:${code}`);
+        return undefined as never;
+      }) as never);
+
+    await runSetup({
+      ...baseOpts,
+      yes: false, // conflict check only runs without --yes
+      harnesses: ["claude-code", "opencode"],
+    });
+
+    const results = mockSummary.mock.calls[0]![0].results;
+    expect(results).toHaveLength(2);
+    expect(results[0]!.status).toBe("failed"); // operational, NOT declined
+    expect(results[1]!.status).toBe("ok");
+    // The sibling's record is written — the failure never escaped the loop.
+    const saved = mockSaveManifest.mock.calls[0]![0] as Manifest;
+    expect(Object.keys(saved.harnesses)).toEqual(["opencode"]);
+    // Operational failure → exit 1 (after lock release).
+    expect(events).toContain("exit:1");
+    exitSpy.mockRestore();
+  });
+});
