@@ -2,6 +2,38 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Dependency refresh to latest minors/patches (exact pins kept):**
+  `@inquirer/prompts` 8.5.2 → 8.6.0, `tsx` 4.22.4 → 4.23.12, `vitest`
+  4.1.9 → 4.1.11. The three majors available at review time were deliberately
+  held: `chalk` 6 requires Node >= 22 (this package supports >= 20),
+  `typescript` 7 is the native-compiler migration and gets its own pass, and
+  `@types/node` 26 describes APIs outside the supported Node floor.
+- `CHANGELOG.md` now ships in the npm tarball (added to `files`), and the
+  build stamps the executable bit on `dist/cli.js` directly (`postbuild
+  chmod +x`) instead of relying on npm's bin-link chmod at install time.
+
+### Fixed
+
+- **Non-TTY invocation without `-y` no longer dies on a raw inquirer
+  cancellation.** The API-key prompt's `interactive` gate now checks
+  `process.stdin.isTTY` (mirroring the existing guard on the account prompt),
+  so a piped/CI run with no key falls through to the actionable error —
+  `No API key found. Pass --api-key or set ULUOPS_API_KEY…` — instead of
+  `User force closed the prompt`. Found by live dx validation
+  (consumer-validate run #36).
+- **README caught up to the shipped CLI.** The `--username` flag and its
+  registry-username step (live since 0.9.9) are now in the Options table,
+  the installer step list, and the Examples; the `--list`/`--verify` sample
+  outputs were regenerated from v0.11.0 (the old captures showed v0.9.5 and
+  pre-rename agent slugs like `code-validator` for what is now `validate`);
+  the Node >= 20 requirement is stated at the quick-start instead of only in
+  the bottom Requirements section; a contents line was added and all code
+  fences carry language tags.
+
 ## [0.11.0] - 2026-07-18
 
 ### Changed

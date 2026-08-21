@@ -13,6 +13,12 @@ export interface AtomicWriteOptions {
   mode?: number;
 }
 
+/**
+ * Write `content` to `path` atomically: write to a random-suffixed temp file
+ * in the same directory, then rename over the target. Readers see either the
+ * old file or the new one, never a partial write. The temp file is unlinked
+ * on failure.
+ */
 export async function atomicWrite(
   path: string,
   content: string,

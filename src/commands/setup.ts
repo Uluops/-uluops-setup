@@ -70,6 +70,13 @@ interface RunSetupOpts {
   username?: string;
 }
 
+/**
+ * The main install flow: resolves every target harness up front (fail-fast on
+ * typos), runs the once-per-run steps (auth, username, CLI prompts) a single
+ * time, then installs MCP config, definitions, and the metrics hook per
+ * harness with failure isolation — one harness failing does not abort the
+ * others. Exits 1 if any harness failed operationally.
+ */
 export async function runSetup(opts: RunSetupOpts): Promise<void> {
   if (opts.harnesses.length === 0) {
     info(

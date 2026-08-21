@@ -42,6 +42,13 @@ export interface RunUninstallOpts {
   allDetected?: boolean;
 }
 
+/**
+ * The `--uninstall` flow: removes UluOps-managed artifacts for every harness
+ * in the manifest, or — when a harness filter is passed — only the named
+ * subset, preserving shared infrastructure (global CLI packages, shell
+ * export) that remaining harnesses still need. Fails fast if a named harness
+ * is not in the manifest.
+ */
 export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
   const version = await getVersion();
   console.log();

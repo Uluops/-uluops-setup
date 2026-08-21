@@ -34,6 +34,13 @@ async function listFilesRecursive(dir: string, prefix = ""): Promise<string[]> {
   return files.sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Install the harness's skill files from the bundled assets: unchanged files
+ * are skipped (hash comparison), updated files overwritten, and manifest
+ * entries no longer in the assets removed. `localDefs` redirects the install
+ * to `./uluops/skills` (project-scoped). Per-file failures are collected in
+ * the result, not thrown.
+ */
 export async function installSkills(
   profile: HarnessProfile,
   localDefs: boolean,
@@ -102,6 +109,10 @@ export async function installSkills(
   return { copied, skipped, removed, files: installedFiles, failures };
 }
 
+/**
+ * Remove the manifest-listed skill files under `defsPath/skills`, then prune
+ * any directories left empty. Returns the number of files removed.
+ */
 export async function uninstallSkills(
   files: string[],
   defsPath: string,

@@ -96,8 +96,15 @@ export async function initContext(opts: {
       ok(`Account created (${auth.email})`);
       ok(`API key generated`);
     } else {
+      // Non-TTY must fall through to resolveApiKey's no-key error (which
+      // names --api-key / ULUOPS_API_KEY) — prompting against a closed stdin
+      // dies on inquirer's raw cancellation instead. Mirrors the isTTY guard
+      // in shouldPromptForAccount.
       const interactive =
-        !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"];
+        !opts.yes &&
+        !opts.apiKey &&
+        !process.env["ULUOPS_API_KEY"] &&
+        Boolean(process.stdin.isTTY);
       const auth = await resolveApiKey({
         apiKeyFlag: opts.apiKey,
         skipValidation: opts.skipValidation,

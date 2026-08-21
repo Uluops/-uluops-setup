@@ -162,12 +162,14 @@ function renderCounts(r: PerHarnessResult): string {
   return parts.length > 0 ? `(${parts.join(" · ")})` : "";
 }
 
+/** Mask an API key for display: all but the last 4 chars become `*` (minimum 4 stars). */
 export function maskKey(key: string): string {
   if (!key || key.length <= 4) return "****";
   const last4 = key.slice(-4);
   return `${"*".repeat(Math.max(4, key.length - 4))}${last4}`;
 }
 
+/** Render the `--list` output: workflows then agents from the asset catalog, descriptions truncated to fit. */
 export async function printAgentList(): Promise<void> {
   const workflows = await getWorkflowCommands();
   const agents = await getAgentCommands();

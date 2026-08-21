@@ -3,6 +3,11 @@ import { verify } from "../steps/verify.js";
 import { ok, fail, info } from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 
+/**
+ * The `--verify` flow: prints one check line per verify-step result
+ * (manifest, per-harness readiness/MCP/files/hook, API key) and exits 1
+ * when any check failed. Read-only — makes no changes.
+ */
 export async function runVerify(): Promise<void> {
   const version = await getVersion();
   console.log();

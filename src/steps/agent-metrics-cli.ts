@@ -82,6 +82,12 @@ function summarizeNpmResult(
   return { ok: false, error: stderr || stdout || `exit ${r.status}` };
 }
 
+/**
+ * Detect a globally-installed `@uluops/agent-metrics` via `npm ls -g`.
+ * Returns the installed version string, or null when absent (or when npm
+ * itself fails/times out — absence and detection failure are deliberately
+ * indistinguishable: both mean "offer the install").
+ */
 export function detectGlobalAgentMetrics(): string | null {
   const r = spawnSync(
     "npm",
