@@ -6,6 +6,7 @@ import {
   copyIfChanged,
   unlinkFiles,
   removeStaleFiles,
+  isEnoent,
 } from "../lib/file-ops.js";
 
 export interface CommandsResult {
@@ -44,7 +45,11 @@ export async function installCommands(
   try {
     await readdir(srcBase);
     hasSrcDir = true;
-  } catch {
+  } catch (err) {
+    // Only genuine absence means "this harness ships no commands" — an
+    // EACCES here previously rendered as the 'coming soon' capability
+    // message while wiping the manifest's commands list.
+    if (!isEnoent(err)) throw err;
     hasSrcDir = false;
   }
 
@@ -81,7 +86,8 @@ export async function installCommands(
       files = (await readdir(srcDir)).filter(
         (f) => f.endsWith(".md") || f.endsWith(".toml"),
       );
-    } catch {
+    } catch (err) {
+      if (!isEnoent(err)) throw err; // see the srcBase probe above
       continue;
     }
 

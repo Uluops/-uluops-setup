@@ -38,8 +38,10 @@ export async function hasCredentialsFile(): Promise<boolean> {
   try {
     await access(credentialsPath());
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // Unreadable-but-present counts as PRESENT: answering "absent" steers a
+    // returning user into the new-account branch and a duplicate signup.
+    return !isEnoent(err);
   }
 }
 
@@ -172,8 +174,11 @@ async function readCredentialsFile(): Promise<string | undefined> {
   let raw: string;
   try {
     raw = await readFile(credsPath, "utf-8");
-  } catch {
-    return undefined; // File doesn't exist
+  } catch (err) {
+    if (isEnoent(err)) return undefined; // File doesn't exist
+    throw new Error(
+      `Could not read credentials file at ${credsPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   let creds: unknown;

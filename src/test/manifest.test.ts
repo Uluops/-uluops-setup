@@ -341,6 +341,6 @@ describe("deleteManifest", () => {
   });
 
   it("does not throw if manifest does not exist", async () => {
-    await expect(deleteManifest()).resolves.toBeUndefined();
+    await expect(deleteManifest()).resolves.toEqual({ failed: [] });
   });
 });

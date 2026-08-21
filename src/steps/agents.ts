@@ -6,6 +6,7 @@ import {
   copyIfChanged,
   unlinkFiles,
   removeStaleFiles,
+  isEnoent,
 } from "../lib/file-ops.js";
 
 export interface AgentsResult {
@@ -43,7 +44,11 @@ export async function installAgents(
   let files: string[];
   try {
     files = (await readdir(srcDir)).filter((f) => f.endsWith(ext));
-  } catch {
+  } catch (err) {
+    // ENOENT = this harness ships no agents (legit empty). Anything else
+    // must THROW: returning files:[] here is persisted to the manifest as
+    // authoritative and orphans every previously-recorded agent.
+    if (!isEnoent(err)) throw err;
     return { copied: 0, skipped: 0, removed: 0, files: [], failures: [] };
   }
 

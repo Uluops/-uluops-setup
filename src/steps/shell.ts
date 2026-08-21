@@ -62,12 +62,22 @@ export async function writeShellExport(
 }
 
 /** Remove the fenced UluOps export block from the user's shell profile. */
-export async function removeShellExport(profilePath: string): Promise<void> {
+export async function removeShellExport(
+  profilePath: string,
+): Promise<{ removed: boolean; reason?: string }> {
   let content: string;
   try {
     content = await readFile(profilePath, "utf-8");
-  } catch {
-    return;
+  } catch (err) {
+    if (isEnoent(err)) {
+      return { removed: true, reason: "no profile file" }; // nothing to remove
+    }
+    // Unreadable-but-present: the export (and the plaintext key in it) may
+    // still be there — the caller must NOT print success.
+    return {
+      removed: false,
+      reason: `could not read ${profilePath}: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   const startIdx = content.indexOf(FENCE_START);
@@ -81,5 +91,7 @@ export async function removeShellExport(profilePath: string): Promise<void> {
       (before + after).replace(/\n{3,}/g, "\n\n"),
       { mode: 0o600 },
     );
+    return { removed: true };
   }
+  return { removed: true, reason: "no export block present" };
 }

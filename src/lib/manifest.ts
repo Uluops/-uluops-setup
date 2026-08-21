@@ -375,13 +375,23 @@ export async function saveManifest(manifest: Manifest): Promise<void> {
   await atomicWrite(getManifestPath(), final);
 }
 
-/** Delete the install manifest file from disk. Tries both locations. */
-export async function deleteManifest(): Promise<void> {
+/**
+ * Delete the install manifest file from disk. Tries both locations.
+ * Returns the paths that could NOT be removed (non-ENOENT failures) so the
+ * caller can report the truth instead of an unconditional success —
+ * a manifest that survives keeps claiming a full install.
+ */
+export async function deleteManifest(): Promise<{ failed: string[] }> {
+  const failed: string[] = [];
   for (const path of [getManifestPath(), getLegacyManifestPath()]) {
     try {
       await unlink(path);
-    } catch {
-      // Already gone
+    } catch (err) {
+      if (!isEnoent(err)) {
+        failed.push(`${path} (${err instanceof Error ? err.message : String(err)})`);
+      }
+      // ENOENT — already gone.
     }
   }
+  return { failed };
 }

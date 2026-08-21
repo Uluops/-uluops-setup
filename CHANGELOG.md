@@ -67,6 +67,28 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **The read-error-means-absent inference is now eliminated at every
+  read-then-act site, not only the overwrite-shaped ones.** Third audit
+  round: the conflict-overwrite guard treated an unreadable destination as
+  "no conflicts" and destroyed a user's own agent file with no prompt (now:
+  conflicts unknown → explicit confirm, default No); the bundled-asset
+  readers returned empty lists on read errors that the manifest then
+  recorded as authoritative, orphaning previously-installed files (now:
+  only ENOENT means "ships none"; anything else fails the step and records
+  partial state); an unreadable lock `meta.json` was classified stale and a
+  LIVE lock stolen (now: unverifiable = held, never reclaimed), and the
+  mkdir→meta window got a grace-recheck before stale-claiming; the metrics
+  tool copy verifies its source is readable before wiping the installed
+  tree.
+- **Uninstall reports the truth.** `removeShellExport` and `deleteManifest`
+  return results their callers consult: an unremovable shell export warns
+  that the plaintext key survives (previously "✓ Removed export" over an
+  untouched file), an undeletable manifest warns instead of "✓ Manifest
+  deleted", and per-file unlink failures during uninstall are named instead
+  of silently excluded from a truthful-looking count. Returning-user
+  detection (`hasCredentialsFile`) now counts unreadable-but-present as
+  present, so a permissions hiccup no longer steers into a duplicate
+  signup.
 - **The install manifest can no longer be silently replaced or misread as
   absent.** `readManifestFile` collapsed every read error AND malformed
   JSON into "no manifest" — after which a save would overwrite the file it

@@ -85,8 +85,15 @@ export async function unlinkFiles(
     try {
       await unlink(join(dir, file));
       removed++;
-    } catch {
-      // Already gone
+    } catch (err) {
+      // ENOENT = already gone (the dominant, idempotent case). Anything
+      // else is a file we FAILED to remove — say so, because the caller's
+      // count alone reads as success and the manifest may be deleted next.
+      if (!isEnoent(err)) {
+        console.warn(
+          `  ⚠ Could not remove ${join(dir, file)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   }
   return removed;
@@ -117,8 +124,12 @@ export async function removeStaleFiles(
       if (!dryRun) {
         try {
           await unlink(join(destDir, oldFile));
-        } catch {
-          // Already gone
+        } catch (err) {
+          if (!isEnoent(err)) {
+            console.warn(
+              `  ⚠ Could not remove stale ${join(destDir, oldFile)}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          }
         }
       }
       removed++;

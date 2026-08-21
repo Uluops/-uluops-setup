@@ -6,6 +6,7 @@
  */
 
 import { mkdir, readdir, copyFile, rm, access, readFile } from "node:fs/promises";
+import { isEnoent } from "../lib/file-ops.js";
 import { warn } from "../lib/display.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,8 +112,11 @@ async function copyJsDir(
       if (!dryRun) await copyFile(join(srcDir, file), join(destDir, file));
       count++;
     }
-  } catch {
-    // Directory doesn't exist — not critical
+  } catch (err) {
+    // ENOENT = optional subdir absent. Anything else throws — swallowing it
+    // after the destructive rm below turns a read failure into a destroyed
+    // previously-working install reporting 0 files with no error.
+    if (!isEnoent(err)) throw err;
   }
   return count;
 }
@@ -132,6 +136,15 @@ async function copyToolFiles(
   // disk and shadow the new one. Wipe dist/ before repopulating so the
   // installed tree matches the source tree exactly.
   if (!dryRun) {
+    // Verify the SOURCE is readable BEFORE the destructive wipe — an
+    // unreadable source after the rm leaves a destroyed install. A missing
+    // source dist (ENOENT) skips the whole copy without wiping.
+    try {
+      await readdir(srcDist);
+    } catch (err) {
+      if (isEnoent(err)) return 0;
+      throw err;
+    }
     await rm(destDist, { recursive: true, force: true });
     await mkdir(destDist, { recursive: true });
     for (const sub of subDirs) {

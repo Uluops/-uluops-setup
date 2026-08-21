@@ -234,8 +234,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
         const { getShellProfile } = await import("../lib/paths.js");
         const shellProfile = getShellProfile();
         if (shellProfile && !opts.dryRun) {
-          await removeShellExport(shellProfile.path);
-          ok(`Removed export from ${shellProfile.path}`);
+          const shellRes = await removeShellExport(shellProfile.path);
+          if (shellRes.removed) {
+            ok(`Removed export from ${shellProfile.path}`);
+          } else {
+            warn(
+              `Could not remove export from ${shellProfile.path}${shellRes.reason ? ` — ${shellRes.reason}` : ""}. The plaintext API key may still be in the file; remove the UluOps block manually.`,
+            );
+          }
         } else if (shellProfile) {
           ok(`Would remove export from ${shellProfile.path}`);
         }
@@ -256,8 +262,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
     //     would reject an empty-harnesses file)
     if (!opts.dryRun) {
       if (isFullUninstall) {
-        await deleteManifest();
-        ok("Manifest deleted");
+        const delRes = await deleteManifest();
+        if (delRes.failed.length === 0) {
+          ok("Manifest deleted");
+        } else {
+          warn(
+            `Could not delete manifest: ${delRes.failed.join("; ")} — it still records this install; remove it manually.`,
+          );
+        }
       } else {
         for (const name of toUninstall) {
           delete manifest.harnesses[name];
@@ -269,8 +281,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
             `Manifest updated — ${remaining} harness(es) remain: ${Object.keys(manifest.harnesses).join(", ")}`,
           );
         } else {
-          await deleteManifest();
-          ok("Manifest deleted (no harnesses remain)");
+          const delRes2 = await deleteManifest();
+          if (delRes2.failed.length === 0) {
+            ok("Manifest deleted (no harnesses remain)");
+          } else {
+            warn(
+              `Could not delete manifest: ${delRes2.failed.join("; ")} — remove it manually.`,
+            );
+          }
         }
       }
     }

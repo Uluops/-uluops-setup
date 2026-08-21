@@ -112,8 +112,18 @@ describe("removeShellExport", () => {
     expect(content).toBe("# no uluops here\n");
   });
 
-  it("does nothing if file does not exist", async () => {
-    await expect(removeShellExport(join(tmpDir, "nonexistent"))).resolves.toBeUndefined();
+  it("reports removed (nothing to do) if file does not exist", async () => {
+    await expect(
+      removeShellExport(join(tmpDir, "nonexistent")),
+    ).resolves.toMatchObject({ removed: true });
+  });
+
+  it("reports NOT removed when the profile exists but cannot be read", async () => {
+    // The caller must not print success while the plaintext key survives.
+    const dir = await mkdtemp(join(tmpdir(), "uluops-shellrm-dir-"));
+    const res = await removeShellExport(dir);
+    expect(res.removed).toBe(false);
+    expect(res.reason).toBeTruthy();
   });
 
   it("removes duplicate fence blocks left by earlier buggy installs", async () => {

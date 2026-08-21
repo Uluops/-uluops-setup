@@ -28,6 +28,7 @@ import type {
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
 import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
+import { isEnoent } from "../lib/file-ops.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -570,8 +571,24 @@ export async function checkConflicts(
   let existingFiles: string[];
   try {
     existingFiles = await readdir(destDir);
-  } catch {
-    return; // No destination dir yet — fresh install, nothing to conflict.
+  } catch (err) {
+    if (isEnoent(err)) {
+      return; // No destination dir yet — fresh install, nothing to conflict.
+    }
+    // Unreadable destination = conflicts UNKNOWN, never "no conflicts":
+    // proceeding silently overwrites files we could not enumerate. Ask.
+    warn(
+      `Could not read ${destDir} (${err instanceof Error ? err.message : String(err)}) — cannot check for existing agents that would be overwritten.`,
+    );
+    const { confirm } = await import("@inquirer/prompts");
+    const proceed = await confirm({
+      message: "Continue anyway (existing files may be overwritten)?",
+      default: false,
+    });
+    if (!proceed) {
+      throw new ConflictRejectedError(profile.name);
+    }
+    return;
   }
 
   let assetFiles: string[];

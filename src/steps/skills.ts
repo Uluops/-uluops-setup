@@ -2,7 +2,7 @@ import { mkdir, readdir, rmdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
 import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged, removeStaleFiles, unlinkFiles } from "../lib/file-ops.js";
+import { copyIfChanged, removeStaleFiles, unlinkFiles, isEnoent } from "../lib/file-ops.js";
 
 export interface SkillsResult {
   copied: number;
@@ -17,7 +17,11 @@ async function listFilesRecursive(dir: string, prefix = ""): Promise<string[]> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    // ENOENT = no skills shipped/installed at this level. Anything else
+    // throws — an empty list here becomes the manifest's authoritative
+    // skills record.
+    if (!isEnoent(err)) throw err;
     return [];
   }
 

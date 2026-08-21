@@ -132,11 +132,16 @@ export async function acquireInstallLock(
       continue;
     }
 
-    throw new InstallLockHeldError({
-      pid: verdict.meta.pid,
-      hostname: verdict.meta.hostname,
-      ageMs: Date.now() - verdict.meta.startedAt,
-    });
+    if (verdict.kind === "live") {
+      throw new InstallLockHeldError({
+        pid: verdict.meta.pid,
+        hostname: verdict.meta.hostname,
+        ageMs: Date.now() - verdict.meta.startedAt,
+      });
+    }
+    // "held" — present but unverifiable (unreadable meta). Never reclaim:
+    // stealing a possibly-live lock disarms the mutual exclusion.
+    throw new InstallLockHeldError({ pid: -1, hostname: "unverifiable", ageMs: 0 });
   }
 
   // Both attempts exhausted without acquiring.
@@ -145,6 +150,7 @@ export async function acquireInstallLock(
 
 type Verdict =
   | { kind: "live"; meta: LockMeta }
+  | { kind: "held"; reason: string } // present but unverifiable — never reclaim
   | { kind: "stale"; reason: string };
 
 async function inspectHeldLock(
@@ -155,9 +161,25 @@ async function inspectHeldLock(
   let raw: string;
   try {
     raw = await readFile(metaPath, "utf-8");
-  } catch {
-    // Lock dir exists but meta missing or unreadable — treat as stale.
-    return { kind: "stale", reason: "missing-meta" };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      // Unreadable-but-present meta is UNVERIFIABLE, not stale: classifying
+      // it stale lets a second process rm -rf a live holder's lock and
+      // disarms the mutual exclusion entirely.
+      return {
+        kind: "held",
+        reason: `meta.json unreadable (${err instanceof Error ? err.message : String(err)})`,
+      };
+    }
+    // Genuinely missing meta: usually a crashed holder — but also the
+    // window between the winner's mkdir and its meta write. Grace-recheck:
+    // a race resolves in milliseconds, a crash leaves it missing forever.
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      raw = await readFile(metaPath, "utf-8");
+    } catch {
+      return { kind: "stale", reason: "missing-meta" };
+    }
   }
 
   let meta: LockMeta;
