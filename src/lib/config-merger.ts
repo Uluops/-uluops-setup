@@ -109,11 +109,20 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
   } catch {
     return {}; // File doesn't exist — fresh config
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as ClaudeConfig;
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error(`Failed to parse config at ${path} — file contains invalid JSON`);
   }
+  // Same rationale as the JSON throw: valid JSON that isn't an object cannot
+  // be merged into — spreading it would corrupt the file we then write back.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Failed to parse config at ${path} — expected a JSON object at the top level`,
+    );
+  }
+  return parsed as ClaudeConfig;
 }
 
 /**

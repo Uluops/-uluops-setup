@@ -134,6 +134,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
   // concurrent multi-harness installs from separate processes serialize
   // (spec §10.6).
   let lock: LockHandle | null = null;
+  let exitCode = 0;
   if (!opts.dryRun) {
     lock = await acquireInstallLock();
   }
@@ -380,11 +381,14 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     // Exit-code classifier (spec §7.5 4-tier table). One call, one place.
     // Empty perHarnessResults already short-circuited above with the
     // "nothing to install" message; classifyExit handles defense-in-depth.
-    const exitCode = classifyExit(perHarnessResults);
-    if (exitCode !== 0) {
-      process.exit(exitCode);
-    }
+    exitCode = classifyExit(perHarnessResults);
   } finally {
     if (lock) await lock.release();
+  }
+  // process.exit inside the try would skip the finally and leave the lock
+  // held (the signal handlers are a backstop, not the contract) — classify
+  // inside, exit only after cleanup has run.
+  if (exitCode !== 0) {
+    process.exit(exitCode);
   }
 }

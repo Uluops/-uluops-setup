@@ -1,9 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   mergeUluopsHook,
   removeUluopsHook,
   hasUluopsHook,
   probeHookSupport,
+  readSettings,
   CLAUDE_HOOK_TYPES,
   DEFAULT_CLAUDE_HOOK_TYPE,
 } from "../lib/settings-merger.js";
@@ -314,5 +318,63 @@ describe("CLAUDE_HOOK_TYPES anchor", () => {
     // changing it is a user-visible breaking change. Anchor it here so the
     // change has to be deliberate.
     expect(DEFAULT_CLAUDE_HOOK_TYPE).toBe("SubagentStop");
+  });
+});
+
+describe("readSettings shape gate", () => {
+  let dir: string;
+  const write = async (content: string): Promise<string> => {
+    dir = await mkdtemp(join(tmpdir(), "uluops-settings-test-"));
+    const p = join(dir, "settings.json");
+    await writeFile(p, content);
+    return p;
+  };
+
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it("accepts a well-formed settings object", async () => {
+    const p = await write(
+      JSON.stringify({ hooks: { SubagentStop: [{ hooks: [] }] } }),
+    );
+    const s = await readSettings(p);
+    expect(s.hooks!["SubagentStop"]).toHaveLength(1);
+  });
+
+  it("rejects a top-level array (valid JSON, unmergeable shape)", async () => {
+    const p = await write("[1,2,3]");
+    await expect(readSettings(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects a top-level string", async () => {
+    const p = await write('"just a string"');
+    await expect(readSettings(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects hooks as a string (would spread into per-char keys)", async () => {
+    const p = await write(JSON.stringify({ hooks: "yes" }));
+    await expect(readSettings(p)).rejects.toThrow(/'hooks' has an unexpected shape/);
+  });
+
+  it("rejects a hooks entry that is not an array", async () => {
+    const p = await write(JSON.stringify({ hooks: { SubagentStop: {} } }));
+    await expect(readSettings(p)).rejects.toThrow(/'hooks' has an unexpected shape/);
+  });
+});
+
+describe("mergeUluopsHook defensive filter", () => {
+  it("preserves matcher entries without a hooks array instead of crashing", () => {
+    const settings = {
+      hooks: {
+        SubagentStop: [{ note: "user entry, unknown shape" } as never],
+      },
+    };
+    const result = mergeUluopsHook(settings, "node hook.js");
+    // The malformed user entry survives; the UluOps hook is appended.
+    expect(result.hooks!["SubagentStop"]).toHaveLength(2);
+    expect(
+      (result.hooks!["SubagentStop"]![0] as { note?: string }).note,
+    ).toBe("user entry, unknown shape");
   });
 });

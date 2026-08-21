@@ -18,6 +18,20 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **`process.exit` no longer fires inside `runSetup`'s try block.** The
+  non-zero exit-code path skipped the `finally` that releases the install
+  lock (the signal handlers were the only cleanup actually running).
+  `classifyExit` still runs inside; the exit happens after the lock release.
+- **Settings/config reads now reject unmergeable shapes instead of crashing
+  or corrupting.** Valid-JSON-wrong-shape user files (top-level array or
+  string; `hooks` as a string — which the merge would have spread into
+  per-character keys and written back; a hooks entry that is not an array)
+  now throw the same friendly named-path error as invalid JSON. The hook
+  merge additionally preserves matcher entries it cannot parse instead of
+  TypeErroring on them. Applies to both `settings-merger` and
+  `config-merger` reads.
+- **Install-lock `meta.json` is written mode 0600** — it carries the owning
+  PID/hostname and was world-readable.
 - **Non-TTY invocation without `-y` no longer dies on a raw inquirer
   cancellation.** The API-key prompt's `interactive` gate now checks
   `process.stdin.isTTY` (mirroring the existing guard on the account prompt),

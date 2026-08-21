@@ -101,7 +101,9 @@ export async function acquireInstallLock(
         hostname: hostname(),
         startedAt: Date.now(),
       };
-      await writeFile(join(lockDir, META_FILENAME), JSON.stringify(meta));
+      await writeFile(join(lockDir, META_FILENAME), JSON.stringify(meta), {
+        mode: 0o600,
+      });
       return registerHandle(lockDir);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;

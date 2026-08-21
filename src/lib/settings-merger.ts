@@ -100,11 +100,39 @@ export async function readSettings(path: string): Promise<HarnessSettings> {
   } catch {
     return {}; // File doesn't exist — fresh config
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as HarnessSettings;
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error(`Failed to parse settings at ${path} — file contains invalid JSON`);
   }
+  // Same rationale as the JSON throw above: a shape we can't merge into must
+  // surface, not crash mid-merge or silently corrupt on spread. Valid JSON
+  // that isn't an object (or whose hooks aren't matcher arrays) is treated
+  // as unmergeable, not coerced.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Failed to parse settings at ${path} — expected a JSON object at the top level`,
+    );
+  }
+  const hooks = (parsed as { hooks?: unknown }).hooks;
+  if (hooks !== undefined) {
+    const hooksValid =
+      typeof hooks === "object" &&
+      hooks !== null &&
+      !Array.isArray(hooks) &&
+      Object.values(hooks).every(
+        (v) =>
+          Array.isArray(v) &&
+          v.every((m) => typeof m === "object" && m !== null),
+      );
+    if (!hooksValid) {
+      throw new Error(
+        `Failed to parse settings at ${path} — 'hooks' has an unexpected shape; fix or remove it and re-run`,
+      );
+    }
+  }
+  return parsed as HarnessSettings;
 }
 
 /**
@@ -133,8 +161,19 @@ export function mergeUluopsHook(
   const hooks = settings.hooks ?? {};
   const existing = hooks[hookType] ?? [];
 
+  // Defensive against matcher entries readSettings' shape gate can't see
+  // (e.g. a settings object built in memory): entries without a hooks array
+  // are user data — preserve them, never crash on them.
   const filtered = existing.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
+    (m) =>
+      !(
+        Array.isArray(m?.hooks) &&
+        m.hooks.some(
+          (h) =>
+            typeof h?.command === "string" &&
+            h.command.includes(HOOK_OWNERSHIP_SIGNATURE),
+        )
+      ),
   );
 
   const uluopsHook: HookMatcher = {

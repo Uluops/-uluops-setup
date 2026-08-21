@@ -89,6 +89,16 @@ describe("loadManifest", () => {
       "code-validator-agent.md",
     ]);
     expect(result!.harnesses["claude-code"]!.hooksInstalled).toBe(true);
+    // Scope/path fields must survive migration verbatim — losing them
+    // re-derives uninstall paths from defaults instead of what was installed.
+    expect(result!.harnesses["claude-code"]!.mcpScope).toBe("global");
+    expect(result!.harnesses["claude-code"]!.defsScope).toBe("global");
+    expect(result!.harnesses["claude-code"]!.mcpConfigPath).toBe(
+      "/home/user/.claude.json",
+    );
+    expect(result!.harnesses["claude-code"]!.defsPath).toBe(
+      "/home/user/.claude",
+    );
   });
 
   it("returns null on malformed JSON", async () => {
