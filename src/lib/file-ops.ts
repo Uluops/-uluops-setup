@@ -1,5 +1,5 @@
 import { readFile, mkdir, unlink, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve, relative, isAbsolute } from "node:path";
 import { fileHash } from "./hash.js";
 import { atomicWrite } from "./atomic-write.js";
 
@@ -74,6 +74,20 @@ export async function writeIfChanged(
 }
 
 /**
+ * Containment gate for manifest-supplied file names (CWE-22): the manifest
+ * is a same-UID-writable JSON file, and a hand-edited or foreign-written
+ * entry containing `../` would otherwise turn uninstall into an
+ * arbitrary-delete primitive. Only paths that resolve INSIDE `dir` pass.
+ */
+function resolveContained(dir: string, file: string): string | null {
+  const base = resolve(dir);
+  const target = resolve(base, file);
+  const rel = relative(base, target);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
+  return target;
+}
+
+/**
  * Remove files from a directory. Returns count of successfully removed files.
  */
 export async function unlinkFiles(
@@ -82,8 +96,15 @@ export async function unlinkFiles(
 ): Promise<number> {
   let removed = 0;
   for (const file of files) {
+    const target = resolveContained(dir, file);
+    if (target === null) {
+      console.warn(
+        `  ⚠ Refusing to remove ${JSON.stringify(file)} — resolves outside ${dir}`,
+      );
+      continue;
+    }
     try {
-      await unlink(join(dir, file));
+      await unlink(target);
       removed++;
     } catch (err) {
       // ENOENT = already gone (the dominant, idempotent case). Anything
@@ -120,9 +141,16 @@ export async function removeStaleFiles(
   let removed = 0;
   for (const oldFile of oldManifestFiles) {
     if (!currentFiles.includes(oldFile)) {
+      const staleTarget = resolveContained(destDir, oldFile);
+      if (staleTarget === null) {
+        console.warn(
+          `  ⚠ Refusing to remove stale ${JSON.stringify(oldFile)} — resolves outside ${destDir}`,
+        );
+        continue;
+      }
       if (!dryRun) {
         try {
-          await unlink(join(destDir, oldFile));
+          await unlink(staleTarget);
         } catch (err) {
           if (!isEnoent(err)) {
             console.warn(
