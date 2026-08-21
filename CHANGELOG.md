@@ -4,6 +4,8 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-21
+
 ### Added
 
 - **Per-file write coordinator** (`src/lib/write-coordinator.ts`). Every
@@ -65,16 +67,6 @@ All notable changes to `@uluops/setup` will be documented in this file.
 - `CHANGELOG.md` now ships in the npm tarball (added to `files`), and the
   build stamps the executable bit on `dist/cli.js` directly (`postbuild
   chmod +x`) instead of relying on npm's bin-link chmod at install time.
-
-### Known gap (deferred)
-
-- **`process.exit` immediately after console output can truncate piped
-  stdout** (`npx @uluops/setup | tee` may lose the tail of the summary).
-  Converting the exit paths to `process.exitCode` requires an open-handle
-  audit first — a lingering inquirer/stdin handle would turn a truncated
-  log into a hung process, which is the worse failure. Tracked for its own
-  pass; uninstall's filter-error path already rides `process.exitCode`
-  (safe there: no prompt has run).
 
 ### Fixed
 
@@ -277,6 +269,16 @@ All notable changes to `@uluops/setup` will be documented in this file.
   the Node >= 20 requirement is stated at the quick-start instead of only in
   the bottom Requirements section; a contents line was added and all code
   fences carry language tags.
+
+### Known gap (deferred)
+
+- **`process.exit` immediately after console output can truncate piped
+  stdout** (`npx @uluops/setup | tee` may lose the tail of the summary).
+  Converting the exit paths to `process.exitCode` requires an open-handle
+  audit first — a lingering inquirer/stdin handle would turn a truncated
+  log into a hung process, which is the worse failure. Tracked for its own
+  pass; uninstall's filter-error path already rides `process.exitCode`
+  (safe there: no prompt has run).
 
 ### Security
 
