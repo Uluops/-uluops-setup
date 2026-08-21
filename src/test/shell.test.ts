@@ -112,8 +112,18 @@ describe("removeShellExport", () => {
     expect(content).toBe("# no uluops here\n");
   });
 
-  it("does nothing if file does not exist", async () => {
-    await expect(removeShellExport(join(tmpDir, "nonexistent"))).resolves.toBeUndefined();
+  it("reports removed (nothing to do) if file does not exist", async () => {
+    await expect(
+      removeShellExport(join(tmpDir, "nonexistent")),
+    ).resolves.toMatchObject({ removed: true });
+  });
+
+  it("reports NOT removed when the profile exists but cannot be read", async () => {
+    // The caller must not print success while the plaintext key survives.
+    const dir = await mkdtemp(join(tmpdir(), "uluops-shellrm-dir-"));
+    const res = await removeShellExport(dir);
+    expect(res.removed).toBe(false);
+    expect(res.reason).toBeTruthy();
   });
 
   it("removes duplicate fence blocks left by earlier buggy installs", async () => {
@@ -137,5 +147,17 @@ describe("removeShellExport", () => {
     expect(content).toContain("# after");
     expect(content).not.toContain("ULUOPS_API_KEY");
     expect(content).not.toContain("UluOps");
+  });
+});
+
+describe("writeShellExport unreadable-but-present discrimination", () => {
+  it("throws (refusing) when the profile path exists but is not readable as a file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-shell-dir-"));
+    // A directory gives a deterministic non-ENOENT read error on every OS —
+    // this pins that an EACCES-class error can never fall through to the
+    // fresh-file write that would replace the user's rc.
+    await expect(writeShellExport(dir, "ulr_key", false)).rejects.toThrow(
+      /refusing to write/,
+    );
   });
 });

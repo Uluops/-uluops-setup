@@ -5,6 +5,7 @@ import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
 import { readInstalledMetricsVersion } from "./metrics.js";
 import { extractEmail } from "../lib/json-guards.js";
+import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -165,7 +166,19 @@ async function checkHooks(
     return true;
   }
 
-  const hookPresent = await profile.hooks.check(profile.paths.settingsPath);
+  // A malformed settings file must read as a failed check with the parse
+  // error as detail, not crash the whole verify run.
+  let hookPresent: boolean;
+  try {
+    hookPresent = await profile.hooks.check(profile.paths.settingsPath);
+  } catch (err) {
+    checks.push({
+      label: `[${profile.displayName}] Agent metrics hook`,
+      passed: false,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
   let hookFilePresent = false;
   if (profile.paths.toolsDir) {
     try {
@@ -302,6 +315,9 @@ export async function verify(): Promise<VerifyResult> {
         // object at all (surfaced below as a check failure) and returns null
         // when data/email are absent or wrong-typed.
         let email: string | null;
+        // No early return on a bad body: failing this check must not
+        // suppress the unrelated npm-resolvability check below.
+        let emailDecodeFailed = false;
         try {
           email = extractEmail(await res.json());
         } catch (err) {
@@ -312,12 +328,15 @@ export async function verify(): Promise<VerifyResult> {
               err instanceof Error ? err.message : "Unexpected response shape",
           });
           allOk = false;
-          return { ok: allOk, checks };
+          emailDecodeFailed = true;
+          email = null;
         }
-        checks.push({
-          label: `API key valid${email ? ` (user: ${email})` : ""}`,
-          passed: true,
-        });
+        if (!emailDecodeFailed) {
+          checks.push({
+            label: `API key valid${email ? ` (user: ${email})` : ""}`,
+            passed: true,
+          });
+        }
       } else {
         checks.push({
           label: "API key valid",
@@ -334,6 +353,34 @@ export async function verify(): Promise<VerifyResult> {
       });
       allOk = false;
     }
+  }
+
+  // MCP client packages resolvable on npm. The install-time probe warns and
+  // moves on (non-blocking by design) — this is where that warning stops
+  // being detached from runtime reality: the harness runs `npx -y <spec>` at
+  // startup, so an unresolvable package means MCP servers silently fail to
+  // start long after setup reported success. --verify re-asks the question
+  // on demand.
+  try {
+    const { missing } = await checkMcpPackageAvailability();
+    if (missing.length === 0) {
+      checks.push({ label: "MCP packages resolvable on npm", passed: true });
+    } else {
+      checks.push({
+        label: "MCP packages resolvable on npm",
+        passed: false,
+        detail: `not found in registry: ${missing.join(", ")} — MCP servers will fail to start`,
+      });
+      allOk = false;
+    }
+  } catch {
+    checks.push({
+      label: "MCP packages resolvable on npm",
+      passed: false,
+      detail: "npm registry unreachable — could not verify",
+    });
+    // Network-down is already reflected by the connectivity checks; do not
+    // double-fail the run for the same outage.
   }
 
   return { ok: allOk, checks };

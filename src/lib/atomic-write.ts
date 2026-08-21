@@ -7,12 +7,19 @@
 
 import { writeFile, rename, unlink, chmod } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
+import { recordWrite } from "./write-coordinator.js";
 
 export interface AtomicWriteOptions {
   /** File mode (permissions). Defaults to Node's default (0o666 before umask). */
   mode?: number;
 }
 
+/**
+ * Write `content` to `path` atomically: write to a random-suffixed temp file
+ * in the same directory, then rename over the target. Readers see either the
+ * old file or the new one, never a partial write. The temp file is unlinked
+ * on failure.
+ */
 export async function atomicWrite(
   path: string,
   content: string,
@@ -33,6 +40,9 @@ export async function atomicWrite(
       await chmod(tmp, options.mode);
     }
     await rename(tmp, path);
+    // Attest the write for the coordinator's restore guard — only content
+    // this process provably wrote may be rolled back over.
+    recordWrite(path, content);
   } catch (err) {
     // Clean up temp file on failure
     try {

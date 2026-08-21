@@ -1,6 +1,20 @@
-import { readFile, writeFile, mkdir, unlink, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile, mkdir, unlink, readdir } from "node:fs/promises";
+import { join, resolve, relative, isAbsolute } from "node:path";
 import { fileHash } from "./hash.js";
+import { atomicWrite } from "./atomic-write.js";
+
+/**
+ * True when `err` is fs ENOENT — the ONLY read error that means "absent".
+ * Every read-then-overwrite path must use this before treating a file as
+ * fresh: EACCES/EISDIR/EIO also land in a catch, and inferring "absent" from
+ * them turns an unreadable-but-present config into a fresh-file overwrite
+ * that destroys the user's content. (This class was fixed once at
+ * steps/mcp.ts's gitignore path and recurred at five other sites — hence a
+ * shared predicate rather than five inline checks.)
+ */
+export function isEnoent(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException)?.code === "ENOENT";
+}
 
 /**
  * Copy a file if its content has changed (hash comparison). Returns "copied" or "skipped".
@@ -18,12 +32,17 @@ export async function copyIfChanged(
     if (srcHash === fileHash(destContent)) {
       return "skipped";
     }
-  } catch {
-    // File doesn't exist yet
+  } catch (err) {
+    // Only genuine absence means "copy fresh" — an unreadable-but-present
+    // destination should surface, not be silently overwritten (isEnoent doc).
+    if (!isEnoent(err)) throw err;
   }
 
   if (!dryRun) {
-    await writeFile(destPath, srcContent);
+    // Atomic: a crash mid-copy must not leave a truncated agent/command file
+    // whose hash matches neither side (re-run would fix it, but the harness
+    // may load the torn file first).
+    await atomicWrite(destPath, srcContent);
   }
   return "copied";
 }
@@ -44,14 +63,28 @@ export async function writeIfChanged(
     if (newHash === fileHash(existing)) {
       return "skipped";
     }
-  } catch {
-    // File doesn't exist yet
+  } catch (err) {
+    if (!isEnoent(err)) throw err; // see copyIfChanged
   }
 
   if (!dryRun) {
-    await writeFile(destPath, content);
+    await atomicWrite(destPath, content);
   }
   return "copied";
+}
+
+/**
+ * Containment gate for manifest-supplied file names (CWE-22): the manifest
+ * is a same-UID-writable JSON file, and a hand-edited or foreign-written
+ * entry containing `../` would otherwise turn uninstall into an
+ * arbitrary-delete primitive. Only paths that resolve INSIDE `dir` pass.
+ */
+function resolveContained(dir: string, file: string): string | null {
+  const base = resolve(dir);
+  const target = resolve(base, file);
+  const rel = relative(base, target);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return null;
+  return target;
 }
 
 /**
@@ -63,11 +96,25 @@ export async function unlinkFiles(
 ): Promise<number> {
   let removed = 0;
   for (const file of files) {
+    const target = resolveContained(dir, file);
+    if (target === null) {
+      console.warn(
+        `  ⚠ Refusing to remove ${JSON.stringify(file)} — resolves outside ${dir}`,
+      );
+      continue;
+    }
     try {
-      await unlink(join(dir, file));
+      await unlink(target);
       removed++;
-    } catch {
-      // Already gone
+    } catch (err) {
+      // ENOENT = already gone (the dominant, idempotent case). Anything
+      // else is a file we FAILED to remove — say so, because the caller's
+      // count alone reads as success and the manifest may be deleted next.
+      if (!isEnoent(err)) {
+        console.warn(
+          `  ⚠ Could not remove ${join(dir, file)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   }
   return removed;
@@ -80,10 +127,9 @@ export async function unlinkFiles(
  * (whether or not the unlink actually ran in dry-run mode).
  *
  * Extracted from three near-identical blocks in syncAssets, installAgents,
- * and installCommands. Errors from unlink are swallowed silently — the
- * "already gone" case is the dominant one (idempotent re-run, manual user
- * deletion, prior failed install), and there's no recovery the caller
- * can usefully perform mid-loop.
+ * and installCommands. ENOENT unlink failures are tolerated silently (the
+ * dominant, idempotent case); any other failure is warned by name and
+ * excluded from the removed count.
  */
 export async function removeStaleFiles(
   destDir: string,
@@ -95,11 +141,23 @@ export async function removeStaleFiles(
   let removed = 0;
   for (const oldFile of oldManifestFiles) {
     if (!currentFiles.includes(oldFile)) {
+      const staleTarget = resolveContained(destDir, oldFile);
+      if (staleTarget === null) {
+        console.warn(
+          `  ⚠ Refusing to remove stale ${JSON.stringify(oldFile)} — resolves outside ${destDir}`,
+        );
+        continue;
+      }
       if (!dryRun) {
         try {
-          await unlink(join(destDir, oldFile));
-        } catch {
-          // Already gone
+          await unlink(staleTarget);
+        } catch (err) {
+          if (!isEnoent(err)) {
+            console.warn(
+              `  ⚠ Could not remove stale ${join(destDir, oldFile)}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            continue; // failed — must not count as removed
+          }
         }
       }
       removed++;

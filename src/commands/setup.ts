@@ -10,7 +10,14 @@ import type {
   PartialStep,
 } from "../lib/manifest.js";
 import { findProjectRoot } from "../lib/paths.js";
-import { info, printSetupSummary, warn } from "../lib/display.js";
+import {
+  info,
+  warn,
+  blank,
+  printSetupBanner,
+  printHarnessHeader,
+  printSetupSummary,
+} from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 import { getProfile } from "../harnesses/index.js";
 import {
@@ -70,6 +77,13 @@ interface RunSetupOpts {
   username?: string;
 }
 
+/**
+ * The main install flow: resolves every target harness up front (fail-fast on
+ * typos), runs the once-per-run steps (auth, username, CLI prompts) a single
+ * time, then installs MCP config, definitions, and the metrics hook per
+ * harness with failure isolation — one harness failing does not abort the
+ * others. Exits 1 if any harness failed operationally.
+ */
 export async function runSetup(opts: RunSetupOpts): Promise<void> {
   if (opts.harnesses.length === 0) {
     info(
@@ -86,19 +100,10 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
   // unknown-name error; the top-level catch in cli.ts surfaces them.
   const profiles = opts.harnesses.map((name) => getProfile(name));
 
-  console.log();
-  console.log(
-    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
-  );
-  console.log(
-    `      ${chalk.dim("operating intelligence as infrastructure")}`,
-  );
-  console.log();
   const targetSummary = profiles.length === 1
     ? profiles[0]!.displayName
     : `${profiles.length} harnesses (${profiles.map((p) => p.displayName).join(", ")})`;
-  console.log(`  Setup v${version} — ${chalk.bold(targetSummary)}`);
-  console.log();
+  printSetupBanner(version, targetSummary);
 
   if (opts.dryRun) {
     info(chalk.dim("(dry run — no changes will be made)\n"));
@@ -106,7 +111,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
 
   // === Once-per-run: BEFORE the per-harness loop ===
   const { env, apiKey } = await initContext(opts);
-  console.log();
+  blank();
 
   // Optional, never-forced: offer to set a registry username (the one-time
   // prerequisite for creating/publishing definitions). Skipped silently in
@@ -118,7 +123,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     dryRun: opts.dryRun,
     emit: (msg) => info(msg),
   });
-  console.log();
+  blank();
 
   // Acquire the install lock before touching any shared state. Skipped on
   // dry-run (read-only). The lock excludes a second concurrent uluops-setup
@@ -127,6 +132,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
   // concurrent multi-harness installs from separate processes serialize
   // (spec §10.6).
   let lock: LockHandle | null = null;
+  let exitCode = 0;
   if (!opts.dryRun) {
     lock = await acquireInstallLock();
   }
@@ -138,7 +144,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       info(
         `Updating ${chalk.dim(existingManifest.version)} → ${chalk.green(version)}`,
       );
-      console.log();
+      blank();
     }
 
     // === Per-harness loop ===
@@ -153,7 +159,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       // files (spec §7.6.1 per-iteration state isolation).
       const existingHarness = existingManifest?.harnesses[harnessName];
 
-      console.log(chalk.dim(`▸ ${profile.displayName}`));
+      printHarnessHeader(profile.displayName);
 
       if (existingHarness && !existingHarness.partial) {
         info(chalk.dim(`  Already installed at v${version} — checking for changes`));
@@ -180,10 +186,25 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
             warn(
               `[${harnessName}] skipped (user declined conflict) — continuing with remaining harnesses`,
             );
-            console.log();
+            blank();
             continue;
           }
-          throw err;
+          // Operational failure (e.g. unreadable dest dir, non-TTY refusal):
+          // classify-and-continue like the MCP branch below — rethrowing
+          // escaped the per-harness loop, leaving installed siblings with NO
+          // manifest record and skipping later harnesses (audit pass 6,
+          // PROBE D). classifyExit yields 1 for a failed result.
+          perHarnessResults.push({
+            harnessName,
+            profile,
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+          });
+          warn(
+            `[${harnessName}] conflict check failed — continuing with remaining harnesses`,
+          );
+          blank();
+          continue;
         }
       }
 
@@ -203,7 +224,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         warn(
           `[${harnessName}] MCP configuration failed — continuing with remaining harnesses`,
         );
-        console.log();
+        blank();
         continue;
       }
 
@@ -262,7 +283,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         partial: failedStep,
       });
 
-      console.log();
+      blank();
     }
 
     // === Once-per-run: AFTER the per-harness loop ===
@@ -304,33 +325,74 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     // harness entry. Declined harnesses and pre-MCP failures land no entry.
     if (!opts.dryRun) {
       const now = new Date().toISOString();
-      const manifest: Manifest = existingManifest ?? {
-        version,
-        installedAt: now,
-        shellModified: false,
-        harnesses: {},
-      };
+      // Clone rather than alias: mutating the loaded object would silently
+      // change what any later `existingManifest` read sees. Today all reads
+      // precede this block — the clone keeps that a non-condition instead of
+      // an ordering invariant someone has to remember.
+      const manifest: Manifest = existingManifest
+        ? structuredClone(existingManifest)
+        : {
+            version,
+            installedAt: now,
+            shellModified: false,
+            harnesses: {},
+          };
       manifest.version = version;
       manifest.installedAt = now;
       manifest.shellModified = shellModified || manifest.shellModified;
 
       for (const r of perHarnessResults) {
         if (!r.mcpResult) continue; // no MCP success → no entry
+        // A step that THREW produced no result — falling back to [] here
+        // would replace a populated prior entry with an empty record,
+        // orphaning every previously-installed file the moment a re-run
+        // fails (uninstall trusts these lists). Undefined result = keep the
+        // prior record; the `partial` marker names what didn't complete.
+        const prevEntry = existingManifest?.harnesses[r.harnessName];
+        const newDefsScope = opts.localDefs ? "local" : "global";
+        // TWO gates, deliberately: the FILE LISTS live under defsPath and
+        // may only be inherited within the same scope (a global list against
+        // a local path points uninstall at the wrong tree). The HOOK fields
+        // live in settings.json under profile.paths — scope-independent —
+        // and gating them on defsScope falsified hooksInstalled on a scope
+        // flip (audit pass 6, PROBE C).
+        const prevLists =
+          prevEntry && prevEntry.defsScope === newDefsScope
+            ? prevEntry
+            : undefined;
+        const prevHooks = prevEntry;
+        if (prevEntry && !prevLists) {
+          // Scope flip: the prior tree at the old defsPath is no longer
+          // tracked by this manifest — say so rather than dropping it
+          // silently (cross-scope cleanup is not implemented).
+          warn(
+            `[${r.harnessName}] defs scope changed (${prevEntry.defsScope} → ${newDefsScope}): previously installed files remain untracked at ${prevEntry.defsPath}`,
+          );
+        }
+        // A metrics result whose skippedReason is set NEVER OBSERVED the
+        // hook state ("--no-metrics" means don't touch metrics; unsupported
+        // harnesses too) — `??` alone can't express that because false is a
+        // value. Only an observing run may change the recorded hook state.
+        const metricsObserved =
+          r.metricsResult !== undefined && !r.metricsResult.skippedReason;
         const harnessEntry: HarnessManifest = {
           installedAt: now,
           setupVersion: version,
           mcpScope: opts.scope,
           mcpConfigPath: r.mcpResult.configPath,
-          defsScope: opts.localDefs ? "local" : "global",
+          defsScope: newDefsScope,
           defsPath: opts.localDefs
             ? join(await findProjectRoot(), "uluops")
             : r.profile.paths.home,
-          agents: r.agentsResult?.files ?? [],
-          commands: r.commandsResult?.files ?? [],
-          skills: r.skillsResult?.files ?? [],
-          hooksInstalled: r.metricsResult?.hookConfigured ?? false,
-          hooksInstalledVersion:
-            r.metricsResult?.hooksInstalledVersion ?? null,
+          agents: r.agentsResult?.files ?? prevLists?.agents ?? [],
+          commands: r.commandsResult?.files ?? prevLists?.commands ?? [],
+          skills: r.skillsResult?.files ?? prevLists?.skills ?? [],
+          hooksInstalled: metricsObserved
+            ? (r.metricsResult?.hookConfigured ?? false)
+            : (prevHooks?.hooksInstalled ?? false),
+          hooksInstalledVersion: metricsObserved
+            ? (r.metricsResult?.hooksInstalledVersion ?? null)
+            : (prevHooks?.hooksInstalledVersion ?? null),
           partial: r.partial ?? null,
         };
         manifest.harnesses[r.harnessName] = harnessEntry;
@@ -365,19 +427,31 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     // per-harness status icons, partial markers, re-run hints, and the
     // aggregate counts in the header. Single-harness path preserves
     // today's Setup-complete banner format inside the same function.
-    await printSetupSummary({
-      results: perHarnessResults,
-      apiKey,
-    });
+    try {
+      await printSetupSummary({
+        results: perHarnessResults,
+        apiKey,
+      });
+    } catch (err) {
+      // A render failure must not invert the run outcome: the install and
+      // manifest write already happened — classifyExit below is the
+      // authority, not the pretty-printer.
+      warn(
+        `Could not render the setup summary: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     // Exit-code classifier (spec §7.5 4-tier table). One call, one place.
     // Empty perHarnessResults already short-circuited above with the
     // "nothing to install" message; classifyExit handles defense-in-depth.
-    const exitCode = classifyExit(perHarnessResults);
-    if (exitCode !== 0) {
-      process.exit(exitCode);
-    }
+    exitCode = classifyExit(perHarnessResults);
   } finally {
     if (lock) await lock.release();
+  }
+  // process.exit inside the try would skip the finally and leave the lock
+  // held (the signal handlers are a backstop, not the contract) — classify
+  // inside, exit only after cleanup has run.
+  if (exitCode !== 0) {
+    process.exit(exitCode);
   }
 }

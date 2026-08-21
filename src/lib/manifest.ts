@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { getManifestPath, getLegacyManifestPath, getUluopsDir } from "./paths.js";
 import { fileHash } from "./hash.js";
 import { atomicWrite } from "./atomic-write.js";
+import { isEnoent } from "./file-ops.js";
 
 /**
  * Identifier for a single harness installation in the manifest.
@@ -123,8 +124,19 @@ function isNewManifest(obj: unknown): obj is Manifest {
     if (typeof h !== "object" || h === null) return false;
     const hm = h as Record<string, unknown>;
     if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
+    // defsScope is load-bearing (the prev-list inheritance gate branches on
+    // it) — an absent/invalid value reads as a permanent scope flip that
+    // orphans every recorded file. Refuse-by-name like every other shape.
+    if (hm["defsScope"] !== "global" && hm["defsScope"] !== "local") return false;
     if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
-    if ("skills" in hm && !Array.isArray(hm["skills"])) return false;
+    // Element typing: a hand-edited agents: [1,2] otherwise reaches
+    // join(dir, file) in uninstall and TypeErrors mid-removal.
+    if (!(hm["agents"] as unknown[]).every((x) => typeof x === "string")) return false;
+    if (!(hm["commands"] as unknown[]).every((x) => typeof x === "string")) return false;
+    if ("skills" in hm) {
+      if (!Array.isArray(hm["skills"])) return false;
+      if (!(hm["skills"] as unknown[]).every((x) => typeof x === "string")) return false;
+    }
     if ("partial" in hm) {
       const p = hm["partial"];
       if (p !== null && p !== "agents" && p !== "commands" && p !== "skills" && p !== "metrics") {
@@ -143,6 +155,10 @@ function isLegacyManifest(obj: unknown): obj is LegacyManifest {
     typeof m["installedAt"] === "string" &&
     typeof m["mcpConfigPath"] === "string" &&
     typeof m["defsPath"] === "string" &&
+    // defsScope is load-bearing post-migration (the inheritance gate
+    // branches on it) — validate here so a bad value hits the
+    // unrecognized-shape refusal instead of migrating to undefined.
+    (m["defsScope"] === "global" || m["defsScope"] === "local") &&
     Array.isArray(m["agents"]) &&
     Array.isArray(m["commands"]) &&
     !("harnesses" in m)
@@ -250,8 +266,17 @@ export async function validateManifest(
     try {
       raw = await readFile(candidate, "utf-8");
       break;
-    } catch {
-      // Try next candidate
+    } catch (err) {
+      if (!isEnoent(err)) {
+        // Warning-only path (hash tamper check) — an unreadable candidate
+        // must not masquerade as "no manifest on disk"; name it and skip
+        // the hash check rather than silently treating it as absent.
+        warnings.push(
+          `Cannot read manifest at ${candidate} to verify content hash (${err instanceof Error ? err.message : String(err)})`,
+        );
+        break;
+      }
+      // Absent — try next candidate.
     }
   }
   if (raw !== null) {
@@ -309,11 +334,27 @@ async function findMissingFiles(
 }
 
 async function readManifestFile(path: string): Promise<unknown | null> {
+  let raw: string;
   try {
-    const raw = await readFile(path, "utf-8");
+    raw = await readFile(path, "utf-8");
+  } catch (err) {
+    if (isEnoent(err)) return null; // genuinely absent
+    // Unreadable-but-PRESENT must never read as "no manifest": loadManifest's
+    // null flows into saveManifest overwriting the file we couldn't read,
+    // orphaning every recorded agent/command/hook — and into uninstall's
+    // "nothing to uninstall". Same class, same rule as the config readers.
+    throw new Error(
+      `Could not read the install manifest at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite the record of what is installed. Nothing was modified.`,
+    );
+  }
+  try {
     return JSON.parse(raw);
   } catch {
-    return null;
+    // Malformed is not absent either: proceeding would rewrite the file and
+    // orphan everything it recorded. Name the path and the way out.
+    throw new Error(
+      `The install manifest at ${path} contains invalid JSON — fix or remove it and re-run. (Detected before any UluOps change; nothing was modified. Removing it makes setup treat this as a fresh install; previously installed files will not be tracked for uninstall.)`,
+    );
   }
 }
 
@@ -330,6 +371,16 @@ export async function loadManifest(): Promise<Manifest | null> {
   }
   // Also check if legacy location has new format (written by newer version but not yet moved)
   if (legacyData && isNewManifest(legacyData)) return legacyData;
+
+  // A PRESENT file that matches no known shape is the last surviving form
+  // of "read problem means absent": returning null here lets setup build a
+  // fresh manifest and overwrite the record. Refuse by name instead.
+  if (newData !== null || legacyData !== null) {
+    const path = newData !== null ? getManifestPath() : getLegacyManifestPath();
+    throw new Error(
+      `The install manifest at ${path} has an unrecognized shape — fix or remove it and re-run. (Detected before any UluOps change; nothing was modified. Removing it makes setup treat this as a fresh install; previously installed files will not be tracked for uninstall.)`,
+    );
+  }
 
   return null;
 }
@@ -349,13 +400,23 @@ export async function saveManifest(manifest: Manifest): Promise<void> {
   await atomicWrite(getManifestPath(), final);
 }
 
-/** Delete the install manifest file from disk. Tries both locations. */
-export async function deleteManifest(): Promise<void> {
+/**
+ * Delete the install manifest file from disk. Tries both locations.
+ * Returns the paths that could NOT be removed (non-ENOENT failures) so the
+ * caller can report the truth instead of an unconditional success —
+ * a manifest that survives keeps claiming a full install.
+ */
+export async function deleteManifest(): Promise<{ failed: string[] }> {
+  const failed: string[] = [];
   for (const path of [getManifestPath(), getLegacyManifestPath()]) {
     try {
       await unlink(path);
-    } catch {
-      // Already gone
+    } catch (err) {
+      if (!isEnoent(err)) {
+        failed.push(`${path} (${err instanceof Error ? err.message : String(err)})`);
+      }
+      // ENOENT — already gone.
     }
   }
+  return { failed };
 }

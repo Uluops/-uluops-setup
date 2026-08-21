@@ -28,6 +28,7 @@ import type {
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
 import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
+import { isEnoent } from "../lib/file-ops.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -96,8 +97,15 @@ export async function initContext(opts: {
       ok(`Account created (${auth.email})`);
       ok(`API key generated`);
     } else {
+      // Non-TTY must fall through to resolveApiKey's no-key error (which
+      // names --api-key / ULUOPS_API_KEY) — prompting against a closed stdin
+      // dies on inquirer's raw cancellation instead. Mirrors the isTTY guard
+      // in shouldPromptForAccount.
       const interactive =
-        !opts.yes && !opts.apiKey && !process.env["ULUOPS_API_KEY"];
+        !opts.yes &&
+        !opts.apiKey &&
+        !process.env["ULUOPS_API_KEY"] &&
+        Boolean(process.stdin.isTTY);
       const auth = await resolveApiKey({
         apiKeyFlag: opts.apiKey,
         skipValidation: opts.skipValidation,
@@ -277,7 +285,14 @@ export async function configureMetricsStep(
         `Metrics hooks not supported for ${profile.displayName}`,
       ),
     );
-    return { toolFilesCopied: 0, hookConfigured: false, hooksInstalledVersion: null };
+    // skippedReason for shape parity with installMetrics' own hookless
+    // branch — metricsObserved must read this run as non-observing.
+    return {
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+      skippedReason: "no-hook-support",
+    };
   }
 
   const probe = probeHookSupport();
@@ -293,6 +308,18 @@ export async function configureMetricsStep(
       "~",
     );
     ok(`Agent metrics → ${toolPath}/ (${parts.join(", ")})`);
+    // Disclosure, not decoration: the hook captures execution metadata to a
+    // LOCAL buffer and sends nothing itself — say so where it's installed.
+    info(
+      chalk.dim(
+        "  Captures agent token/duration metadata to a local buffer (nothing is sent).\n" +
+          "  Skip with --no-metrics · uluops.ai/privacy",
+      ),
+    );
+  } else if (res.skippedReason === "hook-state-unknown") {
+    // installMetrics already warned with the settings path and the
+    // keeping-prior-record note — do not follow it with a message that
+    // misnames the cause (tool files may well have copied).
   } else {
     warn("Agent metrics hook not configured (tool files not found)");
   }
@@ -480,12 +507,19 @@ export async function runHealthCheck(opts: {
         checkEndpoint("https://api.uluops.ai/api/v1/health"),
         checkEndpoint("https://api.uluops.ai/api/v1/registry/health"),
       ]);
-      if (trackerOk && registryOk)
+      if (trackerOk && registryOk) {
         ok("Health check passed — both APIs reachable");
-      else
+      } else {
+        // Name the failing endpoint — "some APIs" gives the user nothing to
+        // report or retry against.
+        const down = [
+          !trackerOk && "Tracker",
+          !registryOk && "Registry",
+        ].filter(Boolean);
         warn(
-          "Some APIs unreachable (MCP tools may have limited functionality)",
+          `${down.join(" and ")} API unreachable (MCP tools may have limited functionality)`,
         );
+      }
     } catch {
       warn("Health check skipped (network issue)");
     }
@@ -546,11 +580,48 @@ export async function checkConflicts(
   const srcDir = join(ASSETS_DIR, profile.name, "agents");
 
   let existingFiles: string[];
-  let assetFiles: string[];
   try {
     existingFiles = await readdir(destDir);
+  } catch (err) {
+    if (isEnoent(err)) {
+      return; // No destination dir yet — fresh install, nothing to conflict.
+    }
+    // Unreadable destination = conflicts UNKNOWN, never "no conflicts":
+    // proceeding silently overwrites files we could not enumerate. Ask.
+    warn(
+      `Could not read ${destDir} (${err instanceof Error ? err.message : String(err)}) — cannot check for existing agents that would be overwritten.`,
+    );
+    if (!process.stdin.isTTY) {
+      // Non-TTY can't answer the prompt; fail-safe is refusal, not a hang
+      // and not a silent overwrite. This is an OPERATIONAL failure (EACCES
+      // class), not a user policy choice — it must exit 1 for CI, so a
+      // plain Error (failed path), not ConflictRejectedError (exit 0).
+      // (--yes skips checkConflicts entirely.)
+      throw new Error(
+        `Cannot verify conflicts in ${destDir} and no TTY to ask — refusing to risk overwriting existing files. Fix the directory permissions or pass --yes to proceed without the check.`,
+      );
+    }
+    const { confirm } = await import("@inquirer/prompts");
+    const proceed = await confirm({
+      message: "Continue anyway (existing files may be overwritten)?",
+      default: false,
+    });
+    if (!proceed) {
+      throw new ConflictRejectedError(profile.name);
+    }
+    return;
+  }
+
+  let assetFiles: string[];
+  try {
     assetFiles = await readdir(srcDir);
-  } catch {
+  } catch (err) {
+    // The BUNDLED assets being unreadable is not a fresh-install condition —
+    // it means the package itself is broken. Don't silently skip the
+    // conflict check; say so (the copy step will surface the hard failure).
+    warn(
+      `Could not read bundled agent assets (${err instanceof Error ? err.message : String(err)}) — conflict check skipped`,
+    );
     return;
   }
 

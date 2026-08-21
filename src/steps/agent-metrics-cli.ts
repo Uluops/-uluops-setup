@@ -71,17 +71,35 @@ function summarizeNpmResult(
   op: string,
 ): { ok: boolean; error?: string } {
   if (r.status === 0) return { ok: true };
+  // Timeout FIRST: a spawnSync timeout sets BOTH r.error (ETIMEDOUT) and
+  // signal SIGTERM — the specific diagnosis must win over the generic one.
   if (r.signal === "SIGTERM" && r.status === null) {
     return {
       ok: false,
       error: `npm ${op} exceeded ${NPM_TIMEOUT_MS / 1000}s timeout and was terminated`,
     };
   }
+  // Spawn failure (npm not on PATH, ENOENT) sets r.error with status null —
+  // mirror src/steps/cli.ts so it never renders as "exit null".
+  if (r.error) {
+    return { ok: false, error: `npm could not be run: ${r.error.message}` };
+  }
   const stderr = (r.stderr ?? "").toString().trim();
   const stdout = (r.stdout ?? "").toString().trim();
-  return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+  let error = stderr || stdout || `exit ${r.status}`;
+  // Mirror src/steps/cli.ts: name the root-owned-prefix cause on EACCES.
+  if (/EACCES|EPERM|permission denied/i.test(error)) {
+    error += ` — your npm global prefix isn't writable. A Node version manager (nvm/fnm) avoids this permanently; see docs.npmjs.com/resolving-eacces-permissions-errors`;
+  }
+  return { ok: false, error };
 }
 
+/**
+ * Detect a globally-installed `@uluops/agent-metrics` via `npm ls -g`.
+ * Returns the installed version string, or null when absent (or when npm
+ * itself fails/times out — absence and detection failure are deliberately
+ * indistinguishable: both mean "offer the install").
+ */
 export function detectGlobalAgentMetrics(): string | null {
   const r = spawnSync(
     "npm",

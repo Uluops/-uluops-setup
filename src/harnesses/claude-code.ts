@@ -26,6 +26,7 @@ import {
   hasUluopsHook,
 } from "../lib/settings-merger.js";
 import { getClaudeHome, getClaudeJsonPath } from "../lib/paths.js";
+import { serialize } from "../lib/write-coordinator.js";
 
 class ClaudeCodeMcpConfig implements McpConfigStrategy {
   async read(path: string): Promise<Record<string, unknown>> {
@@ -66,18 +67,25 @@ class ClaudeCodeHooks implements HookStrategy {
     dryRun: boolean,
   ): Promise<boolean> {
     if (dryRun) return true;
-    const settings = await readSettings(settingsPath);
-    // Claude Code uses SubagentStop as the default event for auto-save
-    const merged = mergeUluopsHook(settings, hookCommand);
-    await writeSettings(settingsPath, merged);
+    // Serialized for uniformity with the MCP cycle — the invariant is
+    // "every settings RMW is exclusive per path", not "only where files
+    // collide today".
+    await serialize(settingsPath, async () => {
+      const settings = await readSettings(settingsPath);
+      // Claude Code uses SubagentStop as the default event for auto-save
+      const merged = mergeUluopsHook(settings, hookCommand);
+      await writeSettings(settingsPath, merged);
+    });
     return true;
   }
 
   async remove(settingsPath: string, dryRun: boolean): Promise<void> {
     if (dryRun) return;
-    const settings = await readSettings(settingsPath);
-    const cleaned = removeUluopsHook(settings);
-    await writeSettings(settingsPath, cleaned);
+    await serialize(settingsPath, async () => {
+      const settings = await readSettings(settingsPath);
+      const cleaned = removeUluopsHook(settings);
+      await writeSettings(settingsPath, cleaned);
+    });
   }
 
   async check(settingsPath: string): Promise<boolean> {

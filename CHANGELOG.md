@@ -2,6 +2,294 @@
 
 All notable changes to `@uluops/setup` will be documented in this file.
 
+## [Unreleased]
+
+## [0.12.0] - 2026-08-21
+
+### Added
+
+- **Per-file write coordinator** (`src/lib/write-coordinator.ts`). Every
+  config read-merge-write cycle (MCP step, hook install/remove, both JSON
+  profiles) is now serialized per resolved path, closing the Gemini CLI
+  same-file pair (`~/.gemini/settings.json` holds both the MCP config and
+  the hook) against interleaved cycles — including under any future
+  concurrent step orchestration. Every `atomicWrite` additionally attests a
+  content hash of what this process wrote (`fileMatchesLastWrite`), so any
+  future rollback mechanism can refuse to clobber content it didn't write.
+  Deliberately NOT single-write coalescing: the hook entry has a hard data
+  dependency on the metrics tool files landing first (a hook pointing at a
+  missing hook.js fires a failing command in the user's harness), so
+  coalescing would couple MCP-config success to the metrics step.
+- **Metrics-step privacy disclosure.** The install output now states, at the
+  point of hook installation, that the hook captures agent token/duration
+  metadata to a local buffer and sends nothing itself, with the `--no-metrics`
+  opt-out and the privacy-policy URL. A README "Data & privacy" section
+  grounds the full picture in the policy's actual terms (local buffer; data
+  leaves only on explicit tracker saves; indefinite retention by design;
+  org-policy note for shared installs).
+
+- **`--verify` checks MCP package resolvability on npm.** The install-time
+  probe is non-blocking by design; the harness runs `npx -y <spec>` at
+  startup, so an unresolvable package fails long after setup succeeded.
+  `--verify` now re-asks the question on demand (a registry outage is
+  reported but does not double-fail a run the connectivity checks already
+  failed).
+
+### Changed
+
+- **MCP server pins bumped to the current release contract:**
+  `@uluops/ops-mcp` 0.11.0 → **0.13.0** (the update-run merge-mode + echo
+  release), `@uluops/registry-mcp` 0.3.5 → **0.3.7**. A fresh install now
+  wires the servers this release was validated against.
+- **The npm availability probe now checks the PINNED VERSIONS, not the bare
+  package names** — reversing the earlier deliberate choice. The harness
+  runs `npx -y <pinned spec>`, so an unresolvable pin is exactly the
+  condition that must fail loudly at install time instead of hours later as
+  an opaque npx error at first MCP launch. "A pin is not a publish"; the
+  probe now enforces it. `--verify`'s resolvability check inherits the same
+  version precision.
+- **Auto-detection now names its exclusions.** When an experimental
+  harness's home directory is present, detection prints a dimmed
+  `Detected <Name> (experimental) — excluded from auto-detection; opt in
+  with --harness <name>` line instead of silently omitting it (the policy —
+  detected = safe to install — is unchanged and now visible).
+- **Conflict check distinguishes "fresh install" from "broken bundle".**
+  A missing destination dir still skips silently (expected on first
+  install); the *bundled assets* being unreadable now warns loudly before
+  skipping — that condition means the package is broken, not that the
+  machine is fresh.
+- **Dependency refresh to latest minors/patches (exact pins kept):**
+  `@inquirer/prompts` 8.5.2 → 8.6.0, `tsx` 4.22.4 → 4.23.12, `vitest`
+  4.1.9 → 4.1.11. The three majors available at review time were deliberately
+  held: `chalk` 6 requires Node >= 22 (this package supports >= 20),
+  `typescript` 7 is the native-compiler migration and gets its own pass, and
+  `@types/node` 26 describes APIs outside the supported Node floor.
+- `CHANGELOG.md` now ships in the npm tarball (added to `files`), and the
+  build stamps the executable bit on `dist/cli.js` directly (`postbuild
+  chmod +x`) instead of relying on npm's bin-link chmod at install time.
+
+### Fixed
+
+- **Fish users no longer get bash syntax written into `config.fish`.**
+  `--shell` now writes `set -gx ULUOPS_API_KEY …` for fish (the `export`
+  form printed a parse error on every new fish shell while never setting
+  the variable — visible breakage plus silent auth failure), and the
+  profile's parent directory is created first (a fresh fish user may have
+  no `~/.config/fish/` yet).
+- **README honesty pass (anxiety-read findings):** the `HTTPS_PROXY`
+  troubleshooting remedy was inert (Node's fetch ignores proxy env vars) —
+  replaced with the working `--skip-validation` path; "safe and idempotent"
+  / "never touched" absolutes replaced with the two known edges the repo
+  itself documents (ownership-marker hook replacement on re-run, and the
+  `--local-defs` scope-flip leaving the prior tree untracked).
+- **Round-7: unknown is never observed.** When `hook.js` is absent and the
+  settings file cannot be read, the metrics step now returns
+  `skippedReason: "hook-state-unknown"` (with a named warning) instead of an
+  observed `false` — the manifest keeps its prior hook record and uninstall
+  keeps removing the hook. The hookless short-circuit gained the same
+  `skippedReason` for shape parity; `defsScope` is validated at manifest
+  load (the inheritance gate branches on it); a summary-render failure can
+  no longer report a completed install as exit-1 (render is advisory,
+  `classifyExit` is the authority) and the catalog's per-file read names
+  unreadable bundled files instead of throwing; the skill-dir prune skips
+  top-level assets.
+- **Round-6 gate corrections (the falsified-state class, final ring).**
+  The defs-scope inheritance gate no longer covers the scope-INDEPENDENT
+  hook fields — a `--local-defs` re-run of a global install can no longer
+  record `hooksInstalled: false` over a live hook (uninstall/verify branch
+  on that field); a scope flip now warns naming the old, now-untracked
+  defsPath. An operational conflict-check failure (unreadable destination,
+  non-TTY refusal) is classified per-harness and the run continues —
+  previously it escaped the loop, leaving installed sibling harnesses with
+  no manifest record at all. `skills` entries are element-typed like
+  agents/commands; `hookConfigured` consults the settings file when
+  hook.js is absent instead of recording false from disk-existence alone;
+  the metrics package.json copy and skill-dir prune failures are named.
+- **Failed copies are no longer deleted as "stale", and skipped steps no
+  longer falsify the record** (fifth audit round — the falsified-state
+  class one ring further out). Stale reconciliation now compares against
+  what the package SHIPS, not what copied successfully this run — an
+  ENOSPC re-run previously deleted the entire previously-working installed
+  set and reported it as routine cleanup; failed-but-previously-installed
+  files stay in the manifest record so uninstall can still remove their
+  surviving prior copies. `--no-metrics` (and unsupported harnesses) no
+  longer downgrade `hooksInstalled` to false — a step that never observed
+  the hook state cannot change its record, so uninstall keeps removing the
+  hook it previously installed. Prior file lists are inherited only within
+  the same defs scope (a `--local-defs` flip no longer points uninstall at
+  the wrong tree); a present manifest with an unrecognized shape refuses
+  loudly instead of reading as absent (behavior change: was silently
+  treated as no-manifest); manifest agents/commands entries are
+  element-typed; the non-TTY unknown-conflicts refusal exits 1 as an
+  operational failure (not a user-decline exit 0); the tool-file removal
+  catch names its error; the unidentifiable-lock message no longer invents
+  "PID -1".
+- **The read-error-means-absent inference is now eliminated at every
+  read-then-act site, not only the overwrite-shaped ones.** Third audit
+  round: the conflict-overwrite guard treated an unreadable destination as
+  "no conflicts" and destroyed a user's own agent file with no prompt (now:
+  conflicts unknown → explicit confirm, default No); the bundled-asset
+  readers returned empty lists on read errors that the manifest then
+  recorded as authoritative, orphaning previously-installed files (now:
+  only ENOENT means "ships none"; anything else fails the step, records
+  partial state, and — fourth round — the manifest entry PRESERVES the
+  prior file lists for every step that produced no result, so the partial
+  record can never itself become the orphaning vector); an unreadable lock `meta.json` was classified stale and a
+  LIVE lock stolen (now: unverifiable = held, never reclaimed), and the
+  mkdir→meta window got a grace-recheck before stale-claiming; the metrics
+  tool copy verifies its source is readable before wiping the installed
+  tree.
+- **Uninstall reports the truth.** `removeShellExport` and `deleteManifest`
+  return results their callers consult: an unremovable shell export warns
+  that the plaintext key survives (previously "✓ Removed export" over an
+  untouched file), an undeletable manifest warns instead of "✓ Manifest
+  deleted", and per-file unlink failures during uninstall are named instead
+  of silently excluded from a truthful-looking count. Returning-user
+  detection (`hasCredentialsFile`) now counts unreadable-but-present as
+  present, so a permissions hiccup no longer steers into a duplicate
+  signup.
+- **The install manifest can no longer be silently replaced or misread as
+  absent.** `readManifestFile` collapsed every read error AND malformed
+  JSON into "no manifest" — after which a save would overwrite the file it
+  couldn't read, orphaning every recorded agent/command/hook, and uninstall
+  would report "nothing to uninstall". Unreadable-but-present now refuses
+  loudly; malformed JSON refuses with the recovery path named. (Behavior
+  change: malformed manifests previously read as absent.)
+- **`writeCredentialsFile` honors its preserve promise.** The merge only
+  starts fresh on genuine absence now — an unreadable or unparseable
+  credentials file (which may hold other profiles shared with @uluops/cli)
+  refuses instead of being overwritten. (Behavior change: unparseable files
+  previously read as absent.)
+- **`--uninstall` with an invalid harness filter exits 1 again** — the
+  previous fix's in-try `return` made the trailing exit unreachable, so the
+  fatal error exited 0; the path now rides `process.exitCode`.
+- **An unreadable-but-present config can no longer be silently replaced.**
+  Every read-then-overwrite path (Claude config, harness settings, Codex
+  TOML, OpenCode JSONC, shell profile) treated ANY read error as "file
+  absent" and proceeded to write a fresh file over it — an EACCES on a
+  root-owned `~/.claude.json` or `~/.zshrc` would have destroyed the user's
+  content with a green checkmark. All five sites now discriminate via a
+  shared `isEnoent` predicate: only a genuinely missing file reads as
+  fresh; anything else refuses loudly with nothing modified. (This class
+  was fixed once before at the gitignore path — the predicate exists so it
+  cannot recur site-by-site.)
+- **Malformed OpenCode JSONC is refused instead of silently truncated.**
+  `jsonc-parser`'s `parse()` is error-recovering and never throws, so the
+  previous guard was unreachable: everything after a syntax error was
+  dropped, merged, and written back. Parse errors are now collected via
+  the errors out-param and refuse the file by name.
+- **`--uninstall` no longer leaks the install lock on an invalid harness
+  filter** — same exit-inside-try defect fixed for `runSetup` earlier,
+  now fixed as the class: the exit is recorded and fired after the
+  `finally` releases the lock.
+- **npm failures diagnose themselves**: a spawn failure (npm not on PATH)
+  now reports the real cause instead of `exit null`, with the timeout
+  diagnosis taking precedence when both signals are present.
+- **Slow-network timeouts get the friendly message**: `AbortSignal.timeout`
+  rejections (DOMException `TimeoutError`) are now classified alongside
+  network `TypeError`s in auth, signup, and username flows — previously the
+  exact case the "check your connection / --skip-validation" messages were
+  written for never triggered them. A 200 with a non-JSON body (captive
+  portal) is also handled in signup/username, matching auth.
+- **Codex TOML removal no longer drops a user's block after an unparseable
+  header** — array-of-tables (`[[x]]`) and quoted-`]` headers now end the
+  skip region instead of leaving it sticky.
+- **`stripDangerousKeys` strips `__proto__` only** — own-property
+  `constructor`/`prototype` keys assigned by `Object.assign` are inert data
+  properties, and stripping them silently ate legitimate user keys
+  (JSON-schema fragments) on the round-trip.
+- **Install-lock release deregisters the dir only after removal completes**,
+  closing a signal-window leak; the coordinator's `fileMatchesLastWrite`
+  now answers true only on ENOENT (an unverifiable read must never
+  authorize a write), and its docblock states plainly that attestation has
+  no production consumer until a rollback mechanism exists.
+- **A verify API-key decode failure no longer suppresses the npm
+  resolvability check**, and `getVersion` wraps its own JSON parse in the
+  deliberate broken-publish error.
+- **Hook ownership is now decided by one predicate across merge/remove/has.**
+  The merge tolerated malformed matcher entries while `removeUluopsHook` and
+  `hasUluopsHook` dereferenced them unguarded — the same hand-edited
+  settings file merged fine but crashed `--uninstall` and `--verify`. All
+  three now share `isUluopsMatcher` (anything not positively ours is user
+  data: preserved by remove, invisible to has, never a crash), the two
+  crash-reachable callers (`uninstallMetrics`, verify's `checkHooks`) are
+  wrapped to degrade to a warning/failed check, and the OpenCode config
+  reader gained the same top-level shape gate as its siblings.
+- **Agent/command/skill file copies are atomic** (`copyIfChanged`/
+  `writeIfChanged` now write via temp+rename) — a crash mid-copy can no
+  longer leave a torn definition file for the harness to load.
+- **Parsed configs are stripped of `__proto__`/`constructor`/`prototype`
+  own-keys at the read boundary.** Our own merges are spread-based and
+  were never pollutable, but a hostile key read from disk would have been
+  written back for assign-semantics consumers to trip on. Break-test
+  proves an `Object.assign` over the stripped parse cannot pollute.
+- **Pre-existing invalid JSON is named as pre-existing.** Both mergers'
+  parse errors now state the file failed to parse *before* any UluOps
+  change was made — previously indistinguishable from installer-caused
+  corruption.
+- **`npm install -g` EACCES failures explain themselves** (both the CLI and
+  agent-metrics installers): the error now names the unwritable-prefix
+  cause and points at version managers / the npm permissions doc.
+- **Health-check failures name the endpoint** (Tracker vs Registry) instead
+  of "some APIs unreachable".
+- **`getVersion` fails loudly on a malformed package.json** instead of
+  stamping `undefined` into banners and the manifest.
+- **Credentials reads only ever return a string key** — a malformed
+  `credentials.json` (numeric/object apiKey) reads as "no stored key"
+  rather than flowing a non-string into Bearer headers.
+- **Manifest save clones instead of aliasing the loaded manifest**, and the
+  gitignore-update warning routes through the standard display helper.
+
+- **`process.exit` no longer fires inside `runSetup`'s try block.** The
+  non-zero exit-code path skipped the `finally` that releases the install
+  lock (the signal handlers were the only cleanup actually running).
+  `classifyExit` still runs inside; the exit happens after the lock release.
+- **Settings/config reads now reject unmergeable shapes instead of crashing
+  or corrupting.** Valid-JSON-wrong-shape user files (top-level array or
+  string; `hooks` as a string — which the merge would have spread into
+  per-character keys and written back; a hooks entry that is not an array)
+  now throw the same friendly named-path error as invalid JSON. The hook
+  merge additionally preserves matcher entries it cannot parse instead of
+  TypeErroring on them. Applies to both `settings-merger` and
+  `config-merger` reads.
+- **Install-lock `meta.json` is written mode 0600** — it carries the owning
+  PID/hostname and was world-readable.
+- **Non-TTY invocation without `-y` no longer dies on a raw inquirer
+  cancellation.** The API-key prompt's `interactive` gate now checks
+  `process.stdin.isTTY` (mirroring the existing guard on the account prompt),
+  so a piped/CI run with no key falls through to the actionable error —
+  `No API key found. Pass --api-key or set ULUOPS_API_KEY…` — instead of
+  `User force closed the prompt`. Found by live dx validation
+  (consumer-validate run #36).
+- **README caught up to the shipped CLI.** The `--username` flag and its
+  registry-username step (live since 0.9.9) are now in the Options table,
+  the installer step list, and the Examples; the `--list`/`--verify` sample
+  outputs were regenerated from v0.11.0 (the old captures showed v0.9.5 and
+  pre-rename agent slugs like `code-validator` for what is now `validate`);
+  the Node >= 20 requirement is stated at the quick-start instead of only in
+  the bottom Requirements section; a contents line was added and all code
+  fences carry language tags.
+
+### Known gap (deferred)
+
+- **`process.exit` immediately after console output can truncate piped
+  stdout** (`npx @uluops/setup | tee` may lose the tail of the summary).
+  Converting the exit paths to `process.exitCode` requires an open-handle
+  audit first — a lingering inquirer/stdin handle would turn a truncated
+  log into a hung process, which is the worse failure. Tracked for its own
+  pass; uninstall's filter-error path already rides `process.exitCode`
+  (safe there: no prompt has run).
+
+### Security
+
+- **Uninstall path containment (CWE-22).** Manifest-supplied file names are
+  now resolved and verified to stay inside the managed directory before any
+  `unlink` — a hand-edited or foreign-written manifest entry containing
+  `../` can no longer turn uninstall into an arbitrary-delete primitive
+  (same-UID confused-deputy amplifier; security-analyst ship-gate finding).
+  Escape attempts are refused by name; break-tested with traversal and
+  absolute entries, outside files surviving.
+
 ## [0.11.0] - 2026-07-18
 
 ### Changed

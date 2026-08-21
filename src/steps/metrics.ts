@@ -6,6 +6,8 @@
  */
 
 import { mkdir, readdir, copyFile, rm, access, readFile } from "node:fs/promises";
+import { isEnoent } from "../lib/file-ops.js";
+import { warn } from "../lib/display.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -110,8 +112,11 @@ async function copyJsDir(
       if (!dryRun) await copyFile(join(srcDir, file), join(destDir, file));
       count++;
     }
-  } catch {
-    // Directory doesn't exist — not critical
+  } catch (err) {
+    // ENOENT = optional subdir absent. Anything else throws — swallowing it
+    // after the destructive rm below turns a read failure into a destroyed
+    // previously-working install reporting 0 files with no error.
+    if (!isEnoent(err)) throw err;
   }
   return count;
 }
@@ -131,6 +136,24 @@ async function copyToolFiles(
   // disk and shadow the new one. Wipe dist/ before repopulating so the
   // installed tree matches the source tree exactly.
   if (!dryRun) {
+    // Verify the SOURCE is readable BEFORE the destructive wipe — an
+    // unreadable source after the rm leaves a destroyed install. A missing
+    // source dist (ENOENT) skips the whole copy without wiping. Subdirs are
+    // probed too: a readable top level with an EACCES subdir would otherwise
+    // throw with the installed tree already gone.
+    try {
+      await readdir(srcDist);
+      for (const sub of subDirs) {
+        try {
+          await readdir(join(srcDist, sub));
+        } catch (subErr) {
+          if (!isEnoent(subErr)) throw subErr; // absent subdir is fine
+        }
+      }
+    } catch (err) {
+      if (isEnoent(err)) return 0;
+      throw err;
+    }
     await rm(destDist, { recursive: true, force: true });
     await mkdir(destDist, { recursive: true });
     for (const sub of subDirs) {
@@ -149,8 +172,13 @@ async function copyToolFiles(
       await copyFile(join(srcRoot, "package.json"), join(destRoot, "package.json"));
     }
     filesCopied++;
-  } catch {
-    // Not critical
+  } catch (err) {
+    // Non-fatal, but not silent: this file is what
+    // readInstalledMetricsVersion reads — a silent miss surfaces later as
+    // "version unknown" / spurious drift in verify.
+    warn(
+      `Could not copy agent-metrics package.json: ${err instanceof Error ? err.message : String(err)} — installed-version detection will be degraded`,
+    );
   }
 
   return filesCopied;
@@ -177,6 +205,14 @@ export async function installMetrics(
   const settingsPath = profile.paths.settingsPath;
 
   const source = await findMetricsSource();
+  if (!source) {
+    // Unresolvable source is a DEGRADED state, not a silent no-op: a prior
+    // install's hook.js may keep hookConfigured true below while the files
+    // go stale. Say so.
+    warn(
+      "@uluops/agent-metrics could not be resolved — tool files not refreshed (a previously installed hook, if any, keeps running its old version)",
+    );
+  }
 
   let toolFilesCopied = 0;
   if (source) {
@@ -198,6 +234,30 @@ export async function installMetrics(
     hookConfigured = true;
   } else if (hookJsExists && dryRun) {
     hookConfigured = true;
+  } else {
+    // hook.js absent: the SETTINGS entry may still exist (externally
+    // cleared tool dir) — recording false from disk-existence alone would
+    // falsify a live hook. Ask the settings file, which is the authority
+    // verify already consults.
+    try {
+      hookConfigured = await profile.hooks.check(settingsPath);
+    } catch (err) {
+      // Unreadable settings = hook state UNKNOWN, not false. Recording an
+      // observed false here would make uninstall skip hook removal over a
+      // possibly-live hook — return unobserved so the manifest keeps its
+      // prior record (the metricsObserved gate exists for exactly this).
+      warn(
+        `Could not read ${settingsPath} (${err instanceof Error ? err.message : String(err)}) — hook state unknown; keeping the previously recorded value`,
+      );
+      const hooksInstalledVersionUnknown =
+        source?.version ?? (await readInstalledMetricsVersion(toolDir));
+      return {
+        toolFilesCopied,
+        hookConfigured: false,
+        hooksInstalledVersion: hooksInstalledVersionUnknown,
+        skippedReason: "hook-state-unknown",
+      };
+    }
   }
 
   // Prefer the source version (from import.meta.resolve); fall back to reading
@@ -222,14 +282,27 @@ export async function uninstallMetrics(
   }
 
   if (!dryRun) {
-    await profile.hooks.remove(profile.paths.settingsPath, false);
+    try {
+      await profile.hooks.remove(profile.paths.settingsPath, false);
+    } catch (err) {
+      // A malformed settings file must not abort the rest of uninstall —
+      // mirror the try/catch the MCP-removal path already has.
+      warn(
+        `Could not remove metrics hook from ${profile.paths.settingsPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   if (!dryRun) {
     try {
       await rm(profile.paths.toolsDir, { recursive: true, force: true });
-    } catch {
-      // Already gone
+    } catch (err) {
+      // force:true already tolerates ENOENT, so anything landing here is a
+      // REAL failure (EACCES/EBUSY) — name it, matching the hook-removal
+      // catch above.
+      warn(
+        `Could not remove tool files at ${profile.paths.toolsDir}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

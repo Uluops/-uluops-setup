@@ -60,7 +60,9 @@ export class InstallLockHeldError extends Error {
     },
   ) {
     super(
-      `Another uluops-setup process is already running (PID ${holder.pid} on ${holder.hostname}, started ${Math.round(holder.ageMs / 1000)}s ago).`,
+      holder.pid > 0
+        ? `Another uluops-setup process is already running (PID ${holder.pid} on ${holder.hostname}, started ${Math.round(holder.ageMs / 1000)}s ago).`
+        : `Another uluops-setup process appears to be running but could not be identified (${holder.hostname}). If no other setup is running, re-run in a moment or remove ~/.uluops/install.lock manually.`,
     );
     this.name = "InstallLockHeldError";
   }
@@ -101,7 +103,9 @@ export async function acquireInstallLock(
         hostname: hostname(),
         startedAt: Date.now(),
       };
-      await writeFile(join(lockDir, META_FILENAME), JSON.stringify(meta));
+      await writeFile(join(lockDir, META_FILENAME), JSON.stringify(meta), {
+        mode: 0o600,
+      });
       return registerHandle(lockDir);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
@@ -130,11 +134,16 @@ export async function acquireInstallLock(
       continue;
     }
 
-    throw new InstallLockHeldError({
-      pid: verdict.meta.pid,
-      hostname: verdict.meta.hostname,
-      ageMs: Date.now() - verdict.meta.startedAt,
-    });
+    if (verdict.kind === "live") {
+      throw new InstallLockHeldError({
+        pid: verdict.meta.pid,
+        hostname: verdict.meta.hostname,
+        ageMs: Date.now() - verdict.meta.startedAt,
+      });
+    }
+    // "held" — present but unverifiable (unreadable meta). Never reclaim:
+    // stealing a possibly-live lock disarms the mutual exclusion.
+    throw new InstallLockHeldError({ pid: -1, hostname: verdict.reason, ageMs: 0 });
   }
 
   // Both attempts exhausted without acquiring.
@@ -143,6 +152,7 @@ export async function acquireInstallLock(
 
 type Verdict =
   | { kind: "live"; meta: LockMeta }
+  | { kind: "held"; reason: string } // present but unverifiable — never reclaim
   | { kind: "stale"; reason: string };
 
 async function inspectHeldLock(
@@ -153,9 +163,25 @@ async function inspectHeldLock(
   let raw: string;
   try {
     raw = await readFile(metaPath, "utf-8");
-  } catch {
-    // Lock dir exists but meta missing or unreadable — treat as stale.
-    return { kind: "stale", reason: "missing-meta" };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      // Unreadable-but-present meta is UNVERIFIABLE, not stale: classifying
+      // it stale lets a second process rm -rf a live holder's lock and
+      // disarms the mutual exclusion entirely.
+      return {
+        kind: "held",
+        reason: `meta.json unreadable (${err instanceof Error ? err.message : String(err)})`,
+      };
+    }
+    // Genuinely missing meta: usually a crashed holder — but also the
+    // window between the winner's mkdir and its meta write. Grace-recheck:
+    // a race resolves in milliseconds, a crash leaves it missing forever.
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      raw = await readFile(metaPath, "utf-8");
+    } catch {
+      return { kind: "stale", reason: "missing-meta" };
+    }
   }
 
   let meta: LockMeta;
@@ -230,7 +256,6 @@ function registerHandle(lockDir: string): LockHandle {
     async release(): Promise<void> {
       if (released) return;
       released = true;
-      heldLockDirs.delete(lockDir);
       try {
         await unlink(join(lockDir, META_FILENAME));
       } catch {
@@ -238,9 +263,18 @@ function registerHandle(lockDir: string): LockHandle {
       }
       try {
         await rm(lockDir, { recursive: true, force: true });
-      } catch {
-        // Best-effort; do not throw from release().
+      } catch (err) {
+        // force:true tolerates ENOENT, so this is a REAL failure
+        // (EACCES/EBUSY). Best-effort — never throw from release() — but
+        // say so; a surviving lock blocks the next run until staleness.
+        console.warn(
+          `  ⚠ Could not remove install lock at ${lockDir}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
+      // Deregister only AFTER the dir is actually gone: a signal landing
+      // mid-release must still find the dir in the set so the sync handler
+      // can clean it (deleting first opened a leak window).
+      heldLockDirs.delete(lockDir);
     },
   };
 }

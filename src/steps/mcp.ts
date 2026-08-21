@@ -4,6 +4,8 @@ import type { HarnessProfile } from "../harnesses/index.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 import { findProjectRoot } from "../lib/paths.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { serialize } from "../lib/write-coordinator.js";
+import { warn } from "../lib/display.js";
 
 export interface McpResult {
   configPath: string;
@@ -23,9 +25,6 @@ export async function installMcp(
       ? profile.paths.globalMcpConfig
       : join(await findProjectRoot(), profile.paths.localMcpConfig);
 
-  const config = await profile.mcpConfig.read(configPath);
-  const merged = profile.mcpConfig.merge(config, apiKey);
-
   const packageWarnings: string[] = [];
   const { missing } = await checkMcpPackageAvailability();
   if (missing.length > 0) {
@@ -34,9 +33,16 @@ export async function installMcp(
     );
   }
 
-  if (!dryRun) {
-    await profile.mcpConfig.write(configPath, merged);
-  }
+  // Serialized read-merge-write: on profiles where the MCP config file is
+  // also the hooks settings file (Gemini CLI), this cycle and the hook
+  // install's cycle must never interleave.
+  await serialize(configPath, async () => {
+    const config = await profile.mcpConfig.read(configPath);
+    const merged = profile.mcpConfig.merge(config, apiKey);
+    if (!dryRun) {
+      await profile.mcpConfig.write(configPath, merged);
+    }
+  });
 
   if (scope === "local" && !dryRun) {
     await addToGitignore(profile.paths.localMcpConfig);
@@ -50,9 +56,11 @@ export async function uninstallMcp(
   profile: HarnessProfile,
   configPath: string,
 ): Promise<void> {
-  const config = await profile.mcpConfig.read(configPath);
-  const cleaned = profile.mcpConfig.remove(config);
-  await profile.mcpConfig.write(configPath, cleaned);
+  await serialize(configPath, async () => {
+    const config = await profile.mcpConfig.read(configPath);
+    const cleaned = profile.mcpConfig.remove(config);
+    await profile.mcpConfig.write(configPath, cleaned);
+  });
 }
 
 async function addToGitignore(localConfigFilename: string): Promise<void> {
@@ -89,8 +97,8 @@ export async function ensureGitignoreEntry(
       await atomicWrite(gitignorePath, `${entry}\n`);
       return;
     }
-    console.warn(
-      `Warning: could not read ${gitignorePath} (${(err as Error).message}). Skipping .gitignore update.`,
+    warn(
+      `Could not read ${gitignorePath} (${(err as Error).message}). Skipping .gitignore update.`,
     );
     return;
   }

@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
+import { stripDangerousKeys } from "./json-guards.js";
+import { isEnoent } from "./file-ops.js";
 import {
-  MCP_PACKAGES,
+  MCP_PROBE_TARGETS,
   OPS_MCP_SPEC,
   REGISTRY_MCP_SPEC,
 } from "./mcp-packages.js";
@@ -61,9 +63,11 @@ async function probeAvailability(): Promise<AvailabilityResult> {
   const available: string[] = [];
   const missing: string[] = [];
 
+  // Probe the PINNED version endpoints — the harness runs `npx -y <spec>`,
+  // so pin resolvability is the question, not name existence.
   const results = await Promise.allSettled(
-    MCP_PACKAGES.map((pkg) =>
-      fetch(`https://registry.npmjs.org/${pkg}`, {
+    MCP_PROBE_TARGETS.map(({ pkg, version }) =>
+      fetch(`https://registry.npmjs.org/${pkg}/${version}`, {
         method: "HEAD",
         signal: AbortSignal.timeout(5000),
         redirect: "follow",
@@ -71,13 +75,14 @@ async function probeAvailability(): Promise<AvailabilityResult> {
     ),
   );
 
-  // Per-index correspondence: results[i] corresponds to MCP_PACKAGES[i] by
+  // Per-index correspondence: results[i] corresponds to MCP_PROBE_TARGETS[i] by
   // Promise.allSettled's stable ordering. The previous `?? "unknown"` fallback
   // could emit a literal "unknown" string into `missing`, hiding the real
   // failure reason (DNS error, timeout, 404) under an undiagnosable label.
   for (let i = 0; i < results.length; i++) {
     const result = results[i]!;
-    const pkg = MCP_PACKAGES[i]!;
+    const target = MCP_PROBE_TARGETS[i]!;
+    const pkg = `${target.pkg}@${target.version}`;
     if (result.status === "fulfilled") {
       if (result.value.ok) {
         available.push(pkg);
@@ -106,14 +111,33 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
-  } catch {
-    return {}; // File doesn't exist — fresh config
+  } catch (err) {
+    if (isEnoent(err)) return {}; // File doesn't exist — fresh config
+    // Unreadable-but-PRESENT (EACCES/EISDIR/EIO) must never read as fresh:
+    // the {} would be merged and renamed over the file we couldn't read.
+    throw new Error(
+      `Could not read config at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite a file that exists but could not be read. Nothing was modified.`,
+    );
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as ClaudeConfig;
+    parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`Failed to parse config at ${path} — file contains invalid JSON`);
+    // The read happens BEFORE any write — say so, or a pre-existing broken
+    // file reads as UluOps-caused corruption.
+    throw new Error(
+      `Failed to parse config at ${path} — file contains invalid JSON. ` +
+        `(Detected before any UluOps change; nothing was modified. Fix or remove the file and re-run.)`,
+    );
   }
+  // Same rationale as the JSON throw: valid JSON that isn't an object cannot
+  // be merged into — spreading it would corrupt the file we then write back.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Failed to parse config at ${path} — expected a JSON object at the top level`,
+    );
+  }
+  return stripDangerousKeys(parsed) as ClaudeConfig;
 }
 
 /**

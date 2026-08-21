@@ -1,9 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   mergeUluopsHook,
   removeUluopsHook,
   hasUluopsHook,
   probeHookSupport,
+  readSettings,
   CLAUDE_HOOK_TYPES,
   DEFAULT_CLAUDE_HOOK_TYPE,
 } from "../lib/settings-merger.js";
@@ -314,5 +318,124 @@ describe("CLAUDE_HOOK_TYPES anchor", () => {
     // changing it is a user-visible breaking change. Anchor it here so the
     // change has to be deliberate.
     expect(DEFAULT_CLAUDE_HOOK_TYPE).toBe("SubagentStop");
+  });
+});
+
+describe("readSettings shape gate", () => {
+  let dir: string;
+  const write = async (content: string): Promise<string> => {
+    dir = await mkdtemp(join(tmpdir(), "uluops-settings-test-"));
+    const p = join(dir, "settings.json");
+    await writeFile(p, content);
+    return p;
+  };
+
+  afterEach(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it("accepts a well-formed settings object", async () => {
+    const p = await write(
+      JSON.stringify({ hooks: { SubagentStop: [{ hooks: [] }] } }),
+    );
+    const s = await readSettings(p);
+    expect(s.hooks!["SubagentStop"]).toHaveLength(1);
+  });
+
+  it("rejects a top-level array (valid JSON, unmergeable shape)", async () => {
+    const p = await write("[1,2,3]");
+    await expect(readSettings(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects a top-level string", async () => {
+    const p = await write('"just a string"');
+    await expect(readSettings(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects hooks as a string (would spread into per-char keys)", async () => {
+    const p = await write(JSON.stringify({ hooks: "yes" }));
+    await expect(readSettings(p)).rejects.toThrow(/'hooks' has an unexpected shape/);
+  });
+
+  it("rejects a hooks entry that is not an array", async () => {
+    const p = await write(JSON.stringify({ hooks: { SubagentStop: {} } }));
+    await expect(readSettings(p)).rejects.toThrow(/'hooks' has an unexpected shape/);
+  });
+});
+
+describe("mergeUluopsHook defensive filter", () => {
+  it("preserves matcher entries without a hooks array instead of crashing", () => {
+    const settings = {
+      hooks: {
+        SubagentStop: [{ note: "user entry, unknown shape" } as never],
+      },
+    };
+    const result = mergeUluopsHook(settings, "node hook.js");
+    // The malformed user entry survives; the UluOps hook is appended.
+    expect(result.hooks!["SubagentStop"]).toHaveLength(2);
+    expect(
+      (result.hooks!["SubagentStop"]![0] as { note?: string }).note,
+    ).toBe("user entry, unknown shape");
+  });
+});
+
+describe("ownership predicate consistency on malformed matcher shapes", () => {
+  // The defect class this locks in: merge was defensive against malformed
+  // matcher entries while remove/has dereferenced m.hooks unguarded — the
+  // same hand-edited settings file merged fine but crashed uninstall (via
+  // removeUluopsHook) and verify (via hasUluopsHook). All three now share
+  // one predicate; these tests run the malformed shapes through EACH.
+  const malformed = {
+    hooks: {
+      SubagentStop: [
+        { note: "no hooks array at all" } as never,
+        { hooks: "not an array" } as never,
+        { hooks: [{ command: 42 }] } as never,
+        {
+          hooks: [
+            { type: "command", command: "node agent-metrics/dist/hook.js", timeout: 30 },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("removeUluopsHook removes only the UluOps entry, preserves malformed user entries, does not crash", () => {
+    const result = removeUluopsHook(malformed);
+    const remaining = result.hooks!["SubagentStop"]!;
+    expect(remaining).toHaveLength(3);
+    expect((remaining[0] as { note?: string }).note).toBe("no hooks array at all");
+  });
+
+  it("hasUluopsHook detects ours amid malformed entries, does not crash", () => {
+    expect(hasUluopsHook(malformed)).toBe(true);
+  });
+
+  it("hasUluopsHook is false when only malformed entries exist", () => {
+    const onlyMalformed = {
+      hooks: { SubagentStop: [{ note: "user" } as never, { hooks: "x" } as never] },
+    };
+    expect(hasUluopsHook(onlyMalformed)).toBe(false);
+  });
+
+  it("removeUluopsHook tolerates a non-array hooks entry (in-memory shape)", () => {
+    const bad = { hooks: { SubagentStop: "not-an-array" as never } };
+    expect(removeUluopsHook(bad)).toEqual(bad);
+  });
+
+  it("hasUluopsHook tolerates a non-array hooks entry", () => {
+    const bad = { hooks: { SubagentStop: "not-an-array" as never } };
+    expect(hasUluopsHook(bad)).toBe(false);
+  });
+});
+
+describe("readSettings unreadable-but-present discrimination", () => {
+  it("throws (refusing to continue) when the path exists but is not readable as a file", async () => {
+    const d = await mkdtemp(join(tmpdir(), "uluops-settings-dir-"));
+    try {
+      await expect(readSettings(d)).rejects.toThrow(/refusing to continue/);
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
   });
 });

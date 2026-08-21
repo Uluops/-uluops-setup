@@ -6,6 +6,7 @@ import {
   copyIfChanged,
   unlinkFiles,
   removeStaleFiles,
+  isEnoent,
 } from "../lib/file-ops.js";
 
 export interface CommandsResult {
@@ -44,7 +45,11 @@ export async function installCommands(
   try {
     await readdir(srcBase);
     hasSrcDir = true;
-  } catch {
+  } catch (err) {
+    // Only genuine absence means "this harness ships no commands" — an
+    // EACCES here previously rendered as the 'coming soon' capability
+    // message while wiping the manifest's commands list.
+    if (!isEnoent(err)) throw err;
     hasSrcDir = false;
   }
 
@@ -66,6 +71,7 @@ export async function installCommands(
   let pipelineCommands = 0;
   let skipped = 0;
   const allFiles: string[] = [];
+  const sourceFiles: string[] = [];
   const failures: CommandsResult["failures"] = [];
 
   for (const subdir of SUBDIRS) {
@@ -81,7 +87,8 @@ export async function installCommands(
       files = (await readdir(srcDir)).filter(
         (f) => f.endsWith(".md") || f.endsWith(".toml"),
       );
-    } catch {
+    } catch (err) {
+      if (!isEnoent(err)) throw err; // see the srcBase probe above
       continue;
     }
 
@@ -101,11 +108,6 @@ export async function installCommands(
         } else {
           skipped++;
         }
-        // Only track files that actually made it into a known state. Failed
-        // copies do NOT enter allFiles — otherwise the manifest's "remove
-        // stale entries on re-run" diff would treat a never-copied file as
-        // present, and an `--uninstall` would later try to unlink something
-        // that was never written.
         allFiles.push(relativePath);
       } catch (err) {
         // Continue past per-file failures (see AgentsResult.failures rationale).
@@ -113,6 +115,12 @@ export async function installCommands(
           file: relativePath,
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        // Source census regardless of copy outcome — stale reconciliation
+        // must compare against what the package SHIPS, or a failed copy
+        // reads as "no longer shipped" and the prior working file is
+        // deleted (the ENOSPC-wipes-everything shape).
+        sourceFiles.push(relativePath);
       }
     }
   }
@@ -120,9 +128,18 @@ export async function installCommands(
   const removed = await removeStaleFiles(
     destBase,
     existingManifestCommands,
-    allFiles,
+    sourceFiles,
     dryRun,
   );
+
+  // Record keeps failed-but-previously-installed files (prior copy is still
+  // on disk after source-based reconciliation) so uninstall can remove them.
+  const recordedCommandFiles = [
+    ...allFiles,
+    ...failures
+      .map((f) => f.file)
+      .filter((f) => existingManifestCommands?.includes(f) ?? false),
+  ];
 
   return {
     agentCommands,
@@ -130,7 +147,7 @@ export async function installCommands(
     pipelineCommands,
     skipped,
     removed,
-    files: allFiles,
+    files: recordedCommandFiles,
     failures,
   };
 }

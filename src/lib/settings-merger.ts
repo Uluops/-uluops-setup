@@ -7,6 +7,8 @@
 
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
+import { stripDangerousKeys } from "./json-guards.js";
+import { isEnoent } from "./file-ops.js";
 
 interface HookEntry {
   type: string;
@@ -97,14 +99,51 @@ export async function readSettings(path: string): Promise<HarnessSettings> {
   let raw: string;
   try {
     raw = await readFile(path, "utf-8");
-  } catch {
-    return {}; // File doesn't exist — fresh config
+  } catch (err) {
+    if (isEnoent(err)) return {}; // File doesn't exist — fresh config
+    // Unreadable-but-PRESENT must never read as fresh (see isEnoent's doc).
+    throw new Error(
+      `Could not read settings at ${path} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite a file that exists but could not be read. Nothing was modified.`,
+    );
   }
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as HarnessSettings;
+    parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`Failed to parse settings at ${path} — file contains invalid JSON`);
+    // The read happens BEFORE any write — say so, or a pre-existing broken
+    // file reads as UluOps-caused corruption.
+    throw new Error(
+      `Failed to parse settings at ${path} — file contains invalid JSON. ` +
+        `(Detected before any UluOps change; nothing was modified. Fix or remove the file and re-run.)`,
+    );
   }
+  // Same rationale as the JSON throw above: a shape we can't merge into must
+  // surface, not crash mid-merge or silently corrupt on spread. Valid JSON
+  // that isn't an object (or whose hooks aren't matcher arrays) is treated
+  // as unmergeable, not coerced.
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      `Failed to parse settings at ${path} — expected a JSON object at the top level`,
+    );
+  }
+  const hooks = (parsed as { hooks?: unknown }).hooks;
+  if (hooks !== undefined) {
+    const hooksValid =
+      typeof hooks === "object" &&
+      hooks !== null &&
+      !Array.isArray(hooks) &&
+      Object.values(hooks).every(
+        (v) =>
+          Array.isArray(v) &&
+          v.every((m) => typeof m === "object" && m !== null),
+      );
+    if (!hooksValid) {
+      throw new Error(
+        `Failed to parse settings at ${path} — 'hooks' has an unexpected shape; fix or remove it and re-run`,
+      );
+    }
+  }
+  return stripDangerousKeys(parsed) as HarnessSettings;
 }
 
 /**
@@ -117,6 +156,28 @@ export async function writeSettings(
   await atomicWrite(path, JSON.stringify(settings, null, 2) + "\n", {
     mode: 0o600,
   });
+}
+
+/**
+ * True when a matcher entry is a UluOps-owned hook. THE single ownership
+ * predicate — merge, remove, and has must all use it, or they disagree on
+ * malformed shapes (the exact defect this replaced: merge was defensive
+ * while remove/has dereferenced m.hooks unguarded and crashed uninstall/
+ * verify on hand-edited files). Defensive by design: readSettings' gate
+ * deliberately tolerates unknown-shaped user entries (no hooks array,
+ * non-string commands) so the merge can preserve them — anything not
+ * positively identifiable as ours is user data: preserved by remove,
+ * invisible to has, never a crash.
+ */
+function isUluopsMatcher(m: HookMatcher): boolean {
+  return (
+    Array.isArray(m?.hooks) &&
+    m.hooks.some(
+      (h) =>
+        typeof h?.command === "string" &&
+        h.command.includes(HOOK_OWNERSHIP_SIGNATURE),
+    )
+  );
 }
 
 /**
@@ -133,9 +194,7 @@ export function mergeUluopsHook(
   const hooks = settings.hooks ?? {};
   const existing = hooks[hookType] ?? [];
 
-  const filtered = existing.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
-  );
+  const filtered = existing.filter((m) => !isUluopsMatcher(m));
 
   const uluopsHook: HookMatcher = {
     hooks: [
@@ -173,11 +232,9 @@ export function removeUluopsHook(
   if (!hooks) return settings;
 
   const hookEntries = hooks[hookType];
-  if (!hookEntries) return settings;
+  if (!Array.isArray(hookEntries)) return settings;
 
-  const filtered = hookEntries.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
-  );
+  const filtered = hookEntries.filter((m) => !isUluopsMatcher(m));
 
   const updatedHooks = { ...hooks };
   if (filtered.length === 0) {
@@ -205,8 +262,6 @@ export function hasUluopsHook(
 ): boolean {
   const hookType = hookTypeOverride ?? getDefaultHookEventType();
   const hookEntries = settings.hooks?.[hookType];
-  if (!hookEntries) return false;
-  return hookEntries.some((m) =>
-    m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
-  );
+  if (!Array.isArray(hookEntries)) return false;
+  return hookEntries.some(isUluopsMatcher);
 }

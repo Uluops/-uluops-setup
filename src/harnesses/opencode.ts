@@ -14,9 +14,13 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, isAbsolute } from "node:path";
-import { parse as parseJsonc } from "jsonc-parser";
+import {
+  parse as parseJsonc,
+  type ParseError as JsoncParseError,
+} from "jsonc-parser";
 import { ULUOPS_SERVERS, ConfigParseError, type HarnessProfile, type McpConfigStrategy } from "./types.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { isEnoent } from "../lib/file-ops.js";
 import { OPS_MCP_SPEC, REGISTRY_MCP_SPEC } from "../lib/mcp-packages.js";
 
 interface OpenCodeMcpServer {
@@ -40,8 +44,13 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
         raw = await readFile(p, "utf-8");
         this.resolvedPaths.set(path, p);
         break;
-      } catch {
-        // Try next
+      } catch (err) {
+        if (isEnoent(err)) continue; // Try next candidate
+        // Unreadable-but-PRESENT must never fall through to "no file →
+        // fresh config" — the write would replace the file we couldn't read.
+        throw new Error(
+          `Could not read OpenCode config at ${p} (${err instanceof Error ? err.message : String(err)}) — refusing to continue rather than overwrite a file that exists but could not be read. Nothing was modified.`,
+        );
       }
     }
     if (raw === null) {
@@ -49,11 +58,33 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
       return {};
     }
 
-    try {
-      return parseJsonc(raw) as Record<string, unknown>;
-    } catch (err) {
-      throw new ConfigParseError(path, err);
+    // jsonc-parser's parse() is error-RECOVERING, never throwing: on a
+    // syntax error it silently returns whatever it salvaged, and everything
+    // after the error point would be dropped, merged, and written back over
+    // the user's file. The errors out-param is the only honest signal.
+    const parseErrors: JsoncParseError[] = [];
+    const parsed: unknown = parseJsonc(raw, parseErrors, {
+      allowTrailingComma: true,
+    });
+    if (parseErrors.length > 0) {
+      const first = parseErrors[0]!;
+      throw new ConfigParseError(
+        path,
+        new Error(
+          `invalid JSONC (error code ${first.error} at offset ${first.offset}) — fix or remove the file and re-run; nothing was modified`,
+        ),
+      );
     }
+    // Same top-level gate as config-merger/settings-merger: valid JSONC that
+    // isn't an object cannot be merged into — writing it back mangled with
+    // no error is worse than refusing.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new ConfigParseError(
+        path,
+        new Error("expected a JSON object at the top level"),
+      );
+    }
+    return parsed as Record<string, unknown>;
   }
 
   merge(

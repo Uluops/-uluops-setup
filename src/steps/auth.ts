@@ -3,12 +3,24 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { extractEmail } from "../lib/json-guards.js";
 import { atomicWrite } from "../lib/atomic-write.js";
+import { isEnoent } from "../lib/file-ops.js";
 
 export interface AuthResult {
   apiKey: string;
   email: string | null;
 }
 
+/**
+ * Expected API-key prefix, overridable via ULUOPS_KEY_PREFIX for dev/test
+ * environments whose local API mints differently-prefixed keys.
+ *
+ * ADVISORY ONLY — deliberate divergence from @uluops/sdk-core, which
+ * hardcodes "ulr_". The prefix here gates nothing: a mismatched key gets a
+ * hint in the prompt and a proceed-anyway warning, and server validation
+ * remains the sole authority. Keep it that way: making this blocking would
+ * turn the env override into a footgun (keys accepted here, rejected by
+ * every sdk-core consumer).
+ */
 function getKeyPrefix(): string {
   return process.env["ULUOPS_KEY_PREFIX"] ?? "ulr_";
 }
@@ -26,8 +38,10 @@ export async function hasCredentialsFile(): Promise<boolean> {
   try {
     await access(credentialsPath());
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    // Unreadable-but-present counts as PRESENT: answering "absent" steers a
+    // returning user into the new-account branch and a duplicate signup.
+    return !isEnoent(err);
   }
 }
 
@@ -48,16 +62,34 @@ export async function writeCredentialsFile(
   const credsPath = credentialsPath();
   await mkdir(dirname(credsPath), { recursive: true, mode: 0o700 });
 
-  // Merge: preserve any non-default profiles already on disk.
+  // Merge: preserve any non-default profiles already on disk. The preserve
+  // promise means we may only start fresh when the file is genuinely ABSENT
+  // — an unreadable or unparseable file may hold profiles (e.g. @uluops/cli's
+  // `work` profile) that a fresh write would destroy.
   let existing: Record<string, unknown> = {};
+  let raw: string | null = null;
   try {
-    const raw = await readFile(credsPath, "utf-8");
-    const parsed: unknown = JSON.parse(raw);
+    raw = await readFile(credsPath, "utf-8");
+  } catch (err) {
+    if (!isEnoent(err)) {
+      throw new Error(
+        `Could not read ${credsPath} (${err instanceof Error ? err.message : String(err)}) — refusing to write credentials over a file that exists but could not be read. Nothing was modified.`,
+      );
+    }
+    // Absent — fresh file.
+  }
+  if (raw !== null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `Existing credentials file at ${credsPath} contains invalid JSON — it may hold other profiles, so it will not be overwritten. Fix or remove it and re-run. Nothing was modified.`,
+      );
+    }
     if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
       existing = parsed as Record<string, unknown>;
     }
-  } catch {
-    // No existing file, or unparseable — start fresh.
   }
 
   const merged = {
@@ -142,8 +174,11 @@ async function readCredentialsFile(): Promise<string | undefined> {
   let raw: string;
   try {
     raw = await readFile(credsPath, "utf-8");
-  } catch {
-    return undefined; // File doesn't exist
+  } catch (err) {
+    if (isEnoent(err)) return undefined; // File doesn't exist
+    throw new Error(
+      `Could not read credentials file at ${credsPath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   let creds: unknown;
@@ -156,9 +191,16 @@ async function readCredentialsFile(): Promise<string | undefined> {
   }
 
   if (typeof creds !== "object" || creds === null) return undefined;
-  const profiles = creds as Record<string, { apiKey?: string; api_key?: string }>;
+  const profiles = creds as Record<string, unknown>;
   const defaultProfile = profiles["default"];
-  return defaultProfile?.apiKey ?? defaultProfile?.api_key;
+  if (typeof defaultProfile !== "object" || defaultProfile === null) {
+    return undefined;
+  }
+  const p = defaultProfile as { apiKey?: unknown; api_key?: unknown };
+  // Only ever return a string — a malformed file (apiKey: 42, apiKey: {...})
+  // must read as "no stored key", not flow a non-string into Bearer headers.
+  const candidate = p.apiKey ?? p.api_key;
+  return typeof candidate === "string" && candidate ? candidate : undefined;
 }
 
 async function validateKey(
@@ -199,9 +241,11 @@ async function validateKey(
     }
     return { email: extractEmail(body) };
   } catch (err) {
-    // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED).
+    // fetch() throws TypeError for network failures (ENOTFOUND, ECONNREFUSED);
+    // AbortSignal.timeout rejects with a DOMException named "TimeoutError" —
+    // the slow-network case this friendly message was written for.
     // Re-thrown errors from the res.status checks above are plain Error instances.
-    if (err instanceof TypeError) {
+    if (err instanceof TypeError || (err as Error)?.name === "TimeoutError") {
       throw new Error(
         "Can't reach api.uluops.ai — check your connection. Use --skip-validation to continue offline.",
       );

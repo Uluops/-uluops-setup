@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { writeFile, mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -42,10 +42,33 @@ function makeManifest(
   };
 }
 
+const originalFetch = globalThis.fetch;
+
 beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubEnv("ULUOPS_API_KEY", "");
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-verify-"));
+  // verify() now probes npm resolvability (and may hit auth/health
+  // endpoints): stub fetch so NO test in this file depends on live network,
+  // and reset the availability cache so per-test stubs actually apply.
+  // Pattern mirrors config-merger.test.ts.
+  globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ data: { email: "verify@test" } }),
+  } as unknown as Response);
+  const { __resetAvailabilityCacheForTesting } = await import(
+    "../lib/config-merger.js"
+  );
+  __resetAvailabilityCacheForTesting();
+});
+
+afterEach(async () => {
+  globalThis.fetch = originalFetch;
+  const { __resetAvailabilityCacheForTesting } = await import(
+    "../lib/config-merger.js"
+  );
+  __resetAvailabilityCacheForTesting();
 });
 
 describe("verify", () => {
@@ -244,5 +267,88 @@ describe("verify", () => {
     const failedChecks = result.checks.filter((c) => !c.passed);
     expect(failedChecks).toHaveLength(0);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("MCP package resolvability check", () => {
+  // Helper: a fully-healthy on-disk state so the ONLY variable is the
+  // npm probe. Mirrors the "passes when all manifest entries match" setup.
+  async function healthySetup(): Promise<void> {
+    const defsPath = join(tmpDir, "defs");
+    await mkdir(join(defsPath, "agents"), { recursive: true });
+    const configPath = join(tmpDir, "claude.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          "uluops-tracker": { command: "npx", args: [], env: {} },
+          "uluops-registry": { command: "npx", args: [], env: {} },
+        },
+      }),
+    );
+    mockLoadManifest.mockResolvedValue(makeManifest(defsPath, configPath));
+  }
+
+  it("passes and appears in checks when every package resolves", async () => {
+    await healthySetup();
+    const result = await verify();
+    const check = result.checks.find(
+      (c) => c.label === "MCP packages resolvable on npm",
+    );
+    expect(check).toBeDefined();
+    expect(check!.passed).toBe(true);
+  });
+
+  it("fails the run and names the packages when the registry 404s them", async () => {
+    await healthySetup();
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const u = String(url);
+      if (u.includes("registry.npmjs.org")) {
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { email: "verify@test" } }),
+      } as unknown as Response);
+    });
+    const result = await verify();
+    const check = result.checks.find(
+      (c) => c.label === "MCP packages resolvable on npm",
+    );
+    expect(check).toBeDefined();
+    expect(check!.passed).toBe(false);
+    expect(check!.detail).toContain("not found in registry");
+    expect(check!.detail).toContain("MCP servers will fail to start");
+    expect(result.ok).toBe(false);
+  });
+
+  it("reports registry-unreachable without double-failing the run", async () => {
+    await healthySetup();
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL) => {
+      const u = String(url);
+      if (u.includes("registry.npmjs.org")) {
+        return Promise.reject(
+          Object.assign(new Error("getaddrinfo ENOTFOUND"), {
+            code: "ENOTFOUND",
+          }),
+        );
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { email: "verify@test" } }),
+      } as unknown as Response);
+    });
+    const result = await verify();
+    const check = result.checks.find(
+      (c) => c.label === "MCP packages resolvable on npm",
+    );
+    expect(check).toBeDefined();
+    // Network failures on individual fetches land in `missing` via
+    // allSettled (the probe itself resolves) — either way the check must
+    // not pass silently AND must carry a detail naming the condition.
+    expect(check!.passed).toBe(false);
+    expect(check!.detail).toBeTruthy();
   });
 });

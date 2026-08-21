@@ -9,6 +9,30 @@ const info = (msg: string) => console.log(`  ${msg}`);
 
 export { ok, warn, fail, info };
 
+/** Blank spacer line — keeps command modules free of raw console calls. */
+export function blank(): void {
+  console.log();
+}
+
+/** Per-harness section header in the multi-harness install loop. */
+export function printHarnessHeader(displayName: string): void {
+  console.log(chalk.dim(`▸ ${displayName}`));
+}
+
+/** The branded setup banner: logo, tagline, version + target line. */
+export function printSetupBanner(version: string, targetSummary: string): void {
+  console.log();
+  console.log(
+    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
+  );
+  console.log(
+    `      ${chalk.dim("operating intelligence as infrastructure")}`,
+  );
+  console.log();
+  console.log(`  Setup v${version} — ${chalk.bold(targetSummary)}`);
+  console.log();
+}
+
 const DIVIDER = `  ${chalk.dim("━".repeat(46))}`;
 
 /**
@@ -92,7 +116,15 @@ export async function printSetupSummary(input: {
     results[0]!.status === "ok" &&
     results[0]!.profile.name === "claude-code"
   ) {
-    await printAgentList();
+    try {
+      await printAgentList();
+    } catch (err) {
+      // The catalog is decorative; the export line and restart instruction
+      // below are the actionable tail — never lose them to a listing error.
+      warn(
+        `Could not list bundled agents: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // API-key reminder — once per run regardless of harness count.
@@ -162,12 +194,14 @@ function renderCounts(r: PerHarnessResult): string {
   return parts.length > 0 ? `(${parts.join(" · ")})` : "";
 }
 
+/** Mask an API key for display: all but the last 4 chars become `*` (minimum 4 stars). */
 export function maskKey(key: string): string {
   if (!key || key.length <= 4) return "****";
   const last4 = key.slice(-4);
   return `${"*".repeat(Math.max(4, key.length - 4))}${last4}`;
 }
 
+/** Render the `--list` output: workflows then agents from the asset catalog, descriptions truncated to fit. */
 export async function printAgentList(): Promise<void> {
   const workflows = await getWorkflowCommands();
   const agents = await getAgentCommands();

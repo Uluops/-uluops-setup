@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { writeFile, readFile, mkdir, mkdtemp, readdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { copyIfChanged, unlinkFiles, syncAssets, writeIfChanged } from "../lib/file-ops.js";
+import { copyIfChanged, unlinkFiles, removeStaleFiles, syncAssets, writeIfChanged } from "../lib/file-ops.js";
 import { atomicWrite } from "../lib/atomic-write.js";
 
 let tmpDir: string;
@@ -171,5 +171,48 @@ describe("atomicWrite", () => {
     // Temp file should not remain
     const files = await readdir(tmpDir);
     expect(files.every((f) => !f.includes(".uluops-tmp"))).toBe(true);
+  });
+});
+
+describe("uninstall path containment (CWE-22)", () => {
+  // A manifest entry containing ../ must never turn uninstall into an
+  // arbitrary-delete primitive. Break-test: the escape attempt must be
+  // refused AND the outside file must survive.
+  it("unlinkFiles refuses entries that resolve outside the base dir", async () => {
+    const base = await mkdtemp(join(tmpdir(), "uluops-contain-"));
+    const inside = join(base, "managed");
+    await mkdir(inside, { recursive: true });
+    await writeFile(join(inside, "ours.md"), "x");
+    const victim = join(base, "victim.txt");
+    await writeFile(victim, "precious");
+    const logSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const removed = await unlinkFiles(inside, [
+      "ours.md",
+      "../victim.txt",
+      "/etc/definitely-not-ours",
+    ]);
+
+    expect(removed).toBe(1); // only ours.md
+    await expect(readFile(victim, "utf-8")).resolves.toBe("precious");
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Refusing to remove"),
+    );
+    logSpy.mockRestore();
+  });
+
+  it("removeStaleFiles refuses traversal entries in the old manifest list", async () => {
+    const base = await mkdtemp(join(tmpdir(), "uluops-contain2-"));
+    const dest = join(base, "dest");
+    await mkdir(dest, { recursive: true });
+    const victim = join(base, "victim.txt");
+    await writeFile(victim, "precious");
+    const logSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const removed = await removeStaleFiles(dest, ["../victim.txt"], [], false);
+
+    expect(removed).toBe(0);
+    await expect(readFile(victim, "utf-8")).resolves.toBe("precious");
+    logSpy.mockRestore();
   });
 });

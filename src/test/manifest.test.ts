@@ -89,12 +89,23 @@ describe("loadManifest", () => {
       "code-validator-agent.md",
     ]);
     expect(result!.harnesses["claude-code"]!.hooksInstalled).toBe(true);
+    // Scope/path fields must survive migration verbatim — losing them
+    // re-derives uninstall paths from defaults instead of what was installed.
+    expect(result!.harnesses["claude-code"]!.mcpScope).toBe("global");
+    expect(result!.harnesses["claude-code"]!.defsScope).toBe("global");
+    expect(result!.harnesses["claude-code"]!.mcpConfigPath).toBe(
+      "/home/user/.claude.json",
+    );
+    expect(result!.harnesses["claude-code"]!.defsPath).toBe(
+      "/home/user/.claude",
+    );
   });
 
-  it("returns null on malformed JSON", async () => {
+  it("throws loudly on malformed JSON instead of reading as absent", async () => {
+    // The old behavior (null) let saveManifest overwrite a manifest it
+    // couldn't parse, orphaning every recorded agent/command/hook.
     await writeFile(manifestPath, "{ invalid json }");
-    const result = await loadManifest();
-    expect(result).toBeNull();
+    await expect(loadManifest()).rejects.toThrow(/invalid JSON/);
   });
 });
 
@@ -207,8 +218,10 @@ describe("manifest schema invariants", () => {
       harnesses: {},
     };
     await writeFile(manifestPath, JSON.stringify(emptyHarnesses));
-    const result = await loadManifest();
-    expect(result).toBeNull();
+    // Behavior upgraded (auditor pass 5): a PRESENT file with an
+    // unrecognized shape refuses loudly instead of reading as absent —
+    // null here previously let setup overwrite the record.
+    await expect(loadManifest()).rejects.toThrow(/unrecognized shape/);
   });
 });
 
@@ -330,6 +343,18 @@ describe("deleteManifest", () => {
   });
 
   it("does not throw if manifest does not exist", async () => {
-    await expect(deleteManifest()).resolves.toBeUndefined();
+    await expect(deleteManifest()).resolves.toEqual({ failed: [] });
+  });
+});
+
+describe("legacy manifest defsScope validation", () => {
+  it("refuses a legacy manifest with a missing/invalid defsScope instead of migrating undefined", async () => {
+    // defsScope is load-bearing post-migration (the prev-list inheritance
+    // gate branches on it) — migrating undefined produced a permanent
+    // phantom scope-flip.
+    const badLegacy = { ...legacyManifest } as Record<string, unknown>;
+    delete badLegacy["defsScope"];
+    await writeFile(legacyPath, JSON.stringify(badLegacy));
+    await expect(loadManifest()).rejects.toThrow(/unrecognized shape/);
   });
 });

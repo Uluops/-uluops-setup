@@ -511,3 +511,55 @@ describe("opencode XDG_CONFIG_HOME validation is deferred", () => {
     }
   });
 });
+
+describe("harness config readers: unreadable-but-present discrimination", () => {
+  // Directory-as-path = deterministic non-ENOENT (EISDIR) on every OS.
+  // Pins that read errors other than genuine absence REFUSE instead of
+  // reading as fresh — the write path replaces whole files for both.
+  it("opencode read throws refusing on an unreadable-but-present path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-oc-dir-"));
+    const target = join(dir, "sub");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(target);
+    await expect(opencodeProfile.mcpConfig.read(target)).rejects.toThrow(
+      /refusing to continue/,
+    );
+  });
+
+  it("opencode read refuses malformed JSONC instead of truncating it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-oc-jsonc-"));
+    const p = join(dir, "opencode.json");
+    // Unclosed object: jsonc-parser recovers silently — everything after the
+    // error would be dropped and written back if the out-param went unread.
+    await writeFile(p, '{"mcp":{"user":{"type":"local"}},"keybinds":{"x":"y"');
+    await expect(opencodeProfile.mcpConfig.read(p)).rejects.toThrow(
+      /invalid JSONC/,
+    );
+  });
+
+  it("opencode read still accepts comments and trailing commas (positive control)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-oc-ok-"));
+    const p = join(dir, "opencode.json");
+    await writeFile(p, '{\n  // user comment\n  "mcp": {"user": {"type": "local"}},\n}\n');
+    const config = await opencodeProfile.mcpConfig.read(p);
+    expect((config["mcp"] as Record<string, unknown>)["user"]).toBeDefined();
+  });
+});
+
+describe("codex config reader: unreadable-but-present discrimination", () => {
+  it("codex read throws refusing on an unreadable-but-present path", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-cx-dir-"));
+    const target = join(dir, "sub");
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(target);
+    await expect(codexProfile.mcpConfig.read(target)).rejects.toThrow(
+      /refusing to continue/,
+    );
+  });
+
+  it("codex read still returns empty raw for a genuinely missing file (positive control)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "uluops-cx-missing-"));
+    const config = await codexProfile.mcpConfig.read(join(dir, "config.toml"));
+    expect(config["__rawToml"]).toBe("");
+  });
+});

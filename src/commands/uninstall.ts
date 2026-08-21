@@ -42,6 +42,13 @@ export interface RunUninstallOpts {
   allDetected?: boolean;
 }
 
+/**
+ * The `--uninstall` flow: removes UluOps-managed artifacts for every harness
+ * in the manifest, or — when a harness filter is passed — only the named
+ * subset, preserving shared infrastructure (global CLI packages, shell
+ * export) that remaining harnesses still need. Fails fast if a named harness
+ * is not in the manifest.
+ */
 export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
   const version = await getVersion();
   console.log();
@@ -97,7 +104,12 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
       if (err instanceof UninstallFilterError) {
         fail(err.message);
         console.log();
-        process.exit(1);
+        // Same rule as runSetup: never process.exit inside the lock-guarded
+        // try. A plain `return` here makes any statement after the finally
+        // unreachable, so the code must ride process.exitCode — safe at this
+        // point because no prompt has run (no lingering stdin handle).
+        process.exitCode = 1;
+        return;
       }
       throw err;
     }
@@ -161,8 +173,10 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
         try {
           await uninstallMcp(profile, hm.mcpConfigPath);
           ok(`Removed MCP servers from ${hm.mcpConfigPath}`);
-        } catch {
-          warn(`Could not remove MCP servers from ${hm.mcpConfigPath}`);
+        } catch (err) {
+          warn(
+            `Could not remove MCP servers from ${hm.mcpConfigPath}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       } else {
         ok(`Would remove MCP servers from ${hm.mcpConfigPath}`);
@@ -222,8 +236,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
         const { getShellProfile } = await import("../lib/paths.js");
         const shellProfile = getShellProfile();
         if (shellProfile && !opts.dryRun) {
-          await removeShellExport(shellProfile.path);
-          ok(`Removed export from ${shellProfile.path}`);
+          const shellRes = await removeShellExport(shellProfile.path);
+          if (shellRes.removed) {
+            ok(`Removed export from ${shellProfile.path}`);
+          } else {
+            warn(
+              `Could not remove export from ${shellProfile.path}${shellRes.reason ? ` — ${shellRes.reason}` : ""}. The plaintext API key may still be in the file; remove the UluOps block manually.`,
+            );
+          }
         } else if (shellProfile) {
           ok(`Would remove export from ${shellProfile.path}`);
         }
@@ -244,8 +264,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
     //     would reject an empty-harnesses file)
     if (!opts.dryRun) {
       if (isFullUninstall) {
-        await deleteManifest();
-        ok("Manifest deleted");
+        const delRes = await deleteManifest();
+        if (delRes.failed.length === 0) {
+          ok("Manifest deleted");
+        } else {
+          warn(
+            `Could not delete manifest: ${delRes.failed.join("; ")} — it still records this install; remove it manually.`,
+          );
+        }
       } else {
         for (const name of toUninstall) {
           delete manifest.harnesses[name];
@@ -257,8 +283,14 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
             `Manifest updated — ${remaining} harness(es) remain: ${Object.keys(manifest.harnesses).join(", ")}`,
           );
         } else {
-          await deleteManifest();
-          ok("Manifest deleted (no harnesses remain)");
+          const delRes2 = await deleteManifest();
+          if (delRes2.failed.length === 0) {
+            ok("Manifest deleted (no harnesses remain)");
+          } else {
+            warn(
+              `Could not delete manifest: ${delRes2.failed.join("; ")} — remove it manually.`,
+            );
+          }
         }
       }
     }

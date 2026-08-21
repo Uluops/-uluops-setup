@@ -8,6 +8,7 @@ import { getVersion } from "./lib/version.js";
 import {
   listHarnesses,
   detectHarnesses,
+  detectExcludedExperimental,
   getProfile,
   HarnessNotTestedError,
 } from "./harnesses/index.js";
@@ -158,6 +159,16 @@ async function main(): Promise<void> {
   // matrix of (--harness, --all-detected, detection count, TTY) lives in
   // one tested place. cli.ts only wires the prompt and emit-info callbacks.
   const detected = detectHarnesses();
+  // Name the exclusion: auto-detection only returns stable profiles, and a
+  // user who can see an experimental harness installed reads silence as a
+  // detection bug rather than a policy.
+  for (const p of detectExcludedExperimental()) {
+    console.log(
+      chalk.dim(
+        `  Detected ${p.displayName} (experimental) — excluded from auto-detection; opt in with --harness ${p.name}`,
+      ),
+    );
+  }
   const isInteractive =
     !opts.yes &&
     !opts.apiKey &&

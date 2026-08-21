@@ -281,17 +281,22 @@ describe("writeCredentialsFile", () => {
     });
   });
 
-  it("starts fresh when the existing file is unparseable", async () => {
+  it("REFUSES to overwrite an unparseable existing file (may hold other profiles)", async () => {
+    // Behavior change (code-auditor finding, 2026-08-21): the old
+    // start-fresh-on-unparseable path destroyed non-default profiles a
+    // corrupt-but-recoverable file might hold. The preserve promise means
+    // fresh writes are only allowed over genuine absence.
     const credsDir = join(tmpDir, ".uluops");
     await mkdir(credsDir, { recursive: true });
     await writeFile(join(credsDir, "credentials.json"), "{not json");
 
     mockHomeDir = tmpDir;
-    await writeCredentialsFile("ulr_recover");
-
+    await expect(writeCredentialsFile("ulr_recover")).rejects.toThrow(
+      /will not be overwritten/,
+    );
+    // The corrupt file's bytes survive for hand-recovery.
     const raw = await readFile(join(credsDir, "credentials.json"), "utf-8");
-    const creds = JSON.parse(raw);
-    expect(creds.default.apiKey).toBe("ulr_recover");
+    expect(raw).toBe("{not json");
   });
 
   it("skips writing entirely on dryRun", async () => {
@@ -310,5 +315,52 @@ describe("writeCredentialsFile", () => {
       "utf-8",
     );
     expect(JSON.parse(raw).default.source).toBe("flag");
+  });
+});
+
+describe("writeCredentialsFile cross-package contract", () => {
+  // Pins the StoredProfile shape @uluops/cli's saveCredentials writes and
+  // @uluops/sdk-core's StoredProfile expects. sdk-core is deliberately not a
+  // dependency of this package, so the contract is pinned literally here:
+  // if any assertion below has to change, the SAME change must land in
+  // sdk-core/cli or `ulu auth logout` dispatches revocation with no bearer
+  // header (creds.type !== 'api_key') and the server-side key survives.
+  it("writes the default profile with the api_key discriminant", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_contract", {
+      email: "a@b.c",
+      source: "signup",
+    });
+    const raw = await readFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      "utf-8",
+    );
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const profile = parsed["default"]!;
+    expect(profile["type"]).toBe("api_key");
+    expect(profile["apiKey"]).toBe("ulr_contract");
+    expect(profile["email"]).toBe("a@b.c");
+    expect(profile["source"]).toBe("signup");
+    expect(Number.isNaN(Date.parse(profile["createdAt"] as string))).toBe(
+      false,
+    );
+  });
+
+  it("preserves non-default profiles on merge", async () => {
+    mockHomeDir = tmpDir;
+    await mkdir(join(tmpDir, ".uluops"), { recursive: true });
+    await writeFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      JSON.stringify({ work: { type: "api_key", apiKey: "ulr_work" } }),
+    );
+    await writeCredentialsFile("ulr_new", { source: "prompt" });
+    const parsed = JSON.parse(
+      await readFile(join(tmpDir, ".uluops", "credentials.json"), "utf-8"),
+    ) as Record<string, Record<string, unknown>>;
+    expect(parsed["work"]!["apiKey"]).toBe("ulr_work");
+    expect(parsed["default"]!["apiKey"]).toBe("ulr_new");
   });
 });

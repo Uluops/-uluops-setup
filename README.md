@@ -6,11 +6,15 @@
 
 Zero-friction installer for [UluOps](https://uluops.ai) agentic harnesses. One command sets up MCP servers, agents, and slash commands for Claude Code, OpenCode, and more.
 
-```
+```bash
 npx @uluops/setup
 ```
 
+> Requires **Node.js >= 20** ([full requirements](#requirements)).
+
 > **⚠️ Windows Users:** Native Windows is not yet supported. Please use **WSL2 (Ubuntu)** and run the setup inside your WSL environment.
+
+**Contents:** [Supported harnesses](#supported-harnesses) · [What it does](#what-it-does) · [Usage](#usage) · [Options](#options) · [Advanced commands](#advanced-commands) · [Examples](#examples) · [How updates work](#how-updates-work) · [Troubleshooting](#troubleshooting) · [Uninstall](#uninstall) · [Requirements](#requirements)
 
 ## Supported harnesses
 
@@ -43,7 +47,14 @@ npx @uluops/setup --harness claude-code,gemini-cli
 If you don't pass `--harness` or `--all-detected`, setup probes your home directory for known harness install markers and picks a target:
 
 - **One harness detected** — that harness is used as the target. A dimmed `Detected <Name>` line confirms the choice (suppressed when the detected harness is the default `claude-code`).
-- **Multiple harnesses detected (interactive)** — you get a multi-select checkbox listing every detected harness, with **every option checked by default** so the "install everywhere" case is a single Enter press. Use space to toggle entries off.
+- **Multiple harnesses detected (interactive)** — you get a multi-select checkbox listing every detected harness, with **every option checked by default** so the "install everywhere" case is a single Enter press. Use space to toggle entries off:
+
+  ```text
+  ? Multiple harnesses detected. Which would you like to install into?
+  ❯ ◉ Claude Code
+    ◉ OpenCode
+    ◉ Gemini CLI
+  ```
 - **Multiple harnesses detected (non-interactive — `--yes`, `--api-key`, piped stdin)** — to keep CI scripts predictable, this preserves earlier behavior: the first detected harness installs and a dimmed notice lists the others. CI users who want multi-install opt in explicitly with `--all-detected`.
 - **No harnesses detected** — falls back to the default (`claude-code`) so `npx @uluops/setup` always does something useful on a fresh machine.
 
@@ -69,7 +80,7 @@ npx @uluops/setup --harness claude,oc
 
 Each harness gets its own per-section block in the summary:
 
-```
+```text
   Setup complete: 3 installed of 3 harnesses
 
   ✓ [Claude Code] installed (23 agents · 28 commands · metrics)
@@ -99,17 +110,18 @@ Each harness gets its own per-section block in the summary:
 The installer runs these steps in sequence:
 
 1. **Authenticate** — Asks whether you're creating a new account. New users sign up with email + password; returning users paste an API key. Skip the question with `--api-key`, `--signup`, `--yes`, or `ULUOPS_API_KEY`.
-2. **MCP config** — Writes tracker and registry server entries to the harness config
-3. **Definitions** — Copies pre-rendered agent definition files
-4. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
-5. **`ulu` CLI** *(optional)* — Offers to install `@uluops/cli` globally. Interactive runs are prompted (default Y); non-interactive runs skip unless `--with-cli` is passed. `--no-cli` always skips. The install is best-effort: if `npm install -g` fails (permissions, nvm prefix, etc.) the rest of setup still completes and a manual install command is printed.
-6. **Health check** — Verifies both API endpoints are reachable
+2. **Registry username** *(optional)* — Offers to set your registry username, the one-time prerequisite for creating or publishing definitions. Never forced: consumers who only run definitions don't need one, and non-interactive runs skip it silently unless `--username <name>` is supplied.
+3. **MCP config** — Writes tracker and registry server entries to the harness config
+4. **Definitions** — Copies pre-rendered agent definition files
+5. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
+6. **`ulu` CLI** *(optional)* — Offers to install `@uluops/cli` globally. Interactive runs are prompted (default Y); non-interactive runs skip unless `--with-cli` is passed. `--no-cli` always skips. The install is best-effort: if `npm install -g` fails (permissions, nvm prefix, etc.) the rest of setup still completes and a manual install command is printed.
+7. **Health check** — Verifies both API endpoints are reachable
 
 > When this setup installs the CLI, the install is recorded in the manifest so `--uninstall` removes it symmetrically. If the CLI was already on your PATH before running setup, it is left alone on uninstall.
 
 ## Usage
 
-```
+```bash
 npx @uluops/setup
 ```
 
@@ -121,7 +133,7 @@ Setup will first ask whether you're creating a new UluOps account. Pick **Y** to
 
 ### Options
 
-```
+```text
 npx @uluops/setup [options]
 
   --api-key <key>      API key (skip prompt)
@@ -136,6 +148,11 @@ npx @uluops/setup [options]
                        synonym for --harness all. Cannot be combined with
                        --harness <single-name> (fail-fast conflict error).
   --signup             Create account from terminal (email + password)
+  --username <name>    Set your registry username without prompting (lowercase
+                       slug, e.g. ulu-labs). One-time prerequisite for
+                       creating/publishing definitions — optional if you only
+                       run them. Non-interactive runs skip the username step
+                       entirely unless this flag is passed.
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
   --local-defs         Install definitions into ./uluops/ (project-scoped)
                        instead of the harness's home directory
@@ -167,35 +184,42 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.9.5 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.12.0 — available agents and workflows
 
   WORKFLOWS
-  /workflows:post-implementation   Iterative validation after coding
-  /workflows:pre-implementation    Design validation before implementation
-  /workflows:prompt-audit          Strategic prompt quality audit
+    /workflows:post-implementation    Iterative validation workflow. Run af...
+    /workflows:pre-implementation     Validates proposed design and archite...
+    /workflows:prompt-audit           Comprehensive prompt audit with ecosy...
 
-  AGENTS (run individually)                          MODEL
-  /agents:code-validator           Validate cod...  sonnet
-  /agents:type-safety              Deep TypeScr...  sonnet
-  /agents:security-analyst         Comprehensiv...  sonnet
-  /agents:test-architect           Validate tes...  sonnet
-  ...
+  AGENTS (run individually)                              MODEL
+    /agents:anxiety-reader            Reads from the pos... sonnet
+    /agents:architect                 Run Pre-Implementa... sonnet
+    /agents:assumption-excavator      Surfaces implicit ... sonnet
+    /agents:audit                     Deep runtime corre... sonnet
+    /agents:docs-validate             Validates comprehe... sonnet
+    /agents:security                  Comprehensive secu... sonnet
+    ...
 ```
 
 #### Check installation health (`--verify`)
 Validates your current installation against the local manifest and checks API connectivity.
 
 ```text
-  ⟨u⟩ ulu·ops Installation Check v0.9.5
+  ⟨u⟩ ulu·ops Installation Check v0.12.0
 
-  ✓ Manifest found (~/.uluops/manifest.json)
-  ✓ All 23 agents present in ~/.claude/agents/
-  ✓ MCP servers configured in ~/.claude.json
-  ✓ API connectivity: Tracker (Online)
-  ✓ API connectivity: Registry (Online)
+  ✓ Manifest found (v0.12.0, installed 2026-08-21)
+  ✓ [Claude Code] Readiness
+  ✓ [Claude Code] MCP config present in ~/.claude.json (2 servers)
+  ✓ [Claude Code] 23/23 agents in ~/.claude/agents
+  ✓ [Claude Code] 28/28 commands
+  ✓ [Claude Code] Agent metrics hook configured
+  ✓ API key valid
+  ✓ MCP packages resolvable on npm
 
   All checks passed.
 ```
+
+> With multiple harnesses installed, `--verify` prints one `[<Harness>]` block per manifest entry.
 
 ### Examples
 
@@ -206,6 +230,9 @@ npx @uluops/setup
 
 # Skip the account question and go straight to signup
 npx @uluops/setup --signup
+
+# Set your registry username during setup (required to publish definitions)
+npx @uluops/setup --username ulu-labs
 
 # Install for OpenCode
 npx @uluops/setup --harness opencode
@@ -246,12 +273,17 @@ npx @uluops/setup --no-agent-metrics-cli
 
 ## How updates work
 
-Re-running `npx @uluops/setup` is safe and idempotent:
+Re-running `npx @uluops/setup` is designed to be safe to repeat:
 
 - Unchanged files are skipped (content hash comparison)
 - Updated files are overwritten
-- Removed definitions are cleaned up
-- Your custom agents and non-UluOps MCP servers are never touched
+- Definitions no longer shipped are cleaned up
+- Custom agents and non-UluOps MCP servers are left alone, with two known
+  edges: a hook whose command *contains* the UluOps ownership marker (e.g. a
+  hand-forked copy of our agent-metrics hook) is treated as ours and replaced
+  on re-run, and switching `--local-defs` between runs starts a fresh tree —
+  the previous scope's files stay on disk untracked (setup warns when this
+  happens)
 
 Setup manages four surfaces: agent files, command files, MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can cleanly reverse all changes. The manifest supports multiple harnesses — each gets its own installation state.
 
@@ -259,13 +291,13 @@ Setup manages four surfaces: agent files, command files, MCP config entries, and
 
 - **Agents not appearing:** Ensure you have restarted your harness (Claude Code, etc.) after running setup. For Claude Code, simply exit and restart the CLI.
 - **MCP errors:** If the harness fails to start the MCP servers, ensure `npx` is available in your PATH. You can check your config at `~/.claude.json` or `~/.config/opencode/opencode.json`.
-- **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). If you are behind a corporate proxy, you may need to set `HTTPS_PROXY`.
+- **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). Behind a corporate proxy, note that setup's own API calls do **not** honor `HTTPS_PROXY` (Node's fetch ignores proxy env vars) — use `--skip-validation` to complete setup offline and verify the key later from a network that can reach `api.uluops.ai`.
 - **`@uluops/cli` install warning:** If setup warns it could not install the CLI globally (EACCES, nvm prefix mismatch, network), the rest of setup still completes. Run `npm install -g @uluops/cli` yourself when convenient — once it's on your PATH, every subsequent `npx @uluops/setup` will see it and skip the install step.
 - **Windows issues:** Remember that native Windows is not supported; you must run the installer and your harness within **WSL2**.
 
 ## Uninstall
 
-```
+```bash
 # Uninstall everything (every harness in the manifest + globals + shell export)
 npx @uluops/setup --uninstall
 
@@ -282,6 +314,23 @@ npx @uluops/setup --uninstall --all-detected
 Removes only UluOps-managed files: agents, commands, MCP config entries, shell profile export (if `--shell` was used), and the global `@uluops/cli` package (only if this setup installed it — a CLI you installed yourself is left alone). Your custom agents and other MCP servers are preserved.
 
 **Subset uninstall** (`--uninstall --harness <name>`) removes only the named harness(es) from the manifest and disk. Shared infrastructure (the global `@uluops/cli`, `@uluops/agent-metrics`, and the shell-profile export) is left in place because remaining harnesses still need it. The manifest is updated rather than deleted. A subset uninstall that names a harness not in the manifest fails fast with an error listing what IS in the manifest — no silent no-op.
+
+## Data & privacy
+
+The metrics hook (step 5) captures **agent execution metadata only** — token
+counts, durations, model and agent names — into a **local buffer** on your
+machine. The hook itself sends nothing anywhere: data reaches the UluOps
+tracker only when a run is explicitly saved (by you, or by tooling you run).
+Artifact content being validated is never stored — only validation results.
+
+Validation run and issue data saved to the tracker is **retained
+indefinitely by design** (the immutable forensics model); account and data
+deletion is available on request. Full details:
+[uluops.ai/privacy](https://uluops.ai/privacy).
+
+Opt-outs: `--no-metrics` skips the hook install entirely; `--uninstall`
+removes it later. If you're installing inside an organization, check your
+org's telemetry policy before enabling the hook on shared projects.
 
 ## Requirements
 

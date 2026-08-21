@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { OPS_MCP_VERSION, REGISTRY_MCP_VERSION } from "../lib/mcp-packages.js";
 import { writeFile, readFile, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -271,8 +272,8 @@ describe("checkMcpPackageAvailability", () => {
     );
     const result = await checkMcpPackageAvailability();
     expect(result.available).toEqual([
-      "@uluops/ops-mcp",
-      "@uluops/registry-mcp",
+      `@uluops/ops-mcp@${OPS_MCP_VERSION}`,
+      `@uluops/registry-mcp@${REGISTRY_MCP_VERSION}`,
     ]);
     expect(result.missing).toEqual([]);
   });
@@ -285,8 +286,8 @@ describe("checkMcpPackageAvailability", () => {
     const result = await checkMcpPackageAvailability();
     expect(result.available).toEqual([]);
     expect(result.missing).toEqual([
-      "@uluops/ops-mcp",
-      "@uluops/registry-mcp",
+      `@uluops/ops-mcp@${OPS_MCP_VERSION}`,
+      `@uluops/registry-mcp@${REGISTRY_MCP_VERSION}`,
     ]);
   });
 
@@ -353,8 +354,8 @@ describe("checkMcpPackageAvailability", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const result = await checkMcpPackageAvailability();
-    expect(result.available).toEqual(["@uluops/ops-mcp"]);
-    expect(result.missing).toEqual(["@uluops/registry-mcp"]);
+    expect(result.available).toEqual([`@uluops/ops-mcp@${OPS_MCP_VERSION}`]);
+    expect(result.missing).toEqual([`@uluops/registry-mcp@${REGISTRY_MCP_VERSION}`]);
   });
 });
 
@@ -395,7 +396,9 @@ describe("ensureGitignoreEntry", () => {
     const original = "important user content\n.env\nsecrets/\n";
     await writeFile(gitignorePath, original);
     const { ensureGitignoreEntry } = await import("../steps/mcp.js");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // The warning now routes through display's warn() (console.log with the
+    // ⚠ prefix), not console.warn.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const failingReader = () =>
       Promise.reject(
@@ -409,11 +412,11 @@ describe("ensureGitignoreEntry", () => {
     // File on disk must be unchanged — this is the regression guard
     const content = await readFile(gitignorePath, "utf-8");
     expect(content).toBe(original);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("could not read"),
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Could not read"),
     );
 
-    warnSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it("creates the file on injected ENOENT (regression: ENOENT path still works under injection)", async () => {
