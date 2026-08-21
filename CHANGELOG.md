@@ -28,6 +28,16 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Changed
 
+- **Auto-detection now names its exclusions.** When an experimental
+  harness's home directory is present, detection prints a dimmed
+  `Detected <Name> (experimental) — excluded from auto-detection; opt in
+  with --harness <name>` line instead of silently omitting it (the policy —
+  detected = safe to install — is unchanged and now visible).
+- **Conflict check distinguishes "fresh install" from "broken bundle".**
+  A missing destination dir still skips silently (expected on first
+  install); the *bundled assets* being unreadable now warns loudly before
+  skipping — that condition means the package is broken, not that the
+  machine is fresh.
 - **Dependency refresh to latest minors/patches (exact pins kept):**
   `@inquirer/prompts` 8.5.2 → 8.6.0, `tsx` 4.22.4 → 4.23.12, `vitest`
   4.1.9 → 4.1.11. The three majors available at review time were deliberately

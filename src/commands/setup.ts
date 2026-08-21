@@ -10,7 +10,14 @@ import type {
   PartialStep,
 } from "../lib/manifest.js";
 import { findProjectRoot } from "../lib/paths.js";
-import { info, printSetupSummary, warn } from "../lib/display.js";
+import {
+  info,
+  warn,
+  blank,
+  printSetupBanner,
+  printHarnessHeader,
+  printSetupSummary,
+} from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 import { getProfile } from "../harnesses/index.js";
 import {
@@ -93,19 +100,10 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
   // unknown-name error; the top-level catch in cli.ts surfaces them.
   const profiles = opts.harnesses.map((name) => getProfile(name));
 
-  console.log();
-  console.log(
-    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
-  );
-  console.log(
-    `      ${chalk.dim("operating intelligence as infrastructure")}`,
-  );
-  console.log();
   const targetSummary = profiles.length === 1
     ? profiles[0]!.displayName
     : `${profiles.length} harnesses (${profiles.map((p) => p.displayName).join(", ")})`;
-  console.log(`  Setup v${version} — ${chalk.bold(targetSummary)}`);
-  console.log();
+  printSetupBanner(version, targetSummary);
 
   if (opts.dryRun) {
     info(chalk.dim("(dry run — no changes will be made)\n"));
@@ -113,7 +111,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
 
   // === Once-per-run: BEFORE the per-harness loop ===
   const { env, apiKey } = await initContext(opts);
-  console.log();
+  blank();
 
   // Optional, never-forced: offer to set a registry username (the one-time
   // prerequisite for creating/publishing definitions). Skipped silently in
@@ -125,7 +123,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     dryRun: opts.dryRun,
     emit: (msg) => info(msg),
   });
-  console.log();
+  blank();
 
   // Acquire the install lock before touching any shared state. Skipped on
   // dry-run (read-only). The lock excludes a second concurrent uluops-setup
@@ -146,7 +144,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       info(
         `Updating ${chalk.dim(existingManifest.version)} → ${chalk.green(version)}`,
       );
-      console.log();
+      blank();
     }
 
     // === Per-harness loop ===
@@ -161,7 +159,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       // files (spec §7.6.1 per-iteration state isolation).
       const existingHarness = existingManifest?.harnesses[harnessName];
 
-      console.log(chalk.dim(`▸ ${profile.displayName}`));
+      printHarnessHeader(profile.displayName);
 
       if (existingHarness && !existingHarness.partial) {
         info(chalk.dim(`  Already installed at v${version} — checking for changes`));
@@ -188,7 +186,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
             warn(
               `[${harnessName}] skipped (user declined conflict) — continuing with remaining harnesses`,
             );
-            console.log();
+            blank();
             continue;
           }
           throw err;
@@ -211,7 +209,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         warn(
           `[${harnessName}] MCP configuration failed — continuing with remaining harnesses`,
         );
-        console.log();
+        blank();
         continue;
       }
 
@@ -270,7 +268,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         partial: failedStep,
       });
 
-      console.log();
+      blank();
     }
 
     // === Once-per-run: AFTER the per-harness loop ===

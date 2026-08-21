@@ -72,6 +72,17 @@ export function detectHarnesses(): HarnessProfile[] {
   return ALL_PROFILES.filter((p) => p.status === "stable" && existsSync(p.paths.home));
 }
 
+/**
+ * Experimental profiles whose home dir is present — the set detectHarnesses
+ * deliberately excludes. Exposed so the CLI can SAY it excluded them
+ * (silent exclusion reads as a detection bug to a user who can see the
+ * harness installed) while keeping the "detected = safe to install"
+ * promise intact.
+ */
+export function detectExcludedExperimental(): HarnessProfile[] {
+  return ALL_PROFILES.filter((p) => p.status !== "stable" && existsSync(p.paths.home));
+}
+
 /** List all available harness names (not aliases). */
 export function listHarnesses(): string[] {
   return ALL_PROFILES.map((p) => p.name);

@@ -9,6 +9,30 @@ const info = (msg: string) => console.log(`  ${msg}`);
 
 export { ok, warn, fail, info };
 
+/** Blank spacer line — keeps command modules free of raw console calls. */
+export function blank(): void {
+  console.log();
+}
+
+/** Per-harness section header in the multi-harness install loop. */
+export function printHarnessHeader(displayName: string): void {
+  console.log(chalk.dim(`▸ ${displayName}`));
+}
+
+/** The branded setup banner: logo, tagline, version + target line. */
+export function printSetupBanner(version: string, targetSummary: string): void {
+  console.log();
+  console.log(
+    `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
+  );
+  console.log(
+    `      ${chalk.dim("operating intelligence as infrastructure")}`,
+  );
+  console.log();
+  console.log(`  Setup v${version} — ${chalk.bold(targetSummary)}`);
+  console.log();
+}
+
 const DIVIDER = `  ${chalk.dim("━".repeat(46))}`;
 
 /**

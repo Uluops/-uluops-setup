@@ -561,11 +561,22 @@ export async function checkConflicts(
   const srcDir = join(ASSETS_DIR, profile.name, "agents");
 
   let existingFiles: string[];
-  let assetFiles: string[];
   try {
     existingFiles = await readdir(destDir);
-    assetFiles = await readdir(srcDir);
   } catch {
+    return; // No destination dir yet — fresh install, nothing to conflict.
+  }
+
+  let assetFiles: string[];
+  try {
+    assetFiles = await readdir(srcDir);
+  } catch (err) {
+    // The BUNDLED assets being unreadable is not a fresh-install condition —
+    // it means the package itself is broken. Don't silently skip the
+    // conflict check; say so (the copy step will surface the hard failure).
+    warn(
+      `Could not read bundled agent assets (${err instanceof Error ? err.message : String(err)}) — conflict check skipped`,
+    );
     return;
   }
 

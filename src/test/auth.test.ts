@@ -312,3 +312,50 @@ describe("writeCredentialsFile", () => {
     expect(JSON.parse(raw).default.source).toBe("flag");
   });
 });
+
+describe("writeCredentialsFile cross-package contract", () => {
+  // Pins the StoredProfile shape @uluops/cli's saveCredentials writes and
+  // @uluops/sdk-core's StoredProfile expects. sdk-core is deliberately not a
+  // dependency of this package, so the contract is pinned literally here:
+  // if any assertion below has to change, the SAME change must land in
+  // sdk-core/cli or `ulu auth logout` dispatches revocation with no bearer
+  // header (creds.type !== 'api_key') and the server-side key survives.
+  it("writes the default profile with the api_key discriminant", async () => {
+    mockHomeDir = tmpDir;
+    await writeCredentialsFile("ulr_contract", {
+      email: "a@b.c",
+      source: "signup",
+    });
+    const raw = await readFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      "utf-8",
+    );
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    const profile = parsed["default"]!;
+    expect(profile["type"]).toBe("api_key");
+    expect(profile["apiKey"]).toBe("ulr_contract");
+    expect(profile["email"]).toBe("a@b.c");
+    expect(profile["source"]).toBe("signup");
+    expect(Number.isNaN(Date.parse(profile["createdAt"] as string))).toBe(
+      false,
+    );
+  });
+
+  it("preserves non-default profiles on merge", async () => {
+    mockHomeDir = tmpDir;
+    await mkdir(join(tmpDir, ".uluops"), { recursive: true });
+    await writeFile(
+      join(tmpDir, ".uluops", "credentials.json"),
+      JSON.stringify({ work: { type: "api_key", apiKey: "ulr_work" } }),
+    );
+    await writeCredentialsFile("ulr_new", { source: "prompt" });
+    const parsed = JSON.parse(
+      await readFile(join(tmpDir, ".uluops", "credentials.json"), "utf-8"),
+    ) as Record<string, Record<string, unknown>>;
+    expect(parsed["work"]!["apiKey"]).toBe("ulr_work");
+    expect(parsed["default"]!["apiKey"]).toBe("ulr_new");
+  });
+});

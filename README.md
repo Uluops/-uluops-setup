@@ -47,7 +47,14 @@ npx @uluops/setup --harness claude-code,gemini-cli
 If you don't pass `--harness` or `--all-detected`, setup probes your home directory for known harness install markers and picks a target:
 
 - **One harness detected** — that harness is used as the target. A dimmed `Detected <Name>` line confirms the choice (suppressed when the detected harness is the default `claude-code`).
-- **Multiple harnesses detected (interactive)** — you get a multi-select checkbox listing every detected harness, with **every option checked by default** so the "install everywhere" case is a single Enter press. Use space to toggle entries off.
+- **Multiple harnesses detected (interactive)** — you get a multi-select checkbox listing every detected harness, with **every option checked by default** so the "install everywhere" case is a single Enter press. Use space to toggle entries off:
+
+  ```text
+  ? Multiple harnesses detected. Which would you like to install into?
+  ❯ ◉ Claude Code
+    ◉ OpenCode
+    ◉ Gemini CLI
+  ```
 - **Multiple harnesses detected (non-interactive — `--yes`, `--api-key`, piped stdin)** — to keep CI scripts predictable, this preserves earlier behavior: the first detected harness installs and a dimmed notice lists the others. CI users who want multi-install opt in explicitly with `--all-detected`.
 - **No harnesses detected** — falls back to the default (`claude-code`) so `npx @uluops/setup` always does something useful on a fresh machine.
 

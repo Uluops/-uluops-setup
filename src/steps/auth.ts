@@ -9,6 +9,17 @@ export interface AuthResult {
   email: string | null;
 }
 
+/**
+ * Expected API-key prefix, overridable via ULUOPS_KEY_PREFIX for dev/test
+ * environments whose local API mints differently-prefixed keys.
+ *
+ * ADVISORY ONLY — deliberate divergence from @uluops/sdk-core, which
+ * hardcodes "ulr_". The prefix here gates nothing: a mismatched key gets a
+ * hint in the prompt and a proceed-anyway warning, and server validation
+ * remains the sole authority. Keep it that way: making this blocking would
+ * turn the env override into a footgun (keys accepted here, rejected by
+ * every sdk-core consumer).
+ */
 function getKeyPrefix(): string {
   return process.env["ULUOPS_KEY_PREFIX"] ?? "ulr_";
 }
