@@ -44,7 +44,13 @@ async function scanCommandDir(dir: string): Promise<CommandEntry[]> {
   let files: string[];
   try {
     files = await readdir(dir);
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      // Unreadable bundled dir is a broken build, not "ships no commands".
+      console.warn(
+        `  ⚠ Could not read bundled commands dir ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     return [];
   }
 

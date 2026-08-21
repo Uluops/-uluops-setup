@@ -155,6 +155,10 @@ function isLegacyManifest(obj: unknown): obj is LegacyManifest {
     typeof m["installedAt"] === "string" &&
     typeof m["mcpConfigPath"] === "string" &&
     typeof m["defsPath"] === "string" &&
+    // defsScope is load-bearing post-migration (the inheritance gate
+    // branches on it) — validate here so a bad value hits the
+    // unrecognized-shape refusal instead of migrating to undefined.
+    (m["defsScope"] === "global" || m["defsScope"] === "local") &&
     Array.isArray(m["agents"]) &&
     Array.isArray(m["commands"]) &&
     !("harnesses" in m)

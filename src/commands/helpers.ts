@@ -316,6 +316,10 @@ export async function configureMetricsStep(
           "  Skip with --no-metrics · uluops.ai/privacy",
       ),
     );
+  } else if (res.skippedReason === "hook-state-unknown") {
+    // installMetrics already warned with the settings path and the
+    // keeping-prior-record note — do not follow it with a message that
+    // misnames the cause (tool files may well have copied).
   } else {
     warn("Agent metrics hook not configured (tool files not found)");
   }

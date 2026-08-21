@@ -381,3 +381,67 @@ describe("runSetup gate-split and isolation regressions (audit pass 6)", () => {
     exitSpy.mockRestore();
   });
 });
+
+describe("hook-state-unknown never overwrites the record (audit pass 7/8)", () => {
+  const priorHooked = {
+    version: "0.10.0",
+    installedAt: "2026-08-01T00:00:00.000Z",
+    shellModified: false,
+    harnesses: {
+      "claude-code": {
+        installedAt: "2026-08-01T00:00:00.000Z",
+        setupVersion: "0.10.0",
+        mcpScope: "global" as const,
+        mcpConfigPath: "/fake/claude.json",
+        defsScope: "global" as const,
+        defsPath: "/fake/home",
+        agents: [],
+        commands: [],
+        skills: [],
+        hooksInstalled: true,
+        hooksInstalledVersion: "0.8.0",
+        partial: null,
+      },
+    },
+  };
+
+  it("skippedReason 'hook-state-unknown' preserves the prior hook record", async () => {
+    // The AF-002 branch that took seven audit passes to find: an unreadable
+    // settings file must yield an UNOBSERVED result, never an observed
+    // false that uninstall then trusts to skip hook removal.
+    mockLoadManifest.mockResolvedValue(structuredClone(priorHooked));
+    h.configureMetricsStep.mockResolvedValue({
+      toolFilesCopied: 16,
+      hookConfigured: false,
+      hooksInstalledVersion: "0.9.0",
+      skippedReason: "hook-state-unknown",
+    } as never);
+
+    await runSetup(baseOpts);
+
+    const entry = (mockSaveManifest.mock.calls[0]![0] as Manifest).harnesses[
+      "claude-code"
+    ]!;
+    expect(entry.hooksInstalled).toBe(true);
+    expect(entry.hooksInstalledVersion).toBe("0.8.0");
+  });
+
+  it("a genuinely OBSERVING false still overrides the prior true (negative control)", async () => {
+    // Without this, "unknown preserves" could regress into "everything
+    // preserves" and a real hook removal would never be recordable.
+    mockLoadManifest.mockResolvedValue(structuredClone(priorHooked));
+    h.configureMetricsStep.mockResolvedValue({
+      toolFilesCopied: 0,
+      hookConfigured: false,
+      hooksInstalledVersion: null,
+    } as never);
+
+    await runSetup(baseOpts);
+
+    const entry = (mockSaveManifest.mock.calls[0]![0] as Manifest).harnesses[
+      "claude-code"
+    ]!;
+    expect(entry.hooksInstalled).toBe(false);
+    expect(entry.hooksInstalledVersion).toBeNull();
+  });
+});

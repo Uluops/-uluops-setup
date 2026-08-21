@@ -116,7 +116,15 @@ export async function printSetupSummary(input: {
     results[0]!.status === "ok" &&
     results[0]!.profile.name === "claude-code"
   ) {
-    await printAgentList();
+    try {
+      await printAgentList();
+    } catch (err) {
+      // The catalog is decorative; the export line and restart instruction
+      // below are the actionable tail — never lose them to a listing error.
+      warn(
+        `Could not list bundled agents: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   // API-key reminder — once per run regardless of harness count.

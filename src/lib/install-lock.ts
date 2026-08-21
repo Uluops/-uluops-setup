@@ -263,8 +263,13 @@ function registerHandle(lockDir: string): LockHandle {
       }
       try {
         await rm(lockDir, { recursive: true, force: true });
-      } catch {
-        // Best-effort; do not throw from release().
+      } catch (err) {
+        // force:true tolerates ENOENT, so this is a REAL failure
+        // (EACCES/EBUSY). Best-effort — never throw from release() — but
+        // say so; a surviving lock blocks the next run until staleness.
+        console.warn(
+          `  ⚠ Could not remove install lock at ${lockDir}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
       // Deregister only AFTER the dir is actually gone: a signal landing
       // mid-release must still find the dir in the set so the sync handler

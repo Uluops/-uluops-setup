@@ -346,3 +346,15 @@ describe("deleteManifest", () => {
     await expect(deleteManifest()).resolves.toEqual({ failed: [] });
   });
 });
+
+describe("legacy manifest defsScope validation", () => {
+  it("refuses a legacy manifest with a missing/invalid defsScope instead of migrating undefined", async () => {
+    // defsScope is load-bearing post-migration (the prev-list inheritance
+    // gate branches on it) — migrating undefined produced a permanent
+    // phantom scope-flip.
+    const badLegacy = { ...legacyManifest } as Record<string, unknown>;
+    delete badLegacy["defsScope"];
+    await writeFile(legacyPath, JSON.stringify(badLegacy));
+    await expect(loadManifest()).rejects.toThrow(/unrecognized shape/);
+  });
+});
