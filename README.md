@@ -302,6 +302,23 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, shell p
 
 **Subset uninstall** (`--uninstall --harness <name>`) removes only the named harness(es) from the manifest and disk. Shared infrastructure (the global `@uluops/cli`, `@uluops/agent-metrics`, and the shell-profile export) is left in place because remaining harnesses still need it. The manifest is updated rather than deleted. A subset uninstall that names a harness not in the manifest fails fast with an error listing what IS in the manifest — no silent no-op.
 
+## Data & privacy
+
+The metrics hook (step 5) captures **agent execution metadata only** — token
+counts, durations, model and agent names — into a **local buffer** on your
+machine. The hook itself sends nothing anywhere: data reaches the UluOps
+tracker only when a run is explicitly saved (by you, or by tooling you run).
+Artifact content being validated is never stored — only validation results.
+
+Validation run and issue data saved to the tracker is **retained
+indefinitely by design** (the immutable forensics model); account and data
+deletion is available on request. Full details:
+[uluops.ai/privacy](https://uluops.ai/privacy).
+
+Opt-outs: `--no-metrics` skips the hook install entirely; `--uninstall`
+removes it later. If you're installing inside an organization, check your
+org's telemetry policy before enabling the hook on shared projects.
+
 ## Requirements
 
 - **Node.js:** >= 20.0.0

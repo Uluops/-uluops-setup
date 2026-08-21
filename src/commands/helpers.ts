@@ -300,6 +300,14 @@ export async function configureMetricsStep(
       "~",
     );
     ok(`Agent metrics → ${toolPath}/ (${parts.join(", ")})`);
+    // Disclosure, not decoration: the hook captures execution metadata to a
+    // LOCAL buffer and sends nothing itself — say so where it's installed.
+    info(
+      chalk.dim(
+        "  Captures agent token/duration metadata to a local buffer (nothing is sent).\n" +
+          "  Skip with --no-metrics · uluops.ai/privacy",
+      ),
+    );
   } else {
     warn("Agent metrics hook not configured (tool files not found)");
   }

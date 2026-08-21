@@ -4,6 +4,28 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Per-file write coordinator** (`src/lib/write-coordinator.ts`). Every
+  config read-merge-write cycle (MCP step, hook install/remove, both JSON
+  profiles) is now serialized per resolved path, closing the Gemini CLI
+  same-file pair (`~/.gemini/settings.json` holds both the MCP config and
+  the hook) against interleaved cycles — including under any future
+  concurrent step orchestration. Every `atomicWrite` additionally attests a
+  content hash of what this process wrote (`fileMatchesLastWrite`), so any
+  future rollback mechanism can refuse to clobber content it didn't write.
+  Deliberately NOT single-write coalescing: the hook entry has a hard data
+  dependency on the metrics tool files landing first (a hook pointing at a
+  missing hook.js fires a failing command in the user's harness), so
+  coalescing would couple MCP-config success to the metrics step.
+- **Metrics-step privacy disclosure.** The install output now states, at the
+  point of hook installation, that the hook captures agent token/duration
+  metadata to a local buffer and sends nothing itself, with the `--no-metrics`
+  opt-out and the privacy-policy URL. A README "Data & privacy" section
+  grounds the full picture in the policy's actual terms (local buffer; data
+  leaves only on explicit tracker saves; indefinite retention by design;
+  org-policy note for shared installs).
+
 ### Changed
 
 - **Dependency refresh to latest minors/patches (exact pins kept):**

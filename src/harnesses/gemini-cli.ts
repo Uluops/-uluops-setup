@@ -30,6 +30,7 @@ import {
   removeUluopsHook,
   hasUluopsHook,
 } from "../lib/settings-merger.js";
+import { serialize } from "../lib/write-coordinator.js";
 
 class GeminiMcpConfig implements McpConfigStrategy {
   async read(path: string): Promise<Record<string, unknown>> {
@@ -74,22 +75,28 @@ class GeminiHooks implements HookStrategy {
     dryRun: boolean,
   ): Promise<boolean> {
     if (dryRun) return true;
-    const settings = await readSettings(settingsPath);
-    const merged = mergeUluopsHook(
-      settings,
-      hookCommand,
-      GeminiHooks.HOOK_TYPE,
-      GeminiHooks.MATCHER,
-    );
-    await writeSettings(settingsPath, merged);
+    // Serialized: settings.json is ALSO this profile's MCP config file —
+    // the whole read-merge-write must be exclusive against that cycle.
+    await serialize(settingsPath, async () => {
+      const settings = await readSettings(settingsPath);
+      const merged = mergeUluopsHook(
+        settings,
+        hookCommand,
+        GeminiHooks.HOOK_TYPE,
+        GeminiHooks.MATCHER,
+      );
+      await writeSettings(settingsPath, merged);
+    });
     return true;
   }
 
   async remove(settingsPath: string, dryRun: boolean): Promise<void> {
     if (dryRun) return;
-    const settings = await readSettings(settingsPath);
-    const cleaned = removeUluopsHook(settings, GeminiHooks.HOOK_TYPE);
-    await writeSettings(settingsPath, cleaned);
+    await serialize(settingsPath, async () => {
+      const settings = await readSettings(settingsPath);
+      const cleaned = removeUluopsHook(settings, GeminiHooks.HOOK_TYPE);
+      await writeSettings(settingsPath, cleaned);
+    });
   }
 
   async check(settingsPath: string): Promise<boolean> {

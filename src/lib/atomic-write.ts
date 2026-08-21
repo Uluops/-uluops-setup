@@ -7,6 +7,7 @@
 
 import { writeFile, rename, unlink, chmod } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
+import { recordWrite } from "./write-coordinator.js";
 
 export interface AtomicWriteOptions {
   /** File mode (permissions). Defaults to Node's default (0o666 before umask). */
@@ -39,6 +40,9 @@ export async function atomicWrite(
       await chmod(tmp, options.mode);
     }
     await rename(tmp, path);
+    // Attest the write for the coordinator's restore guard — only content
+    // this process provably wrote may be rolled back over.
+    recordWrite(path, content);
   } catch (err) {
     // Clean up temp file on failure
     try {
