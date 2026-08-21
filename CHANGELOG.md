@@ -74,8 +74,10 @@ All notable changes to `@uluops/setup` will be documented in this file.
   conflicts unknown → explicit confirm, default No); the bundled-asset
   readers returned empty lists on read errors that the manifest then
   recorded as authoritative, orphaning previously-installed files (now:
-  only ENOENT means "ships none"; anything else fails the step and records
-  partial state); an unreadable lock `meta.json` was classified stale and a
+  only ENOENT means "ships none"; anything else fails the step, records
+  partial state, and — fourth round — the manifest entry PRESERVES the
+  prior file lists for every step that produced no result, so the partial
+  record can never itself become the orphaning vector); an unreadable lock `meta.json` was classified stale and a
   LIVE lock stolen (now: unverifiable = held, never reclaimed), and the
   mkdir→meta window got a grace-recheck before stale-claiming; the metrics
   tool copy verifies its source is readable before wiping the installed

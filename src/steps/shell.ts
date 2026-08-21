@@ -86,11 +86,21 @@ export async function removeShellExport(
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     const before = content.slice(0, startIdx);
     const after = content.slice(endIdx + FENCE_END.length);
-    await atomicWrite(
-      profilePath,
-      (before + after).replace(/\n{3,}/g, "\n\n"),
-      { mode: 0o600 },
-    );
+    try {
+      await atomicWrite(
+        profilePath,
+        (before + after).replace(/\n{3,}/g, "\n\n"),
+        { mode: 0o600 },
+      );
+    } catch (err) {
+      // A write failure must land in the same result shape as a read
+      // failure — throwing here escapes past the caller's plaintext-key
+      // warning and aborts the rest of uninstall.
+      return {
+        removed: false,
+        reason: `could not rewrite ${profilePath}: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
     return { removed: true };
   }
   return { removed: true, reason: "no export block present" };

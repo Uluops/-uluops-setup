@@ -138,9 +138,18 @@ async function copyToolFiles(
   if (!dryRun) {
     // Verify the SOURCE is readable BEFORE the destructive wipe — an
     // unreadable source after the rm leaves a destroyed install. A missing
-    // source dist (ENOENT) skips the whole copy without wiping.
+    // source dist (ENOENT) skips the whole copy without wiping. Subdirs are
+    // probed too: a readable top level with an EACCES subdir would otherwise
+    // throw with the installed tree already gone.
     try {
       await readdir(srcDist);
+      for (const sub of subDirs) {
+        try {
+          await readdir(join(srcDist, sub));
+        } catch (subErr) {
+          if (!isEnoent(subErr)) throw subErr; // absent subdir is fine
+        }
+      }
     } catch (err) {
       if (isEnoent(err)) return 0;
       throw err;
@@ -191,6 +200,14 @@ export async function installMetrics(
   const settingsPath = profile.paths.settingsPath;
 
   const source = await findMetricsSource();
+  if (!source) {
+    // Unresolvable source is a DEGRADED state, not a silent no-op: a prior
+    // install's hook.js may keep hookConfigured true below while the files
+    // go stale. Say so.
+    warn(
+      "@uluops/agent-metrics could not be resolved — tool files not refreshed (a previously installed hook, if any, keeps running its old version)",
+    );
+  }
 
   let toolFilesCopied = 0;
   if (source) {

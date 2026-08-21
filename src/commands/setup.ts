@@ -328,6 +328,12 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
 
       for (const r of perHarnessResults) {
         if (!r.mcpResult) continue; // no MCP success → no entry
+        // A step that THREW produced no result — falling back to [] here
+        // would replace a populated prior entry with an empty record,
+        // orphaning every previously-installed file the moment a re-run
+        // fails (uninstall trusts these lists). Undefined result = keep the
+        // prior record; the `partial` marker names what didn't complete.
+        const prev = existingManifest?.harnesses[r.harnessName];
         const harnessEntry: HarnessManifest = {
           installedAt: now,
           setupVersion: version,
@@ -337,12 +343,15 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
           defsPath: opts.localDefs
             ? join(await findProjectRoot(), "uluops")
             : r.profile.paths.home,
-          agents: r.agentsResult?.files ?? [],
-          commands: r.commandsResult?.files ?? [],
-          skills: r.skillsResult?.files ?? [],
-          hooksInstalled: r.metricsResult?.hookConfigured ?? false,
+          agents: r.agentsResult?.files ?? prev?.agents ?? [],
+          commands: r.commandsResult?.files ?? prev?.commands ?? [],
+          skills: r.skillsResult?.files ?? prev?.skills ?? [],
+          hooksInstalled:
+            r.metricsResult?.hookConfigured ?? prev?.hooksInstalled ?? false,
           hooksInstalledVersion:
-            r.metricsResult?.hooksInstalledVersion ?? null,
+            r.metricsResult?.hooksInstalledVersion ??
+            prev?.hooksInstalledVersion ??
+            null,
           partial: r.partial ?? null,
         };
         manifest.harnesses[r.harnessName] = harnessEntry;

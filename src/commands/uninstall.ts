@@ -173,8 +173,10 @@ export async function runUninstall(opts: RunUninstallOpts): Promise<void> {
         try {
           await uninstallMcp(profile, hm.mcpConfigPath);
           ok(`Removed MCP servers from ${hm.mcpConfigPath}`);
-        } catch {
-          warn(`Could not remove MCP servers from ${hm.mcpConfigPath}`);
+        } catch (err) {
+          warn(
+            `Could not remove MCP servers from ${hm.mcpConfigPath}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       } else {
         ok(`Would remove MCP servers from ${hm.mcpConfigPath}`);

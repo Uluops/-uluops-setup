@@ -235,3 +235,70 @@ describe("runSetup once-per-run aggregation", () => {
     exitSpy.mockRestore();
   });
 });
+
+describe("runSetup partial-state preservation over a prior install", () => {
+  // The defect that survived three audit rounds because the only partial
+  // test ran on a FRESH install: a step that throws during a RE-run must
+  // not replace the populated prior entry with empty lists — uninstall
+  // trusts those lists, and [] orphans every previously-installed file.
+  const priorManifest = {
+    version: "0.10.0",
+    installedAt: "2026-08-01T00:00:00.000Z",
+    shellModified: false,
+    harnesses: {
+      "claude-code": {
+        installedAt: "2026-08-01T00:00:00.000Z",
+        setupVersion: "0.10.0",
+        mcpScope: "global" as const,
+        mcpConfigPath: "/fake/claude.json",
+        defsScope: "global" as const,
+        defsPath: "/fake/home",
+        agents: ["prev-a.md", "prev-b.md"],
+        commands: ["agents/prev.md"],
+        skills: ["skill/prev.md"],
+        hooksInstalled: true,
+        hooksInstalledVersion: "0.8.0",
+        partial: null,
+      },
+    },
+  };
+
+  it("keeps the prior agents/commands/skills/hook record when a step throws mid-re-run", async () => {
+    mockLoadManifest.mockResolvedValue(structuredClone(priorManifest));
+    h.installAgentsDefs.mockRejectedValue(new Error("EACCES on assets"));
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined as never) as never);
+
+    await runSetup(baseOpts);
+
+    const saved = mockSaveManifest.mock.calls[0]![0] as Manifest;
+    const entry = saved.harnesses["claude-code"]!;
+    expect(entry.partial).toBe("agents");
+    // Preservation is the assertion — [] here means orphaned files.
+    expect(entry.agents).toEqual(["prev-a.md", "prev-b.md"]);
+    expect(entry.commands).toEqual(["agents/prev.md"]);
+    expect(entry.skills).toEqual(["skill/prev.md"]);
+    expect(entry.hooksInstalled).toBe(true);
+    expect(entry.hooksInstalledVersion).toBe("0.8.0");
+    exitSpy.mockRestore();
+  });
+
+  it("a completed step's fresh result still wins over the prior record", async () => {
+    mockLoadManifest.mockResolvedValue(structuredClone(priorManifest));
+    // agents completes with a NEW list; commands throws after it.
+    h.installCommandsDefs.mockRejectedValue(new Error("disk full"));
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation((() => undefined as never) as never);
+
+    await runSetup(baseOpts);
+
+    const saved = mockSaveManifest.mock.calls[0]![0] as Manifest;
+    const entry = saved.harnesses["claude-code"]!;
+    expect(entry.partial).toBe("commands");
+    expect(entry.agents).toEqual(["a.md"]); // fresh result from stubHappyPath
+    expect(entry.commands).toEqual(["agents/prev.md"]); // preserved
+    exitSpy.mockRestore();
+  });
+});

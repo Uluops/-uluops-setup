@@ -580,6 +580,11 @@ export async function checkConflicts(
     warn(
       `Could not read ${destDir} (${err instanceof Error ? err.message : String(err)}) — cannot check for existing agents that would be overwritten.`,
     );
+    if (!process.stdin.isTTY) {
+      // Non-TTY can't answer the prompt; fail-safe is decline, not a hang
+      // and not a silent overwrite. (--yes skips checkConflicts entirely.)
+      throw new ConflictRejectedError(profile.name);
+    }
     const { confirm } = await import("@inquirer/prompts");
     const proceed = await confirm({
       message: "Continue anyway (existing files may be overwritten)?",

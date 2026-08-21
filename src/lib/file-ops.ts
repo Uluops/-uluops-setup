@@ -106,10 +106,9 @@ export async function unlinkFiles(
  * (whether or not the unlink actually ran in dry-run mode).
  *
  * Extracted from three near-identical blocks in syncAssets, installAgents,
- * and installCommands. Errors from unlink are swallowed silently — the
- * "already gone" case is the dominant one (idempotent re-run, manual user
- * deletion, prior failed install), and there's no recovery the caller
- * can usefully perform mid-loop.
+ * and installCommands. ENOENT unlink failures are tolerated silently (the
+ * dominant, idempotent case); any other failure is warned by name and
+ * excluded from the removed count.
  */
 export async function removeStaleFiles(
   destDir: string,
@@ -129,6 +128,7 @@ export async function removeStaleFiles(
             console.warn(
               `  ⚠ Could not remove stale ${join(destDir, oldFile)}: ${err instanceof Error ? err.message : String(err)}`,
             );
+            continue; // failed — must not count as removed
           }
         }
       }
