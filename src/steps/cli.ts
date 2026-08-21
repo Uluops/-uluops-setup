@@ -38,7 +38,13 @@ export function summarizeSpawnResult(
   }
   const stderr = (r.stderr ?? "").toString().trim();
   const stdout = (r.stdout ?? "").toString().trim();
-  return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+  let error = stderr || stdout || `exit ${r.status}`;
+  // The most common global-install failure is a root-owned npm prefix —
+  // "try manually" without saying so sends the user into the same wall.
+  if (/EACCES|EPERM|permission denied/i.test(error)) {
+    error += ` — your npm global prefix isn't writable. A Node version manager (nvm/fnm) avoids this permanently; see docs.npmjs.com/resolving-eacces-permissions-errors`;
+  }
+  return { ok: false, error };
 }
 
 /** Default executor — shells out to `ulu` and `npm`. */

@@ -21,6 +21,10 @@ function getPasswordHint(password: string): string | null {
 /**
  * Inquirer validate wrapper. Always returns true (hints are non-blocking)
  * and emits the pure-computed hint via console.warn for display.
+ *
+ * console.warn (stderr) is DELIBERATE, not a display.ts bypass: this fires
+ * mid-inquirer-prompt, and display's console.log helpers write to stdout —
+ * the stream inquirer is actively repainting. stderr interleaves cleanly.
  * @internal Exported for testing only — not part of the public API.
  */
 function hintPassword(password: string): true {

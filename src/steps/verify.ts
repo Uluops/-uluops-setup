@@ -5,6 +5,7 @@ import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
 import { readInstalledMetricsVersion } from "./metrics.js";
 import { extractEmail } from "../lib/json-guards.js";
+import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -334,6 +335,34 @@ export async function verify(): Promise<VerifyResult> {
       });
       allOk = false;
     }
+  }
+
+  // MCP client packages resolvable on npm. The install-time probe warns and
+  // moves on (non-blocking by design) — this is where that warning stops
+  // being detached from runtime reality: the harness runs `npx -y <spec>` at
+  // startup, so an unresolvable package means MCP servers silently fail to
+  // start long after setup reported success. --verify re-asks the question
+  // on demand.
+  try {
+    const { missing } = await checkMcpPackageAvailability();
+    if (missing.length === 0) {
+      checks.push({ label: "MCP packages resolvable on npm", passed: true });
+    } else {
+      checks.push({
+        label: "MCP packages resolvable on npm",
+        passed: false,
+        detail: `not found in registry: ${missing.join(", ")} — MCP servers will fail to start`,
+      });
+      allOk = false;
+    }
+  } catch {
+    checks.push({
+      label: "MCP packages resolvable on npm",
+      passed: false,
+      detail: "npm registry unreachable — could not verify",
+    });
+    // Network-down is already reflected by the connectivity checks; do not
+    // double-fail the run for the same outage.
   }
 
   return { ok: allOk, checks };

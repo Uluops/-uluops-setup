@@ -79,7 +79,12 @@ function summarizeNpmResult(
   }
   const stderr = (r.stderr ?? "").toString().trim();
   const stdout = (r.stdout ?? "").toString().trim();
-  return { ok: false, error: stderr || stdout || `exit ${r.status}` };
+  let error = stderr || stdout || `exit ${r.status}`;
+  // Mirror src/steps/cli.ts: name the root-owned-prefix cause on EACCES.
+  if (/EACCES|EPERM|permission denied/i.test(error)) {
+    error += ` — your npm global prefix isn't writable. A Node version manager (nvm/fnm) avoids this permanently; see docs.npmjs.com/resolving-eacces-permissions-errors`;
+  }
+  return { ok: false, error };
 }
 
 /**

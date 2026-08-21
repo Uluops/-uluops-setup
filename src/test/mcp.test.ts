@@ -395,7 +395,9 @@ describe("ensureGitignoreEntry", () => {
     const original = "important user content\n.env\nsecrets/\n";
     await writeFile(gitignorePath, original);
     const { ensureGitignoreEntry } = await import("../steps/mcp.js");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // The warning now routes through display's warn() (console.log with the
+    // ⚠ prefix), not console.warn.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const failingReader = () =>
       Promise.reject(
@@ -409,11 +411,11 @@ describe("ensureGitignoreEntry", () => {
     // File on disk must be unchanged — this is the regression guard
     const content = await readFile(gitignorePath, "utf-8");
     expect(content).toBe(original);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("could not read"),
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Could not read"),
     );
 
-    warnSpy.mockRestore();
+    logSpy.mockRestore();
   });
 
   it("creates the file on injected ENOENT (regression: ENOENT path still works under injection)", async () => {

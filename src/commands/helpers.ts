@@ -495,12 +495,19 @@ export async function runHealthCheck(opts: {
         checkEndpoint("https://api.uluops.ai/api/v1/health"),
         checkEndpoint("https://api.uluops.ai/api/v1/registry/health"),
       ]);
-      if (trackerOk && registryOk)
+      if (trackerOk && registryOk) {
         ok("Health check passed — both APIs reachable");
-      else
+      } else {
+        // Name the failing endpoint — "some APIs" gives the user nothing to
+        // report or retry against.
+        const down = [
+          !trackerOk && "Tracker",
+          !registryOk && "Registry",
+        ].filter(Boolean);
         warn(
-          "Some APIs unreachable (MCP tools may have limited functionality)",
+          `${down.join(" and ")} API unreachable (MCP tools may have limited functionality)`,
         );
+      }
     } catch {
       warn("Health check skipped (network issue)");
     }

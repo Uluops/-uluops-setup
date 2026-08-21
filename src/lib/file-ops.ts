@@ -1,6 +1,7 @@
-import { readFile, writeFile, mkdir, unlink, readdir } from "node:fs/promises";
+import { readFile, mkdir, unlink, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileHash } from "./hash.js";
+import { atomicWrite } from "./atomic-write.js";
 
 /**
  * Copy a file if its content has changed (hash comparison). Returns "copied" or "skipped".
@@ -23,7 +24,10 @@ export async function copyIfChanged(
   }
 
   if (!dryRun) {
-    await writeFile(destPath, srcContent);
+    // Atomic: a crash mid-copy must not leave a truncated agent/command file
+    // whose hash matches neither side (re-run would fix it, but the harness
+    // may load the torn file first).
+    await atomicWrite(destPath, srcContent);
   }
   return "copied";
 }
@@ -49,7 +53,7 @@ export async function writeIfChanged(
   }
 
   if (!dryRun) {
-    await writeFile(destPath, content);
+    await atomicWrite(destPath, content);
   }
   return "copied";
 }

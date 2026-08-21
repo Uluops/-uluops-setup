@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
+import { stripDangerousKeys } from "./json-guards.js";
 import {
   MCP_PACKAGES,
   OPS_MCP_SPEC,
@@ -113,7 +114,12 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`Failed to parse config at ${path} — file contains invalid JSON`);
+    // The read happens BEFORE any write — say so, or a pre-existing broken
+    // file reads as UluOps-caused corruption.
+    throw new Error(
+      `Failed to parse config at ${path} — file contains invalid JSON. ` +
+        `(Detected before any UluOps change; nothing was modified. Fix or remove the file and re-run.)`,
+    );
   }
   // Same rationale as the JSON throw: valid JSON that isn't an object cannot
   // be merged into — spreading it would corrupt the file we then write back.
@@ -122,7 +128,7 @@ export async function readConfig(path: string): Promise<ClaudeConfig> {
       `Failed to parse config at ${path} — expected a JSON object at the top level`,
     );
   }
-  return parsed as ClaudeConfig;
+  return stripDangerousKeys(parsed) as ClaudeConfig;
 }
 
 /**

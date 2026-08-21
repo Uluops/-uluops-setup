@@ -5,6 +5,7 @@ import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 import { findProjectRoot } from "../lib/paths.js";
 import { atomicWrite } from "../lib/atomic-write.js";
 import { serialize } from "../lib/write-coordinator.js";
+import { warn } from "../lib/display.js";
 
 export interface McpResult {
   configPath: string;
@@ -96,8 +97,8 @@ export async function ensureGitignoreEntry(
       await atomicWrite(gitignorePath, `${entry}\n`);
       return;
     }
-    console.warn(
-      `Warning: could not read ${gitignorePath} (${(err as Error).message}). Skipping .gitignore update.`,
+    warn(
+      `Could not read ${gitignorePath} (${(err as Error).message}). Skipping .gitignore update.`,
     );
     return;
   }

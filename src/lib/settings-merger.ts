@@ -7,6 +7,7 @@
 
 import { readFile } from "node:fs/promises";
 import { atomicWrite } from "./atomic-write.js";
+import { stripDangerousKeys } from "./json-guards.js";
 
 interface HookEntry {
   type: string;
@@ -104,7 +105,12 @@ export async function readSettings(path: string): Promise<HarnessSettings> {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`Failed to parse settings at ${path} — file contains invalid JSON`);
+    // The read happens BEFORE any write — say so, or a pre-existing broken
+    // file reads as UluOps-caused corruption.
+    throw new Error(
+      `Failed to parse settings at ${path} — file contains invalid JSON. ` +
+        `(Detected before any UluOps change; nothing was modified. Fix or remove the file and re-run.)`,
+    );
   }
   // Same rationale as the JSON throw above: a shape we can't merge into must
   // surface, not crash mid-merge or silently corrupt on spread. Valid JSON
@@ -132,7 +138,7 @@ export async function readSettings(path: string): Promise<HarnessSettings> {
       );
     }
   }
-  return parsed as HarnessSettings;
+  return stripDangerousKeys(parsed) as HarnessSettings;
 }
 
 /**

@@ -53,6 +53,11 @@ export interface PerHarnessResult {
  *   | Any declined AND zero failed                         |  0   |
  *   | Empty (user unchecked all, or no harnesses to run)   |  0   |
  *
+ * The implementation is deliberately a single `anyFailed` check, not four
+ * branches: rows 1, 3, and 4 all share exit 0, so the table collapses to
+ * "any operational failure → 1, everything else → 0". The table is the
+ * spec; the code is its minimal form.
+ *
  * Rationale: CI wrapping `--harness all` should not be poisoned by
  * user-policy choices (declines, no-op outcomes) but MUST fail on
  * operational errors (EACCES, ENOSPC, parse-error) so deploy pipelines

@@ -167,9 +167,16 @@ async function readCredentialsFile(): Promise<string | undefined> {
   }
 
   if (typeof creds !== "object" || creds === null) return undefined;
-  const profiles = creds as Record<string, { apiKey?: string; api_key?: string }>;
+  const profiles = creds as Record<string, unknown>;
   const defaultProfile = profiles["default"];
-  return defaultProfile?.apiKey ?? defaultProfile?.api_key;
+  if (typeof defaultProfile !== "object" || defaultProfile === null) {
+    return undefined;
+  }
+  const p = defaultProfile as { apiKey?: unknown; api_key?: unknown };
+  // Only ever return a string — a malformed file (apiKey: 42, apiKey: {...})
+  // must read as "no stored key", not flow a non-string into Bearer headers.
+  const candidate = p.apiKey ?? p.api_key;
+  return typeof candidate === "string" && candidate ? candidate : undefined;
 }
 
 async function validateKey(

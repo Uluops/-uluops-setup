@@ -310,12 +310,18 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
     // harness entry. Declined harnesses and pre-MCP failures land no entry.
     if (!opts.dryRun) {
       const now = new Date().toISOString();
-      const manifest: Manifest = existingManifest ?? {
-        version,
-        installedAt: now,
-        shellModified: false,
-        harnesses: {},
-      };
+      // Clone rather than alias: mutating the loaded object would silently
+      // change what any later `existingManifest` read sees. Today all reads
+      // precede this block — the clone keeps that a non-condition instead of
+      // an ordering invariant someone has to remember.
+      const manifest: Manifest = existingManifest
+        ? structuredClone(existingManifest)
+        : {
+            version,
+            installedAt: now,
+            shellModified: false,
+            harnesses: {},
+          };
       manifest.version = version;
       manifest.installedAt = now;
       manifest.shellModified = shellModified || manifest.shellModified;
