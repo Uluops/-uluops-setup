@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { atomicWrite } from "../lib/atomic-write.js";
 import { isEnoent } from "../lib/file-ops.js";
 
@@ -20,7 +21,14 @@ export async function writeShellExport(
     );
   }
 
-  const block = `${FENCE_START}\nexport ULUOPS_API_KEY="${apiKey}"\n${FENCE_END}`;
+  // Fish has no `export` builtin — bash syntax in config.fish prints a
+  // parse error on EVERY new shell and never sets the variable (silent auth
+  // failure + visible breakage). Dialect follows the profile path.
+  const isFish = profilePath.endsWith("config.fish");
+  const exportLine = isFish
+    ? `set -gx ULUOPS_API_KEY "${apiKey}"`
+    : `export ULUOPS_API_KEY="${apiKey}"`;
+  const block = `${FENCE_START}\n${exportLine}\n${FENCE_END}`;
 
   let content: string;
   try {
@@ -34,6 +42,9 @@ export async function writeShellExport(
       );
     }
     if (!dryRun) {
+      // A fresh fish user may have no ~/.config/fish/ yet — atomicWrite's
+      // 'wx' temp open ENOENTs on a missing parent.
+      await mkdir(dirname(profilePath), { recursive: true });
       await atomicWrite(profilePath, block + "\n", { mode: 0o600 });
     }
     return;

@@ -35,6 +35,17 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Changed
 
+- **MCP server pins bumped to the current release contract:**
+  `@uluops/ops-mcp` 0.11.0 → **0.13.0** (the update-run merge-mode + echo
+  release), `@uluops/registry-mcp` 0.3.5 → **0.3.7**. A fresh install now
+  wires the servers this release was validated against.
+- **The npm availability probe now checks the PINNED VERSIONS, not the bare
+  package names** — reversing the earlier deliberate choice. The harness
+  runs `npx -y <pinned spec>`, so an unresolvable pin is exactly the
+  condition that must fail loudly at install time instead of hours later as
+  an opaque npx error at first MCP launch. "A pin is not a publish"; the
+  probe now enforces it. `--verify`'s resolvability check inherits the same
+  version precision.
 - **Auto-detection now names its exclusions.** When an experimental
   harness's home directory is present, detection prints a dimmed
   `Detected <Name> (experimental) — excluded from auto-detection; opt in
@@ -67,6 +78,18 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **Fish users no longer get bash syntax written into `config.fish`.**
+  `--shell` now writes `set -gx ULUOPS_API_KEY …` for fish (the `export`
+  form printed a parse error on every new fish shell while never setting
+  the variable — visible breakage plus silent auth failure), and the
+  profile's parent directory is created first (a fresh fish user may have
+  no `~/.config/fish/` yet).
+- **README honesty pass (anxiety-read findings):** the `HTTPS_PROXY`
+  troubleshooting remedy was inert (Node's fetch ignores proxy env vars) —
+  replaced with the working `--skip-validation` path; "safe and idempotent"
+  / "never touched" absolutes replaced with the two known edges the repo
+  itself documents (ownership-marker hook replacement on re-run, and the
+  `--local-defs` scope-flip leaving the prior tree untracked).
 - **Round-7: unknown is never observed.** When `hook.js` is absent and the
   settings file cannot be read, the metrics step now returns
   `skippedReason: "hook-state-unknown"` (with a named warning) instead of an

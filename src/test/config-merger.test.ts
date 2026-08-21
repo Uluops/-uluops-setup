@@ -186,8 +186,8 @@ describe("checkMcpPackageAvailability", () => {
     const result = await checkMcpPackageAvailability();
     expect(result.available).toEqual([]);
     expect(result.missing).toEqual([
-      "@uluops/ops-mcp",
-      "@uluops/registry-mcp",
+      `@uluops/ops-mcp@${OPS_MCP_VERSION}`,
+      `@uluops/registry-mcp@${REGISTRY_MCP_VERSION}`,
     ]);
     // No `(network: ...)` suffix on registry-side misses.
     for (const entry of result.missing) {

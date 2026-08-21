@@ -273,12 +273,17 @@ npx @uluops/setup --no-agent-metrics-cli
 
 ## How updates work
 
-Re-running `npx @uluops/setup` is safe and idempotent:
+Re-running `npx @uluops/setup` is designed to be safe to repeat:
 
 - Unchanged files are skipped (content hash comparison)
 - Updated files are overwritten
-- Removed definitions are cleaned up
-- Your custom agents and non-UluOps MCP servers are never touched
+- Definitions no longer shipped are cleaned up
+- Custom agents and non-UluOps MCP servers are left alone, with two known
+  edges: a hook whose command *contains* the UluOps ownership marker (e.g. a
+  hand-forked copy of our agent-metrics hook) is treated as ours and replaced
+  on re-run, and switching `--local-defs` between runs starts a fresh tree —
+  the previous scope's files stay on disk untracked (setup warns when this
+  happens)
 
 Setup manages four surfaces: agent files, command files, MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can cleanly reverse all changes. The manifest supports multiple harnesses — each gets its own installation state.
 
@@ -286,7 +291,7 @@ Setup manages four surfaces: agent files, command files, MCP config entries, and
 
 - **Agents not appearing:** Ensure you have restarted your harness (Claude Code, etc.) after running setup. For Claude Code, simply exit and restart the CLI.
 - **MCP errors:** If the harness fails to start the MCP servers, ensure `npx` is available in your PATH. You can check your config at `~/.claude.json` or `~/.config/opencode/opencode.json`.
-- **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). If you are behind a corporate proxy, you may need to set `HTTPS_PROXY`.
+- **API key rejected:** Verify your key at [app.uluops.ai](https://app.uluops.ai). Behind a corporate proxy, note that setup's own API calls do **not** honor `HTTPS_PROXY` (Node's fetch ignores proxy env vars) — use `--skip-validation` to complete setup offline and verify the key later from a network that can reach `api.uluops.ai`.
 - **`@uluops/cli` install warning:** If setup warns it could not install the CLI globally (EACCES, nvm prefix mismatch, network), the rest of setup still completes. Run `npm install -g @uluops/cli` yourself when convenient — once it's on your PATH, every subsequent `npx @uluops/setup` will see it and skip the install step.
 - **Windows issues:** Remember that native Windows is not supported; you must run the installer and your harness within **WSL2**.
 
