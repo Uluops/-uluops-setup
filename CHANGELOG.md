@@ -278,6 +278,16 @@ All notable changes to `@uluops/setup` will be documented in this file.
   the bottom Requirements section; a contents line was added and all code
   fences carry language tags.
 
+### Security
+
+- **Uninstall path containment (CWE-22).** Manifest-supplied file names are
+  now resolved and verified to stay inside the managed directory before any
+  `unlink` — a hand-edited or foreign-written manifest entry containing
+  `../` can no longer turn uninstall into an arbitrary-delete primitive
+  (same-UID confused-deputy amplifier; security-analyst ship-gate finding).
+  Escape attempts are refused by name; break-tested with traversal and
+  absolute entries, outside files surviving.
+
 ## [0.11.0] - 2026-07-18
 
 ### Changed
