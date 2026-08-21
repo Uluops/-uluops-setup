@@ -60,3 +60,46 @@ describe("writeConfig", () => {
     expect(loaded).toEqual(config);
   });
 });
+
+describe("readConfig shape gate", () => {
+  // Mirror of the readSettings shape-gate suite — same gate, same contract:
+  // valid JSON that is not a top-level object is unmergeable and must throw
+  // the named-path error, never be coerced.
+  it("rejects a top-level array", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, "[1,2,3]");
+    await expect(readConfig(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects a top-level string", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, '"just a string"');
+    await expect(readConfig(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects a top-level number", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, "42");
+    await expect(readConfig(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("rejects top-level null", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, "null");
+    await expect(readConfig(p)).rejects.toThrow(/JSON object at the top level/);
+  });
+
+  it("names pre-existing corruption as pre-existing on invalid JSON", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, "{ not json");
+    await expect(readConfig(p)).rejects.toThrow(/before any UluOps change/i);
+  });
+
+  it("strips __proto__ own-keys at the read boundary", async () => {
+    const p = join(tmpDir, "config.json");
+    await writeFile(p, '{"__proto__":{"polluted":1},"keep":true}');
+    const config = await readConfig(p);
+    expect(Object.prototype.hasOwnProperty.call(config, "__proto__")).toBe(false);
+    expect((config as Record<string, unknown>)["keep"]).toBe(true);
+  });
+});

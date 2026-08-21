@@ -49,11 +49,22 @@ class OpenCodeMcpConfig implements McpConfigStrategy {
       return {};
     }
 
+    let parsed: unknown;
     try {
-      return parseJsonc(raw) as Record<string, unknown>;
+      parsed = parseJsonc(raw);
     } catch (err) {
       throw new ConfigParseError(path, err);
     }
+    // Same top-level gate as config-merger/settings-merger: valid JSONC that
+    // isn't an object cannot be merged into — writing it back mangled with
+    // no error is worse than refusing.
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new ConfigParseError(
+        path,
+        new Error("expected a JSON object at the top level"),
+      );
+    }
+    return parsed as Record<string, unknown>;
   }
 
   merge(

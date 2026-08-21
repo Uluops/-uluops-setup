@@ -214,6 +214,7 @@ Validates your current installation against the local manifest and checks API co
   ✓ [Claude Code] 28/28 commands
   ✓ [Claude Code] Agent metrics hook configured
   ✓ API key valid
+  ✓ MCP packages resolvable on npm
 
   All checks passed.
 ```

@@ -154,6 +154,28 @@ export async function writeSettings(
 }
 
 /**
+ * True when a matcher entry is a UluOps-owned hook. THE single ownership
+ * predicate — merge, remove, and has must all use it, or they disagree on
+ * malformed shapes (the exact defect this replaced: merge was defensive
+ * while remove/has dereferenced m.hooks unguarded and crashed uninstall/
+ * verify on hand-edited files). Defensive by design: readSettings' gate
+ * deliberately tolerates unknown-shaped user entries (no hooks array,
+ * non-string commands) so the merge can preserve them — anything not
+ * positively identifiable as ours is user data: preserved by remove,
+ * invisible to has, never a crash.
+ */
+function isUluopsMatcher(m: HookMatcher): boolean {
+  return (
+    Array.isArray(m?.hooks) &&
+    m.hooks.some(
+      (h) =>
+        typeof h?.command === "string" &&
+        h.command.includes(HOOK_OWNERSHIP_SIGNATURE),
+    )
+  );
+}
+
+/**
  * Merge the UluOps hook into settings, preserving all other
  * hooks and settings. If a UluOps hook already exists, it is replaced.
  */
@@ -167,20 +189,7 @@ export function mergeUluopsHook(
   const hooks = settings.hooks ?? {};
   const existing = hooks[hookType] ?? [];
 
-  // Defensive against matcher entries readSettings' shape gate can't see
-  // (e.g. a settings object built in memory): entries without a hooks array
-  // are user data — preserve them, never crash on them.
-  const filtered = existing.filter(
-    (m) =>
-      !(
-        Array.isArray(m?.hooks) &&
-        m.hooks.some(
-          (h) =>
-            typeof h?.command === "string" &&
-            h.command.includes(HOOK_OWNERSHIP_SIGNATURE),
-        )
-      ),
-  );
+  const filtered = existing.filter((m) => !isUluopsMatcher(m));
 
   const uluopsHook: HookMatcher = {
     hooks: [
@@ -218,11 +227,9 @@ export function removeUluopsHook(
   if (!hooks) return settings;
 
   const hookEntries = hooks[hookType];
-  if (!hookEntries) return settings;
+  if (!Array.isArray(hookEntries)) return settings;
 
-  const filtered = hookEntries.filter(
-    (m) => !m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
-  );
+  const filtered = hookEntries.filter((m) => !isUluopsMatcher(m));
 
   const updatedHooks = { ...hooks };
   if (filtered.length === 0) {
@@ -250,8 +257,6 @@ export function hasUluopsHook(
 ): boolean {
   const hookType = hookTypeOverride ?? getDefaultHookEventType();
   const hookEntries = settings.hooks?.[hookType];
-  if (!hookEntries) return false;
-  return hookEntries.some((m) =>
-    m.hooks.some((h) => h.command.includes(HOOK_OWNERSHIP_SIGNATURE)),
-  );
+  if (!Array.isArray(hookEntries)) return false;
+  return hookEntries.some(isUluopsMatcher);
 }

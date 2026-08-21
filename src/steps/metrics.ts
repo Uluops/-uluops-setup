@@ -6,6 +6,7 @@
  */
 
 import { mkdir, readdir, copyFile, rm, access, readFile } from "node:fs/promises";
+import { warn } from "../lib/display.js";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -222,7 +223,15 @@ export async function uninstallMetrics(
   }
 
   if (!dryRun) {
-    await profile.hooks.remove(profile.paths.settingsPath, false);
+    try {
+      await profile.hooks.remove(profile.paths.settingsPath, false);
+    } catch (err) {
+      // A malformed settings file must not abort the rest of uninstall —
+      // mirror the try/catch the MCP-removal path already has.
+      warn(
+        `Could not remove metrics hook from ${profile.paths.settingsPath}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   if (!dryRun) {

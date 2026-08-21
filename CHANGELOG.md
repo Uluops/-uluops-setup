@@ -26,41 +26,12 @@ All notable changes to `@uluops/setup` will be documented in this file.
   leaves only on explicit tracker saves; indefinite retention by design;
   org-policy note for shared installs).
 
-### Added (tranche 3)
-
 - **`--verify` checks MCP package resolvability on npm.** The install-time
   probe is non-blocking by design; the harness runs `npx -y <spec>` at
   startup, so an unresolvable package fails long after setup succeeded.
   `--verify` now re-asks the question on demand (a registry outage is
   reported but does not double-fail a run the connectivity checks already
   failed).
-
-### Fixed (tranche 3)
-
-- **Agent/command/skill file copies are atomic** (`copyIfChanged`/
-  `writeIfChanged` now write via temp+rename) — a crash mid-copy can no
-  longer leave a torn definition file for the harness to load.
-- **Parsed configs are stripped of `__proto__`/`constructor`/`prototype`
-  own-keys at the read boundary.** Our own merges are spread-based and
-  were never pollutable, but a hostile key read from disk would have been
-  written back for assign-semantics consumers to trip on. Break-test
-  proves an `Object.assign` over the stripped parse cannot pollute.
-- **Pre-existing invalid JSON is named as pre-existing.** Both mergers'
-  parse errors now state the file failed to parse *before* any UluOps
-  change was made — previously indistinguishable from installer-caused
-  corruption.
-- **`npm install -g` EACCES failures explain themselves** (both the CLI and
-  agent-metrics installers): the error now names the unwritable-prefix
-  cause and points at version managers / the npm permissions doc.
-- **Health-check failures name the endpoint** (Tracker vs Registry) instead
-  of "some APIs unreachable".
-- **`getVersion` fails loudly on a malformed package.json** instead of
-  stamping `undefined` into banners and the manifest.
-- **Credentials reads only ever return a string key** — a malformed
-  `credentials.json` (numeric/object apiKey) reads as "no stored key"
-  rather than flowing a non-string into Bearer headers.
-- **Manifest save clones instead of aliasing the loaded manifest**, and the
-  gitignore-update warning routes through the standard display helper.
 
 ### Changed
 
@@ -85,6 +56,40 @@ All notable changes to `@uluops/setup` will be documented in this file.
   chmod +x`) instead of relying on npm's bin-link chmod at install time.
 
 ### Fixed
+
+- **Hook ownership is now decided by one predicate across merge/remove/has.**
+  The merge tolerated malformed matcher entries while `removeUluopsHook` and
+  `hasUluopsHook` dereferenced them unguarded — the same hand-edited
+  settings file merged fine but crashed `--uninstall` and `--verify`. All
+  three now share `isUluopsMatcher` (anything not positively ours is user
+  data: preserved by remove, invisible to has, never a crash), the two
+  crash-reachable callers (`uninstallMetrics`, verify's `checkHooks`) are
+  wrapped to degrade to a warning/failed check, and the OpenCode config
+  reader gained the same top-level shape gate as its siblings.
+- **Agent/command/skill file copies are atomic** (`copyIfChanged`/
+  `writeIfChanged` now write via temp+rename) — a crash mid-copy can no
+  longer leave a torn definition file for the harness to load.
+- **Parsed configs are stripped of `__proto__`/`constructor`/`prototype`
+  own-keys at the read boundary.** Our own merges are spread-based and
+  were never pollutable, but a hostile key read from disk would have been
+  written back for assign-semantics consumers to trip on. Break-test
+  proves an `Object.assign` over the stripped parse cannot pollute.
+- **Pre-existing invalid JSON is named as pre-existing.** Both mergers'
+  parse errors now state the file failed to parse *before* any UluOps
+  change was made — previously indistinguishable from installer-caused
+  corruption.
+- **`npm install -g` EACCES failures explain themselves** (both the CLI and
+  agent-metrics installers): the error now names the unwritable-prefix
+  cause and points at version managers / the npm permissions doc.
+- **Health-check failures name the endpoint** (Tracker vs Registry) instead
+  of "some APIs unreachable".
+- **`getVersion` fails loudly on a malformed package.json** instead of
+  stamping `undefined` into banners and the manifest.
+- **Credentials reads only ever return a string key** — a malformed
+  `credentials.json` (numeric/object apiKey) reads as "no stored key"
+  rather than flowing a non-string into Bearer headers.
+- **Manifest save clones instead of aliasing the loaded manifest**, and the
+  gitignore-update warning routes through the standard display helper.
 
 - **`process.exit` no longer fires inside `runSetup`'s try block.** The
   non-zero exit-code path skipped the `finally` that releases the install

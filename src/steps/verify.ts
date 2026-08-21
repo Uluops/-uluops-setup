@@ -166,7 +166,19 @@ async function checkHooks(
     return true;
   }
 
-  const hookPresent = await profile.hooks.check(profile.paths.settingsPath);
+  // A malformed settings file must read as a failed check with the parse
+  // error as detail, not crash the whole verify run.
+  let hookPresent: boolean;
+  try {
+    hookPresent = await profile.hooks.check(profile.paths.settingsPath);
+  } catch (err) {
+    checks.push({
+      label: `[${profile.displayName}] Agent metrics hook`,
+      passed: false,
+      detail: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
   let hookFilePresent = false;
   if (profile.paths.toolsDir) {
     try {

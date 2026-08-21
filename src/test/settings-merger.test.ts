@@ -378,3 +378,53 @@ describe("mergeUluopsHook defensive filter", () => {
     ).toBe("user entry, unknown shape");
   });
 });
+
+describe("ownership predicate consistency on malformed matcher shapes", () => {
+  // The defect class this locks in: merge was defensive against malformed
+  // matcher entries while remove/has dereferenced m.hooks unguarded — the
+  // same hand-edited settings file merged fine but crashed uninstall (via
+  // removeUluopsHook) and verify (via hasUluopsHook). All three now share
+  // one predicate; these tests run the malformed shapes through EACH.
+  const malformed = {
+    hooks: {
+      SubagentStop: [
+        { note: "no hooks array at all" } as never,
+        { hooks: "not an array" } as never,
+        { hooks: [{ command: 42 }] } as never,
+        {
+          hooks: [
+            { type: "command", command: "node agent-metrics/dist/hook.js", timeout: 30 },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("removeUluopsHook removes only the UluOps entry, preserves malformed user entries, does not crash", () => {
+    const result = removeUluopsHook(malformed);
+    const remaining = result.hooks!["SubagentStop"]!;
+    expect(remaining).toHaveLength(3);
+    expect((remaining[0] as { note?: string }).note).toBe("no hooks array at all");
+  });
+
+  it("hasUluopsHook detects ours amid malformed entries, does not crash", () => {
+    expect(hasUluopsHook(malformed)).toBe(true);
+  });
+
+  it("hasUluopsHook is false when only malformed entries exist", () => {
+    const onlyMalformed = {
+      hooks: { SubagentStop: [{ note: "user" } as never, { hooks: "x" } as never] },
+    };
+    expect(hasUluopsHook(onlyMalformed)).toBe(false);
+  });
+
+  it("removeUluopsHook tolerates a non-array hooks entry (in-memory shape)", () => {
+    const bad = { hooks: { SubagentStop: "not-an-array" as never } };
+    expect(removeUluopsHook(bad)).toEqual(bad);
+  });
+
+  it("hasUluopsHook tolerates a non-array hooks entry", () => {
+    const bad = { hooks: { SubagentStop: "not-an-array" as never } };
+    expect(hasUluopsHook(bad)).toBe(false);
+  });
+});
