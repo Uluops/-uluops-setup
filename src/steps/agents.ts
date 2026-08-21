@@ -85,14 +85,28 @@ export async function installAgents(
     }
   }
 
+  // Stale = "no longer SHIPPED", never "failed to copy today": reconciling
+  // against installedFiles deleted a previously-working file whenever its
+  // copy failed (ENOSPC wiped the whole installed set). Reconcile against
+  // the source list; a failed file's prior copy survives on disk.
   const removed = await removeStaleFiles(
     destDir,
     existingManifestAgents,
-    installedFiles,
+    files,
     dryRun,
   );
 
-  return { copied, skipped, removed, files: installedFiles, failures };
+  // The manifest record keeps failed files that were previously installed —
+  // their prior copy is still on disk (see above) and uninstall must be able
+  // to remove it. Never-installed failures stay out (nothing to unlink).
+  const recordedFiles = [
+    ...installedFiles,
+    ...failures
+      .map((f) => f.file)
+      .filter((f) => existingManifestAgents?.includes(f) ?? false),
+  ];
+
+  return { copied, skipped, removed, files: recordedFiles, failures };
 }
 
 /** Remove previously installed agent files by name. */

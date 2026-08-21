@@ -581,9 +581,14 @@ export async function checkConflicts(
       `Could not read ${destDir} (${err instanceof Error ? err.message : String(err)}) — cannot check for existing agents that would be overwritten.`,
     );
     if (!process.stdin.isTTY) {
-      // Non-TTY can't answer the prompt; fail-safe is decline, not a hang
-      // and not a silent overwrite. (--yes skips checkConflicts entirely.)
-      throw new ConflictRejectedError(profile.name);
+      // Non-TTY can't answer the prompt; fail-safe is refusal, not a hang
+      // and not a silent overwrite. This is an OPERATIONAL failure (EACCES
+      // class), not a user policy choice — it must exit 1 for CI, so a
+      // plain Error (failed path), not ConflictRejectedError (exit 0).
+      // (--yes skips checkConflicts entirely.)
+      throw new Error(
+        `Cannot verify conflicts in ${destDir} and no TTY to ask — refusing to risk overwriting existing files. Fix the directory permissions or pass --yes to proceed without the check.`,
+      );
     }
     const { confirm } = await import("@inquirer/prompts");
     const proceed = await confirm({

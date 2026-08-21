@@ -333,25 +333,39 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         // orphaning every previously-installed file the moment a re-run
         // fails (uninstall trusts these lists). Undefined result = keep the
         // prior record; the `partial` marker names what didn't complete.
-        const prev = existingManifest?.harnesses[r.harnessName];
+        const prevEntry = existingManifest?.harnesses[r.harnessName];
+        const newDefsScope = opts.localDefs ? "local" : "global";
+        // Inherit prior lists ONLY within the same defs scope: a global
+        // install's file list against a fresh local defsPath (or vice versa)
+        // would point uninstall at the wrong tree.
+        const prev =
+          prevEntry && prevEntry.defsScope === newDefsScope
+            ? prevEntry
+            : undefined;
+        // A metrics result whose skippedReason is set NEVER OBSERVED the
+        // hook state ("--no-metrics" means don't touch metrics; unsupported
+        // harnesses too) — `??` alone can't express that because false is a
+        // value. Only an observing run may change the recorded hook state.
+        const metricsObserved =
+          r.metricsResult !== undefined && !r.metricsResult.skippedReason;
         const harnessEntry: HarnessManifest = {
           installedAt: now,
           setupVersion: version,
           mcpScope: opts.scope,
           mcpConfigPath: r.mcpResult.configPath,
-          defsScope: opts.localDefs ? "local" : "global",
+          defsScope: newDefsScope,
           defsPath: opts.localDefs
             ? join(await findProjectRoot(), "uluops")
             : r.profile.paths.home,
           agents: r.agentsResult?.files ?? prev?.agents ?? [],
           commands: r.commandsResult?.files ?? prev?.commands ?? [],
           skills: r.skillsResult?.files ?? prev?.skills ?? [],
-          hooksInstalled:
-            r.metricsResult?.hookConfigured ?? prev?.hooksInstalled ?? false,
-          hooksInstalledVersion:
-            r.metricsResult?.hooksInstalledVersion ??
-            prev?.hooksInstalledVersion ??
-            null,
+          hooksInstalled: metricsObserved
+            ? (r.metricsResult?.hookConfigured ?? false)
+            : (prev?.hooksInstalled ?? false),
+          hooksInstalledVersion: metricsObserved
+            ? (r.metricsResult?.hooksInstalledVersion ?? null)
+            : (prev?.hooksInstalledVersion ?? null),
           partial: r.partial ?? null,
         };
         manifest.harnesses[r.harnessName] = harnessEntry;

@@ -60,7 +60,9 @@ export class InstallLockHeldError extends Error {
     },
   ) {
     super(
-      `Another uluops-setup process is already running (PID ${holder.pid} on ${holder.hostname}, started ${Math.round(holder.ageMs / 1000)}s ago).`,
+      holder.pid > 0
+        ? `Another uluops-setup process is already running (PID ${holder.pid} on ${holder.hostname}, started ${Math.round(holder.ageMs / 1000)}s ago).`
+        : `Another uluops-setup process appears to be running but could not be identified (${holder.hostname}). If no other setup is running, re-run in a moment or remove ~/.uluops/install.lock manually.`,
     );
     this.name = "InstallLockHeldError";
   }

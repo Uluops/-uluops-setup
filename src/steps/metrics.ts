@@ -267,8 +267,13 @@ export async function uninstallMetrics(
   if (!dryRun) {
     try {
       await rm(profile.paths.toolsDir, { recursive: true, force: true });
-    } catch {
-      // Already gone
+    } catch (err) {
+      // force:true already tolerates ENOENT, so anything landing here is a
+      // REAL failure (EACCES/EBUSY) — name it, matching the hook-removal
+      // catch above.
+      warn(
+        `Could not remove tool files at ${profile.paths.toolsDir}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }

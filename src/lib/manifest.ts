@@ -125,6 +125,10 @@ function isNewManifest(obj: unknown): obj is Manifest {
     const hm = h as Record<string, unknown>;
     if (typeof hm["mcpConfigPath"] !== "string" || typeof hm["defsPath"] !== "string") return false;
     if (!Array.isArray(hm["agents"]) || !Array.isArray(hm["commands"])) return false;
+    // Element typing: a hand-edited agents: [1,2] otherwise reaches
+    // join(dir, file) in uninstall and TypeErrors mid-removal.
+    if (!(hm["agents"] as unknown[]).every((x) => typeof x === "string")) return false;
+    if (!(hm["commands"] as unknown[]).every((x) => typeof x === "string")) return false;
     if ("skills" in hm && !Array.isArray(hm["skills"])) return false;
     if ("partial" in hm) {
       const p = hm["partial"];
@@ -356,6 +360,16 @@ export async function loadManifest(): Promise<Manifest | null> {
   }
   // Also check if legacy location has new format (written by newer version but not yet moved)
   if (legacyData && isNewManifest(legacyData)) return legacyData;
+
+  // A PRESENT file that matches no known shape is the last surviving form
+  // of "read problem means absent": returning null here lets setup build a
+  // fresh manifest and overwrite the record. Refuse by name instead.
+  if (newData !== null || legacyData !== null) {
+    const path = newData !== null ? getManifestPath() : getLegacyManifestPath();
+    throw new Error(
+      `The install manifest at ${path} has an unrecognized shape — fix or remove it and re-run. (Detected before any UluOps change; nothing was modified. Removing it makes setup treat this as a fresh install; previously installed files will not be tracked for uninstall.)`,
+    );
+  }
 
   return null;
 }

@@ -218,8 +218,10 @@ describe("manifest schema invariants", () => {
       harnesses: {},
     };
     await writeFile(manifestPath, JSON.stringify(emptyHarnesses));
-    const result = await loadManifest();
-    expect(result).toBeNull();
+    // Behavior upgraded (auditor pass 5): a PRESENT file with an
+    // unrecognized shape refuses loudly instead of reading as absent —
+    // null here previously let setup overwrite the record.
+    await expect(loadManifest()).rejects.toThrow(/unrecognized shape/);
   });
 });
 

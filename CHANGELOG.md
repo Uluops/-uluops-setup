@@ -67,6 +67,25 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ### Fixed
 
+- **Failed copies are no longer deleted as "stale", and skipped steps no
+  longer falsify the record** (fifth audit round — the falsified-state
+  class one ring further out). Stale reconciliation now compares against
+  what the package SHIPS, not what copied successfully this run — an
+  ENOSPC re-run previously deleted the entire previously-working installed
+  set and reported it as routine cleanup; failed-but-previously-installed
+  files stay in the manifest record so uninstall can still remove their
+  surviving prior copies. `--no-metrics` (and unsupported harnesses) no
+  longer downgrade `hooksInstalled` to false — a step that never observed
+  the hook state cannot change its record, so uninstall keeps removing the
+  hook it previously installed. Prior file lists are inherited only within
+  the same defs scope (a `--local-defs` flip no longer points uninstall at
+  the wrong tree); a present manifest with an unrecognized shape refuses
+  loudly instead of reading as absent (behavior change: was silently
+  treated as no-manifest); manifest agents/commands entries are
+  element-typed; the non-TTY unknown-conflicts refusal exits 1 as an
+  operational failure (not a user-decline exit 0); the tool-file removal
+  catch names its error; the unidentifiable-lock message no longer invents
+  "PID -1".
 - **The read-error-means-absent inference is now eliminated at every
   read-then-act site, not only the overwrite-shaped ones.** Third audit
   round: the conflict-overwrite guard treated an unreadable destination as

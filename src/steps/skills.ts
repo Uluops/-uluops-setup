@@ -103,14 +103,21 @@ export async function installSkills(
     }
   }
 
+  // See agents.ts: stale = no-longer-shipped, reconciled against SOURCE.
   const removed = await removeStaleFiles(
     destBase,
     existingManifestSkills,
-    installedFiles,
+    files,
     dryRun,
   );
 
-  return { copied, skipped, removed, files: installedFiles, failures };
+  const recordedSkillFiles = [
+    ...installedFiles,
+    ...failures
+      .map((f) => f.file)
+      .filter((f) => existingManifestSkills?.includes(f) ?? false),
+  ];
+  return { copied, skipped, removed, files: recordedSkillFiles, failures };
 }
 
 /**
