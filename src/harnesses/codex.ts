@@ -32,10 +32,19 @@ const RAW_TOML = "__rawToml";
  * Only read-side tools are seeded. Writes still prompt — the user retains a
  * choice point on every state-changing operation. Lists mirror the
  * `sideEffects: 'read'` declarations in the respective server's tool-registry
- * (sources of truth: ops-uluops-mcp/src/config/tool-registry.ts and
- * uluops-registry-mcp/src/config/tool-registry.ts). If a new read tool ships
- * there, add it here in the same PR — Codex users will silently get a prompt
- * on first use otherwise.
+ * (sources of truth: the tool-registry.ts of whichever copy OPS_MCP_SPEC /
+ * REGISTRY_MCP_SPEC actually pin — `@uluops/ops-mcp` is published from
+ * packages/-uluops-ops-mcp, NOT from ops-uluops-mcp, which is the live
+ * tracker registration's copy; the two are twins but not the same tree).
+ * If a new read tool ships there, add it here in the same PR — Codex users
+ * will silently get a prompt on first use otherwise.
+ *
+ * This list is hand-maintained and nothing checks it against the pinned
+ * package: `preview_update_run` (a read tool since ops-mcp 0.14, 2026-08-21)
+ * was absent here until the 0.17.2 pin bump on 2026-09-11 — three setup
+ * releases stamped a seed missing one read tool. The package's exports map
+ * exposes only its server entry, so a derived test needs ops-mcp to export
+ * its registry first; tracked separately.
  */
 const TRACKER_READ_TOOLS: readonly string[] = [
   "diff_runs",
@@ -63,6 +72,7 @@ const TRACKER_READ_TOOLS: readonly string[] = [
   "list_agents",
   "list_projects",
   "list_runs",
+  "preview_update_run",
   "query_analysis_records",
   "query_issues",
   "search_issues",

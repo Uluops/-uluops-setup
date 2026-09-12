@@ -4,6 +4,39 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-11
+
+### Changed
+
+- **`@uluops/ops-mcp` pin 0.13.0 → 0.17.2** (`OPS_MCP_VERSION`). Every harness
+  writer stamps this into the MCP config, so this is the release that moves
+  first-launch users off a server that **silently stripped `cluster_key`** from
+  every recommendation on `save_run` / `update_run` / `validate_run` — the
+  schema was a plain `z.object()` and never declared the field, so within-run
+  convergence was recorded as NULL and read by the tracker as a collapsing
+  pipeline (ops-mcp 0.17.2 changelog; tracker issue `105c478f`). The jump also
+  crosses ops-mcp's 0.17.0 breaking train (strict ops-sdk 6.0.0; `list_agents`
+  and the list/query tools now return the `{data, total}` envelope; `get_run`
+  is a 14-key read projection). Setup itself calls none of these tools, but an
+  MCP client written against the 0.13.0 shapes will see the difference on
+  first launch after reattestation. Harness configs already on disk keep
+  resolving 0.13.0 until `npx @uluops/setup` runs again.
+- **Codex read-tool seed gains `preview_update_run`** (`src/harnesses/codex.ts`).
+  A read tool since ops-mcp 0.14 (2026-08-21) that the hand-maintained
+  `TRACKER_READ_TOOLS` list never picked up — three setup releases seeded a
+  Codex config that prompted on first use of it. Nothing checks this list
+  against the pinned package; the comment now says so, and deriving it is
+  tracked separately. Seeded only on fresh Codex configs, as before.
+
+### Not changed — deliberately
+
+- **`@uluops/registry-mcp` stays pinned at 0.3.7** while npm `latest` is
+  0.8.0. Two trees publish under that name — `packages/-uluops-registry-mcp`
+  (0.3.7) and `uluops-registry-mcp` (0.8.0), the latter being the live
+  registry registration's copy — and the 0.3.7 → 0.8.0 span has not been
+  validated against setup's Codex read-tool seed or the harness writers. That
+  is its own bump with its own changelog entry, not a rider on this one.
+
 ## [0.12.0] - 2026-08-21
 
 ### Added
