@@ -4,6 +4,19 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`@uluops/ops-mcp` pin 0.17.2 → 0.20.0** (`OPS_MCP_VERSION`). Stale since ops-mcp 0.18.0
+  (org routing, 2026-09-14): fresh installs were stamping a server with no `org` argument on
+  any tool and none of the `get_project_log` / `get_log_stat` reads that 0.20.0 added
+  (ulu log Phase 5). Nothing checks this pin against npm; it was found by the ulu log
+  Phase 7 residue list, not by a test.
+- **Setup banner tagline** `operating intelligence as infrastructure` → `the operations layer
+  for agentic work` (messaging foundation 0.5.3 §4.1/§4.10 — the banner is an agent-read
+  surface, and the category string is the same on every surface by decision D6). uluops.ai's
+  install walkthrough mirrors this line and was changed in the same day's commit, so the
+  site shows the banner of this release, not of 0.13.0, until this ships.
+
 ## [0.13.0] - 2026-09-11
 
 ### Changed

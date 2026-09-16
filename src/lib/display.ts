@@ -26,7 +26,7 @@ export function printSetupBanner(version: string, targetSummary: string): void {
     `  ${chalk.dim("⟨u⟩")} ${chalk.cyan.bold("ulu")}${chalk.bold("·ops")}`,
   );
   console.log(
-    `      ${chalk.dim("operating intelligence as infrastructure")}`,
+    `      ${chalk.dim("the operations layer for agentic work")}`,
   );
   console.log();
   console.log(`  Setup v${version} — ${chalk.bold(targetSummary)}`);
