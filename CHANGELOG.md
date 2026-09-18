@@ -4,7 +4,20 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-09-17
+
 ### Changed
+
+- Bundle `@uluops/agent-metrics` 0.11.0 (previously 0.8.0) for metrics hook
+  installs and refreshes, including the Codex extraction and discovery fixes.
+- Pin tracker MCP to 0.20.1, which uses ops-sdk 6.5.2 and preserves harness,
+  token components and raw model identity across the metrics transport path.
+- Pin registry MCP to 0.8.0 (previously 0.3.7), verified against the published
+  package's tool registry and all four harness config writers. Its read-tool
+  approval list remains compatible.
+- Seed the tracker read tools `get_org_audit_feed`, `get_project_log` and
+  `get_log_stat` in fresh Codex configs. Existing custom tool approvals remain
+  untouched.
 
 - **`@uluops/ops-mcp` pin 0.17.2 → 0.20.0** (`OPS_MCP_VERSION`). Stale since ops-mcp 0.18.0
   (org routing, 2026-09-14): fresh installs were stamping a server with no `org` argument on

@@ -1,6 +1,6 @@
 {
   "name": "@uluops/setup",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Zero-friction installer for UluOps agentic harnesses",
   "license": "MIT",
   "repository": {
@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "8.6.0",
-    "@uluops/agent-metrics": "0.8.0",
+    "@uluops/agent-metrics": "0.11.0",
     "chalk": "5.6.2",
     "commander": "15.0.0",
     "jsonc-parser": "3.3.1"

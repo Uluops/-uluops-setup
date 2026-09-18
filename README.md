@@ -18,6 +18,15 @@ npx @uluops/setup
 
 ## Supported harnesses
 
+Setup 0.13.1 bundles agent-metrics **0.11.0** for hook installation and pins
+tracker MCP **0.20.1** and registry MCP **0.8.0** in generated configs. Tracker
+MCP uses ops-sdk **6.5.2**. Re-run setup to refresh existing configs and hook
+files, then restart the affected MCP connections in your harness.
+
+Optional global CLI installs resolve npm's current release when the CLI is
+absent. Setup preserves an existing global CLI rather than upgrading it;
+update existing `@uluops/cli` or `@uluops/agent-metrics` global installs with npm.
+
 | Harness | Status | Alias | Config |
 |---------|--------|-------|--------|
 | Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
