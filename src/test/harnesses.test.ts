@@ -301,6 +301,25 @@ describe("claude-code hooks: SubagentStart beside SubagentStop (agent-metrics 0.
     expect(s.hooks!["SubagentStop"]).toBeUndefined();
   });
 
+  it("remove clears ours from EVERY event type, whatever ULUOPS_HOOK_TYPE says now (control: managed-types-only leaves SubagentStart)", async () => {
+    const p = await settingsFile({});
+    await claudeCodeProfile.hooks!.install(p, cmd, false); // default: Stop + Start
+    const prev = process.env["ULUOPS_HOOK_TYPE"];
+    process.env["ULUOPS_HOOK_TYPE"] = "Stop";
+    try {
+      const s0 = await read(p);
+      s0.hooks!["Stop"] = [{ hooks: [{ command: cmd }] }, { hooks: [{ command: "user-stop" }] }] as never;
+      await writeFile(p, JSON.stringify(s0));
+      await claudeCodeProfile.hooks!.remove(p, false);
+      const s = await read(p);
+      expect(s.hooks!["SubagentStart"]).toBeUndefined();
+      expect(s.hooks!["SubagentStop"]).toBeUndefined();
+      expect(s.hooks!["Stop"]!.map((m) => m.hooks[0]!.command)).toEqual(["user-stop"]);
+    } finally {
+      if (prev === undefined) delete process.env["ULUOPS_HOOK_TYPE"]; else process.env["ULUOPS_HOOK_TYPE"] = prev;
+    }
+  });
+
   it("an overridden event type (ULUOPS_HOOK_TYPE) installs only that event", async () => {
     const prev = process.env["ULUOPS_HOOK_TYPE"];
     process.env["ULUOPS_HOOK_TYPE"] = "Stop";

@@ -88,7 +88,11 @@ class ClaudeCodeHooks implements HookStrategy {
     if (dryRun) return;
     await serialize(settingsPath, async () => {
       const settings = await readSettings(settingsPath);
-      const cleaned = claudeManagedHookTypes().reduce(
+      // Every event type present, not just the ones the current env would install:
+      // an install made under a different ULUOPS_HOOK_TYPE (or before SubagentStart was
+      // managed) must still come out. isUluopsMatcher identifies ours; user hooks stay.
+      const types = new Set([...claudeManagedHookTypes(), ...Object.keys(settings.hooks ?? {})]);
+      const cleaned = [...types].reduce(
         (acc, type) => removeUluopsHook(acc, type),
         settings,
       );

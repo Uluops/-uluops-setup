@@ -46,7 +46,7 @@
     "typecheck": "tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm test && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@inquirer/prompts": "8.6.0",
