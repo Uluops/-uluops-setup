@@ -6,3 +6,6 @@ node_modules
 dist/
 logs/
 *.tgz
+
+# Local Verdaccio opt-in (CLAUDE.md "Per-project Verdaccio opt-in"); never commit
+.npmrc
