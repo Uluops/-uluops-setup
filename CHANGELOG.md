@@ -13,6 +13,9 @@ All notable changes to `@uluops/setup` will be documented in this file.
   - The start entry is added only with the default `SubagentStop` event. A `ULUOPS_HOOK_TYPE` override installs exactly the overridden event.
   - `--uninstall` removes UluOps hook entries from every event type present in `settings.json`, not just the ones the current environment would install, so an install made under a different `ULUOPS_HOOK_TYPE` still comes out. User hooks are left in place.
   - The installed-hook check now requires both events, so an install from before 0.14.0 reads as out of date and re-running setup upgrades it.
+- **Pin tracker MCP to 0.27.1 (was 0.20.1) and registry MCP to 0.11.4 (was 0.8.0).** Both pins had fallen several releases behind; under the bump rule in `src/lib/mcp-packages.ts` a setup release stamps whatever it pins, so the old pair would have shipped again. Tracker MCP 0.27.1 uses ops-sdk 6.14.0.
+  - The Codex read-only auto-approve lists were checked against the `sideEffects: 'read'` entries in each pinned package's published `dist/config/tool-registry.js` (33 tracker, 32 registry): both already matched, so no change.
+  - Tracker MCP ≥ 0.22.0 gates 12 destructive tools behind `ULUOPS_ALLOW_DESTRUCTIVE`. Setup does not write it, so they stay enabled (the pre-0.22 behaviour) and the server logs a boot warning. Setting it is the operator's call, not setup's.
 - `prepublishOnly` now runs `npm test && npm run typecheck && npm run build` (was build only).
 - Bundle `@uluops/agent-metrics` **0.12.0** (previously 0.11.0). Tracker output from the hook buffer now carries `definition_version`, and contended buffer writes are spilled rather than dropped.
 
