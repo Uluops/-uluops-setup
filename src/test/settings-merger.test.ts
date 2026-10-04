@@ -303,14 +303,16 @@ describe("CLAUDE_HOOK_TYPES anchor", () => {
     // probeHookSupport warning logic still distinguishes drift from legitimate
     // hook types, (3) README/ADR mentions of hook-type vocabulary still match.
     expect([...CLAUDE_HOOK_TYPES].sort()).toEqual(
-      ["Notification", "PostToolUse", "PreToolUse", "Stop", "SubagentStop"].sort(),
+      // SubagentStart added 2026-10-04 (agent-metrics 0.12.0 definition capture; a documented
+      // Claude Code event carrying agent_type, agent_id and tool_use_id — code.claude.com hooks).
+      ["Notification", "PostToolUse", "PreToolUse", "Stop", "SubagentStart", "SubagentStop"].sort(),
     );
   });
 
   it("snapshot — size", () => {
     // Paired with the membership snapshot to catch adds/removes that happen to
     // preserve alphabetic ordering of stringified contents.
-    expect(CLAUDE_HOOK_TYPES.size).toBe(5);
+    expect(CLAUDE_HOOK_TYPES.size).toBe(6);
   });
 
   it("DEFAULT_CLAUDE_HOOK_TYPE is SubagentStop", () => {

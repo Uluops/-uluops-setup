@@ -263,6 +263,76 @@ describe("claude-code profile", () => {
   });
 });
 
+describe("claude-code hooks: SubagentStart beside SubagentStop (agent-metrics 0.12.0)", () => {
+  const cmd = "node /home/u/.claude/tools/agent-metrics/dist/hook.js";
+  const settingsFile = async (content: unknown): Promise<string> => {
+    const dir = await mkdtemp(join(tmpdir(), "setup-hooks-"));
+    const p = join(dir, "settings.json");
+    await writeFile(p, JSON.stringify(content));
+    return p;
+  };
+  const read = async (p: string): Promise<{ hooks?: Record<string, Array<{ hooks: Array<{ command: string }> }>> }> =>
+    JSON.parse(await (await import("node:fs/promises")).readFile(p, "utf-8"));
+
+  it("install registers both events with the same command, preserving user hooks", async () => {
+    const p = await settingsFile({ hooks: { SubagentStop: [{ hooks: [{ type: "command", command: "user-hook" }] }] } });
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    const s = await read(p);
+    expect(s.hooks!["SubagentStart"]!.map((m) => m.hooks[0]!.command)).toEqual([cmd]);
+    expect(s.hooks!["SubagentStop"]!.map((m) => m.hooks[0]!.command)).toEqual(["user-hook", cmd]);
+  });
+
+  it("check is false for a pre-0.14 install with SubagentStop only (control: a SubagentStop-only check reads it as installed)", async () => {
+    const p = await settingsFile({ hooks: { SubagentStop: [{ hooks: [{ type: "command", command: cmd }] }] } });
+    expect(await claudeCodeProfile.hooks!.check(p)).toBe(false);
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    expect(await claudeCodeProfile.hooks!.check(p)).toBe(true);
+  });
+
+  it("remove clears both events and leaves user hooks", async () => {
+    const p = await settingsFile({});
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    const s0 = await read(p);
+    s0.hooks!["SubagentStart"]!.push({ hooks: [{ command: "user-start" }] } as never);
+    await writeFile(p, JSON.stringify(s0));
+    await claudeCodeProfile.hooks!.remove(p, false);
+    const s = await read(p);
+    expect(s.hooks!["SubagentStart"]!.map((m) => m.hooks[0]!.command)).toEqual(["user-start"]);
+    expect(s.hooks!["SubagentStop"]).toBeUndefined();
+  });
+
+  it("remove clears ours from EVERY event type, whatever ULUOPS_HOOK_TYPE says now (control: managed-types-only leaves SubagentStart)", async () => {
+    const p = await settingsFile({});
+    await claudeCodeProfile.hooks!.install(p, cmd, false); // default: Stop + Start
+    const prev = process.env["ULUOPS_HOOK_TYPE"];
+    process.env["ULUOPS_HOOK_TYPE"] = "Stop";
+    try {
+      const s0 = await read(p);
+      s0.hooks!["Stop"] = [{ hooks: [{ command: cmd }] }, { hooks: [{ command: "user-stop" }] }] as never;
+      await writeFile(p, JSON.stringify(s0));
+      await claudeCodeProfile.hooks!.remove(p, false);
+      const s = await read(p);
+      expect(s.hooks!["SubagentStart"]).toBeUndefined();
+      expect(s.hooks!["SubagentStop"]).toBeUndefined();
+      expect(s.hooks!["Stop"]!.map((m) => m.hooks[0]!.command)).toEqual(["user-stop"]);
+    } finally {
+      if (prev === undefined) delete process.env["ULUOPS_HOOK_TYPE"]; else process.env["ULUOPS_HOOK_TYPE"] = prev;
+    }
+  });
+
+  it("an overridden event type (ULUOPS_HOOK_TYPE) installs only that event", async () => {
+    const prev = process.env["ULUOPS_HOOK_TYPE"];
+    process.env["ULUOPS_HOOK_TYPE"] = "Stop";
+    try {
+      const p = await settingsFile({});
+      await claudeCodeProfile.hooks!.install(p, cmd, false);
+      expect(Object.keys((await read(p)).hooks!)).toEqual(["Stop"]);
+    } finally {
+      if (prev === undefined) delete process.env["ULUOPS_HOOK_TYPE"]; else process.env["ULUOPS_HOOK_TYPE"] = prev;
+    }
+  });
+});
+
 describe("opencode profile", () => {
   it("has correct basic properties", () => {
     expect(opencodeProfile.name).toBe("opencode");
