@@ -18,7 +18,7 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.13.1 bundles agent-metrics **0.11.0** for hook installation and pins
+Setup 0.14.0 bundles agent-metrics **0.12.0** for hook installation and pins
 tracker MCP **0.20.1** and registry MCP **0.8.0** in generated configs. Tracker
 MCP uses ops-sdk **6.5.2**. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
@@ -122,7 +122,7 @@ The installer runs these steps in sequence:
 2. **Registry username** *(optional)* — Offers to set your registry username, the one-time prerequisite for creating or publishing definitions. Never forced: consumers who only run definitions don't need one, and non-interactive runs skip it silently unless `--username <name>` is supplied.
 3. **MCP config** — Writes tracker and registry server entries to the harness config
 4. **Definitions** — Copies pre-rendered agent definition files
-5. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI)
+5. **Metrics hook** — Configures a post-agent hook for automatic run capture (Claude Code and Gemini CLI). On Claude Code it registers the same command on `SubagentStart` and `SubagentStop`. The start event records which agent definition each subagent was spawned with, so saved runs carry each agent's own `definition_version`. A setup from before 0.14.0 is detected and upgraded on re-run.
 6. **`ulu` CLI** *(optional)* — Offers to install `@uluops/cli` globally. Interactive runs are prompted (default Y); non-interactive runs skip unless `--with-cli` is passed. `--no-cli` always skips. The install is best-effort: if `npm install -g` fails (permissions, nvm prefix, etc.) the rest of setup still completes and a manual install command is printed.
 7. **Health check** — Verifies both API endpoints are reachable
 
@@ -327,8 +327,9 @@ Removes only UluOps-managed files: agents, commands, MCP config entries, shell p
 ## Data & privacy
 
 The metrics hook (step 5) captures **agent execution metadata only** — token
-counts, durations, model and agent names — into a **local buffer** on your
-machine. The hook itself sends nothing anywhere: data reaches the UluOps
+counts, durations, model and agent names, and (from agent-metrics 0.12.0) the
+version, path and content hash of the agent definition file that ran — into a
+**local buffer** on your machine. The hook itself sends nothing anywhere: data reaches the UluOps
 tracker only when a run is explicitly saved (by you, or by tooling you run).
 Artifact content being validated is never stored — only validation results.
 

@@ -4,6 +4,15 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Claude Code: the metrics hook is also registered on `SubagentStart`** (definition-version-dispositions checklist X4-1a). agent-metrics 0.12.0 records which agent definition each subagent was spawned with at SubagentStart and confirms it at SubagentStop. Claude Code loads a subagent's definition at spawn, so a stop-time read alone would record a definition reinstalled mid-run.
+  - The same command serves both events; the hook dispatches on `hook_event_name`.
+  - The start entry is added only with the default `SubagentStop` event. A `ULUOPS_HOOK_TYPE` override installs exactly the overridden event.
+  - `--uninstall` removes both.
+  - The installed-hook check now requires both events, so an install from before 0.14.0 reads as out of date and re-running setup upgrades it.
+- Bundle `@uluops/agent-metrics` **0.12.0** (previously 0.11.0). Tracker output from the hook buffer now carries `definition_version`, and contended buffer writes are spilled rather than dropped.
+
 ## [0.13.1] - 2026-09-17
 
 ### Changed

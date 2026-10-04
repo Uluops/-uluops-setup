@@ -57,6 +57,7 @@ const HOOK_OWNERSHIP_SIGNATURE = "agent-metrics/dist/hook.js";
  * Exported for that test only — runtime callers should use `probeHookSupport`.
  */
 export const CLAUDE_HOOK_TYPES = new Set([
+  "SubagentStart",
   "SubagentStop",
   "PreToolUse",
   "PostToolUse",
@@ -66,6 +67,22 @@ export const CLAUDE_HOOK_TYPES = new Set([
 
 /** Default Claude Code hook event used when no override is configured. */
 export const DEFAULT_CLAUDE_HOOK_TYPE = "SubagentStop";
+
+/**
+ * The companion event installed beside the default one (agent-metrics 0.12.0,
+ * dvc checklist X4-1). agent-metrics records which agent definition a subagent was
+ * spawned with at SubagentStart and confirms it at SubagentStop; Claude Code loads a
+ * subagent's definition at spawn, so a stop-time read alone would record a
+ * definition reinstalled mid-run. Same command: the hook dispatches on
+ * `hook_event_name`. Installed only with the default event — a user who overrode
+ * the event type (ULUOPS_HOOK_TYPE) gets exactly what they asked for.
+ */
+export const CLAUDE_SPAWN_HOOK_TYPE = "SubagentStart";
+
+/** The hook event types setup manages for Claude Code, given the resolved primary type. */
+export function claudeManagedHookTypes(primary: string = getDefaultHookEventType()): string[] {
+  return primary === DEFAULT_CLAUDE_HOOK_TYPE ? [primary, CLAUDE_SPAWN_HOOK_TYPE] : [primary];
+}
 
 /** Configurable hook type via env var. Falls back to SubagentStop. */
 function getDefaultHookEventType(): string {

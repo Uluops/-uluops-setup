@@ -24,6 +24,7 @@ import {
   mergeUluopsHook,
   removeUluopsHook,
   hasUluopsHook,
+  claudeManagedHookTypes,
 } from "../lib/settings-merger.js";
 import { getClaudeHome, getClaudeJsonPath } from "../lib/paths.js";
 import { serialize } from "../lib/write-coordinator.js";
@@ -72,8 +73,12 @@ class ClaudeCodeHooks implements HookStrategy {
     // collide today".
     await serialize(settingsPath, async () => {
       const settings = await readSettings(settingsPath);
-      // Claude Code uses SubagentStop as the default event for auto-save
-      const merged = mergeUluopsHook(settings, hookCommand);
+      // Claude Code uses SubagentStop as the default event for auto-save, plus
+      // SubagentStart for definition capture (agent-metrics 0.12.0).
+      const merged = claudeManagedHookTypes().reduce(
+        (acc, type) => mergeUluopsHook(acc, hookCommand, type),
+        settings,
+      );
       await writeSettings(settingsPath, merged);
     });
     return true;
@@ -83,14 +88,19 @@ class ClaudeCodeHooks implements HookStrategy {
     if (dryRun) return;
     await serialize(settingsPath, async () => {
       const settings = await readSettings(settingsPath);
-      const cleaned = removeUluopsHook(settings);
+      const cleaned = claudeManagedHookTypes().reduce(
+        (acc, type) => removeUluopsHook(acc, type),
+        settings,
+      );
       await writeSettings(settingsPath, cleaned);
     });
   }
 
   async check(settingsPath: string): Promise<boolean> {
     const settings = await readSettings(settingsPath);
-    return hasUluopsHook(settings);
+    // Every managed event must be present: an install from before 0.14.0 has
+    // SubagentStop only, and reads as needing the upgrade.
+    return claudeManagedHookTypes().every((type) => hasUluopsHook(settings, type));
   }
 }
 
