@@ -4,6 +4,15 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-10-04
+
+### Changed
+
+- **Pin registry MCP to 0.12.0 (was 0.11.4).** This release adds exact-name and literal-prefix discovery (`name`/`match` on `list_definitions`, `match` on `search_definitions`), plus page, sort and order on `search_definitions`. All of it is additive, on existing read tools.
+  - The Codex read-only auto-approve list was checked against the `sideEffects: 'read'` entries in the published 0.12.0 `dist/config/tool-registry.js`: 32 tools, matching. No change.
+  - The 0.12.0 tarball was smoke-tested with `npx -y @uluops/registry-mcp@0.12.0` and an MCP `initialize` from an empty directory. It reported version 0.12.0.
+  - **Not changed:** the tracker MCP pin stays at 0.27.1. ops-mcp 0.28.0 (save-time attribution warnings) was not yet on npm when this was cut (`latest` 0.27.1, tarball 404), and a pin must resolve: the install-time probe checks the pinned version.
+
 ## [0.14.0] - 2026-10-04
 
 ### Changed
