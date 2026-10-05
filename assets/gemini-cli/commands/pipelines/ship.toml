@@ -7,7 +7,7 @@ prompt = '''
 | Field | Value |
 |-------|-------|
 | Name | `ship` |
-| Version | 1.1.1 |
+| Version | 1.2.0 |
 | Domain | software |
 | Subdomain | release |
 | Tags | `ship`, `validation`, `release`, `ci-cd` |
@@ -17,6 +17,7 @@ prompt = '''
 - **Manual**
   - Parameters:
     - `target`: string
+    - `tracker_project`: string
 
 ## Stage Dependency Graph
 
@@ -31,6 +32,8 @@ preflight (Pre-Flight Detection) [parallel]
 ```
 
 ## Stages
+
+**Agent launch protocol:** Launch each stage agent via the Agent tool with `subagent_type` set to the agent ref, and begin the prompt with the explicit tag `[agent:<agent-ref>]` (lowercase kebab-case). The agent-metrics hook resolves agent names only from this tag — omitting it captures the agent's metrics nameless.
 
 ### Stage 1: Pre-Flight Detection
 
@@ -64,7 +67,7 @@ preflight (Pre-Flight Detection) [parallel]
 - `code-validator`
 
 **Gate:**
-- Threshold: 70
+- Threshold: 75
 - On failure: abort
 
 ### Stage 3: Parallel Validation
@@ -142,10 +145,10 @@ After all stages complete, save results to the tracker using `save_run`:
 
 - **definition_type:** `pipeline`
 - **definition_name:** `ship`
-- **definition_version:** `1.1.1`
+- **definition_version:** `1.2.0`
 - **workflow_type:** `ship`
-- **project:** `{{args}}` (the target project name)
-- **agents:** Collect each agent result with name, score, decision, model, and tokens
+- **project:** `$tracker_project` (the target project name)
+- **agents:** Collect each agent result with name, score, decision, and summary. Splice the `-f tracker` output verbatim for the metrics fields (tokens, model, harness, duration_ms, agent_id) — do not hand-restructure or copy a subset
 - **recommendations:** Collect ALL issues from ALL stages into a single recommendations array with agent, title, priority, severity, failure_code, file_path, line_number, description, and type
 - **summary:** `{ all_gates_passed: <true if all abort-gates passed>, average_score: <mean of all agent scores> }`
 
@@ -155,10 +158,10 @@ This MUST be a single bulk call — do NOT create individual issues. The `save_r
 
 Get token metrics from the agent-metrics buffer before saving:
 ```bash
-agent-metrics buffer list --since 15m -f tracker
+agent-metrics buffer list --run $run_token -f tracker -p $target
 ```
 
-Map buffer fields to tracker: `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`, `total_effective_tokens`, and `model`.
+Splice each entry of the `-f tracker` output verbatim into `agents[]` — every field, including `duration_ms` and `agent_id` (the provenance join key to the buffer entry and transcript). Do not hand-restructure: `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`, `cached_input_tokens`, `reasoning_output_tokens`, `thinking_tokens`, `tool_tokens`, `total_effective_tokens`, `harness`, `model`, `duration_ms`, and `agent_id` all carry through as-is.
 
 **Field Mappings:**
 
@@ -179,6 +182,12 @@ Map buffer fields to tracker: `input_tokens`, `output_tokens`, `cache_creation_t
 
 - **NOT READY — Blocking issues found. Fix and re-run.**
 
+## Source
+
+**Schema:** https://uluops.ai/schemas/pdl/v1.5.0/pipeline.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/pipeline/ship@1.2.0
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/pipeline/ship@1.2.0/render
+
 ---
-*Generated from PDL v1.1.1 | Pipeline: ship*
+*Generated from PDL v1.5.0 | Pipeline: ship v1.2.0*
 '''

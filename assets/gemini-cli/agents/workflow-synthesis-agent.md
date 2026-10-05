@@ -251,30 +251,30 @@ How significant is this synthesis finding for understanding the artifact?
 | **Total** | **100** | |
 
 ### 1. Convergence-Divergence Mapping (25 points)
-- [ ] Convergence correctly identified with specific citations (8 pts)
-- [ ] Divergence correctly identified with both positions (8 pts)
-- [ ] Convergence strength assessed (5 pts)
-- [ ] Major findings mapped across agents (4 pts)
+- [ ] Convergence correctly identified with specific citations (8 pts) `→ SEM-COM/H`  Where 2+ agents reach compatible conclusions about the same aspect, cited with agent names and findings
+- [ ] Divergence correctly identified with both positions (8 pts) `→ SEM-COM/H`  Where agents reach incompatible conclusions about the same aspect, with both positions documented
+- [ ] Convergence strength assessed (5 pts) `→ EPI-OVR/M`  Whether convergence reflects genuine multi-perspective agreement or shared analytical scope
+- [ ] Major findings mapped across agents (4 pts) `→ STR-OMI/M`  All significant findings checked for convergence/divergence, not just cherry-picked examples
 
 ### 2. Composition Quality (25 points)
-- [ ] At least one genuinely emergent insight present (10 pts)
-- [ ] Composition reasoning is explicit and convincing (8 pts)
-- [ ] Composition test applied honestly (7 pts)
+- [ ] At least one genuinely emergent insight present (10 pts) `→ SEM-COM/H`  An insight that requires multiple agent perspectives and cannot be derived from any single output
+- [ ] Composition reasoning is explicit and convincing (8 pts) `→ EPI-GRN/M`  Clear explanation of WHY the insight requires multiple perspectives
+- [ ] Composition test applied honestly (7 pts) `→ EPI-OVR/H`  FRAGMENTED reported when composition adds no value — not forced into INTEGRATED
 
 ### 3. Cross-Reference Depth (20 points)
-- [ ] Every cross-reference cites specific agents and findings (7 pts)
-- [ ] Connection mechanisms explained, not just asserted (7 pts)
-- [ ] Patterns traced across 3+ agents when available (6 pts)
+- [ ] Every cross-reference cites specific agents and findings (7 pts) `→ EPI-GRN/H`  Agent names and specific findings cited — no vague 'one agent found...' references
+- [ ] Connection mechanisms explained, not just asserted (7 pts) `→ SEM-AMB/M`  HOW findings relate, not just THAT they relate
+- [ ] Patterns traced across 3+ agents when available (6 pts) `→ STR-INC/M`  Cross-references extend beyond pairs to multi-agent patterns where possible
 
 ### 4. Blind Spot Detection (15 points)
-- [ ] Areas compared across agents for differential findings (5 pts)
-- [ ] Significance of blind spots assessed (5 pts)
-- [ ] Scope boundaries distinguished from blind spots (5 pts)
+- [ ] Areas compared across agents for differential findings (5 pts) `→ STR-OMI/M`  Same area examined by multiple agents, one found what others missed
+- [ ] Significance of blind spots assessed (5 pts) `→ PRA-EFF/M`  Impact of what was missed, not just its existence
+- [ ] Scope boundaries distinguished from blind spots (5 pts) `→ SEM-AMB/M`  'Not in scope' clearly separated from 'in scope but missed'
 
 ### 5. Actionability (15 points)
-- [ ] Meta-insights lead to specific actions (5 pts)
-- [ ] Convergent high-severity findings flagged as highest priority (5 pts)
-- [ ] Convergence-backed insights distinguished from single-source (5 pts)
+- [ ] Meta-insights lead to specific actions (5 pts) `→ PRA-EFF/M`  Cross-cutting patterns translated into prioritized recommendations
+- [ ] Convergent high-severity findings flagged as highest priority (5 pts) `→ PRA-ALI/M`  Convergence-backed high-severity items clearly distinguished from single-source items
+- [ ] Convergence-backed insights distinguished from single-source (5 pts) `→ EPI-OVR/M`  Confidence levels tied to how many independent agents support each conclusion
 
 
 ### Score Interpretation
@@ -285,6 +285,11 @@ Score reflects how well the synthesis integrates upstream agent outputs into a c
 ### Weight Rationale
 
 Convergence-divergence mapping (25) and composition quality (25) receive equal top weight because they are the twin pillars of synthesis — mapping tells you what the landscape looks like, composition tells you what emerges from it. Cross-reference depth (20) receives slightly less because it is the mechanism that enables mapping and composition — quality cross-references are necessary but not sufficient. Blind spot detection (15) adds unique value by finding coverage gaps. Actionability (15) ensures synthesis produces usable output, not just analytical elegance.
+
+
+### Calibration Provenance
+
+> All calibration examples are hand-authored hypothetical scenarios, not derived from empirical output. Calibration status: UNCALIBRATED. The 65-point INTEGRATED threshold is an author estimate — at 65, convergence/divergence mapping must have genuine content, at least one composition attempt must exist, and cross-references must name specific agents. The 27-point degenerate example establishes the floor for aggregation-without-synthesis. To reach CALIBRATED status: (1) collect 5+ synthesis runs across different workflows, (2) verify composition test accurately distinguishes genuine from pseudo insights, (3) adjust threshold based on observed quality.
 
 
 ### Scoring Calibration
@@ -332,7 +337,7 @@ Found one obvious convergence but missed 3 others. No divergence analysis. No ge
 | concrete_recommendations | -3 | Observations without next steps |
 | confidence_calibration | -3 | No confidence calibration |
 
-**Score: 35/100** - FRAGMENTED — summary masquerading as synthesis
+**Score: 27/100** - FRAGMENTED — summary masquerading as synthesis
 Listed each agent's top finding without cross-referencing. Zero emergent insights — every point is a restatement. No specific citations. Vague references throughout. No blind spot analysis. No concrete recommendations. This is aggregation, not synthesis.
 
 
@@ -353,9 +358,10 @@ Listed each agent's top finding without cross-referencing. Zero emergent insight
 
 ## Decision Criteria
 
-**INTEGRATED (✅)**: Score ≥ 75
+**INTEGRATED (✅)**: Score ≥ 75 AND no critical issues — INTEGRATED
 
-**FRAGMENTED (❌)**: Score < 75
+**FRAGMENTED (❌)**: Score < 75 OR any critical issue exists — FRAGMENTED
+
 ### Decision Guidance
 
 INTEGRATED requires genuine cross-cutting analysis with specific citations. Convergence and divergence must both be explored. At least one composition test must be attempted. FRAGMENTED is a valid finding when upstream outputs genuinely don't compose — do not force INTEGRATED to avoid a negative label.
@@ -366,18 +372,23 @@ INTEGRATED requires genuine cross-cutting analysis with specific citations. Conv
 The following conditions result in automatic failure regardless of score:
 
 - **AF-001: Mere summarization — synthesis restates individual findings without cross-referencing** `[CRITICAL]`
+  *Triggers when:* The synthesis section restates what each agent found without cross-referencing between agents. Every claim in the synthesis is traceable to a single upstream agent's output. No convergence, divergence, or composition analysis present.
   *Remediation:* For every synthesis claim, cite at least two upstream agents. Show how their findings relate — converge, diverge, or compose. If findings don't interact, report FRAGMENTED honestly.
 
 - **AF-002: Missing composition test — no assessment of emergent insights** `[CRITICAL]`
+  *Triggers when:* Output has no explicit composition test. Claims of emergent insight exist but without reasoning for why the insight requires multiple perspectives. Or no composition section exists at all.
   *Remediation:* For each claimed emergent insight, explicitly state: (1) which agents' findings combine to produce it, (2) why no single agent could have produced it alone, (3) what is genuinely new. If no genuine composition exists, state this explicitly.
 
 - **AF-003: Synthesis claims not traced to specific upstream agents** `[CRITICAL]`
+  *Triggers when:* Synthesis makes claims about cross-cutting patterns without naming which specific agents and which specific findings support the claim. Vague references like 'one agent found' or 'upstream analysis suggests' without agent names.
   *Remediation:* Every synthesis claim must name the specific agents (e.g., 'code-validator and security-analyst both found...') and cite specific findings from those agents' outputs.
 
 - **AF-004: Convergence analyzed but divergence section empty or perfunctory** `[CRITICAL]`
+  *Triggers when:* Output has a convergence section with genuine content but the divergence section is empty, contains only one sentence, or is skipped entirely. Divergence is at least as analytically valuable as convergence.
   *Remediation:* Include a structured divergence section with the same depth as convergence. Even if agents largely agree, explore areas where their conclusions differ in emphasis, scope, or implication.
 
 - **AF-005: Claiming agents agree when findings are about different aspects** `[CRITICAL]`
+  *Triggers when:* Convergence claimed based on lexical similarity (same words appear in multiple agent outputs) rather than analytical agreement (same aspect examined with compatible conclusions). Agent A mentions 'error handling' in auth, Agent B mentions 'error handling' in data validation — this is NOT convergence.
   *Remediation:* Before claiming convergence, verify: (1) both agents examined the SAME aspect of the artifact, (2) their conclusions are compatible, (3) the connection is analytical, not just lexical.
 
 
@@ -433,6 +444,79 @@ Before finalizing your assessment, verify:
 - [ ] No findings fabricated beyond what upstream agents support
 
 
+## Failure Taxonomy Reference
+
+<!-- GENERATED — do not edit. Emitted by @uluops/definition-factory
+     scripts/generate-taxonomy-surfaces.ts from the canonical taxonomy root.
+     Hand-editing this table is what let it drift from the production catalog on 18 of
+     24 descriptions; the drift reached 237 rendered agent prompts. Edit the root. -->
+
+Compact format: `DOMAIN-MODE/SEVERITY` where:
+- **Domain:** STR (Structural), SEM (Semantic), PRA (Pragmatic), EPI (Epistemic)
+- **Mode:** 3-letter code identifying the specific failure type within a domain
+- **Severity:** C (Critical), H (High), M (Medium), L (Low), I (Info)
+
+**The mode is bound to its domain.** Codes are drawn from the closed set below, not
+composed from a domain and a mode independently — `VAL` is an EPI mode, so `EPI-VAL` is a
+code and `SEM-VAL` is not.
+
+### Domain Reference
+| Code | Domain | Description |
+|------|--------|-------------|
+| STR | Structural | Structural failures |
+| SEM | Semantic | Semantic failures |
+| PRA | Pragmatic | Pragmatic failures |
+| EPI | Epistemic | Epistemic failures |
+
+### Failure Mode Codes
+| Code | Mode | Domain | Meaning |
+|------|------|--------|---------|
+| OMI | Omission | STR | Required element missing |
+| EXC | Excess | STR | Unnecessary element present |
+| MAL | Malformation | STR | Element has wrong structure |
+| INC | Inconsistency | STR | Elements contradict structurally |
+| SYN | Syntax | STR | Syntax or formatting error |
+| FMT | Format | STR | Format or layout issue |
+| ORG | Organization | STR | Content present but ungrouped or poorly ordered |
+| INC | Incorrectness | SEM | Factually or logically wrong |
+| COM | Incompleteness | SEM | Partially correct, missing key aspects |
+| AMB | Ambiguity | SEM | Multiple valid interpretations |
+| COH | Incoherence | SEM | Internal logical contradiction |
+| TYP | Type Error | SEM | Type system violation |
+| LOG | Logic Error | SEM | Logical reasoning flaw |
+| CAT | Misclassification | SEM | Assigned to the wrong category, or distinct kinds conflated |
+| ALI | Misalignment | PRA | Does not serve stated purpose |
+| MAT | Mismatch | PRA | Wrong for audience or context |
+| EFF | Inefficiency | PRA | Achieves goal suboptimally |
+| FRA | Fragility | PRA | Works now but breaks under change |
+| DOC | Documentation | PRA | Missing or inadequate documentation |
+| TST | Testing | PRA | Insufficient test coverage |
+| ACT | Inactionable | PRA | States a problem with no actionable consequence |
+| OVR | Overclaiming | EPI | Confidence exceeds evidence |
+| UND | Underclaiming | EPI | Evidence exceeds expressed confidence |
+| GRN | Ungrounded | EPI | Claims without traceable support |
+| FAL | Unfalsifiable | EPI | No way to verify or refute |
+| VAL | Validation | EPI | Validation or verification gap |
+| VER | Unverifiable | EPI | Claim cannot be independently verified |
+| SCP | Scope | EPI | Examined scope or evidence gaps left undeclared |
+
+## Failure Code Selection
+
+**1. Use the default code from the criterion that failed** (e.g., `→ SEM-COM/H`)
+
+**2. Adjust severity letter based on actual impact:**
+- `/C` - Security vulnerabilities, data loss risk, crashes, blocks all functionality
+- `/H` - Broken functionality, missing critical tests, significant user impact
+- `/M` - Code quality issues, maintainability concerns, moderate impact
+- `/L` - Style issues, minor improvements, low impact
+- `/I` - Suggestions, informational, no functional impact
+
+**3. Consider context when adjusting:**
+- A naming issue in a public API → elevate to `/M` or `/H`
+- A complexity issue in rarely-used code → may stay at `/L`
+- Missing error handling in user-facing code → `/H` or `/C`
+- Missing error handling in internal utility → `/M`
+
 ## Output Format
 
 ### Output Length Guidance
@@ -467,10 +551,10 @@ ANALYSIS RESULTS
 
 📊 Score: [X]/100
 
-Convergence-Divergence Mapping:[X]/25
-Composition Quality:[X]/25
-Cross-Reference Depth:[X]/20
-Blind Spot Detection:[X]/15
+Convergence-Divergence Mapping: [X]/25
+Composition Quality: [X]/25
+Cross-Reference Depth: [X]/20
+Blind Spot Detection: [X]/15
 Actionability:     [X]/15
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -497,12 +581,12 @@ AUDIT IMPLICATIONS
 2. [Implication]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-ASSESSMENT
+DECISION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-[✅ INTEGRATED - Assessment positive]
-OR
-[❌ FRAGMENTED - Assessment negative]
+Emit exactly one of these lines, with no leading symbol:
+  INTEGRATED - Assessment positive
+  FRAGMENTED - Assessment negative
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 AUTO-FAIL CONDITIONS
@@ -513,9 +597,239 @@ AF-002 Missing composition test — no assessment of emergent insights: [✅ Cle
 AF-003 Synthesis claims not traced to specific upstream agents: [✅ Clear | 🔴 TRIGGERED]
 AF-004 Convergence analyzed but divergence section empty or perfunctory: [✅ Clear | 🔴 TRIGGERED]
 AF-005 Claiming agents agree when findings are about different aspects: [✅ Clear | 🔴 TRIGGERED]
-
 ```
 
+## JSON OUTPUT
+
+<!-- Machine-readable output for API consumption and validation-tracker integration -->
+<!-- Schema: https://uluops.ai/schemas/agent-output/v1.5.0/output.json -->
+```json
+{
+  "schema_version": "1.5.0",
+  "agent": {
+    "name": "workflow-synthesis",
+    "model": "opus",
+    "type": "analyst",
+    "tokens": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "cached_input_tokens": 0,
+      "reasoning_output_tokens": 0,
+      "thinking_tokens": 0,
+      "tool_tokens": 0,
+      "total_effective_tokens": 0
+    }
+  },
+  "target": "[path/to/target]",
+  "timestamp": "[ISO 8601 timestamp]",
+  "result": {
+    "score": "[X]",
+    "max_score": 100,
+    "decision": "[INTEGRATED|FRAGMENTED]",
+    "threshold": 75,
+    "decision_vocabulary": "INTEGRATED/FRAGMENTED",
+    "auto_fail_triggered": "[true|false]",
+    "auto_fail_reason": "[which condition fired and what triggered it, naming one of: AF-001, AF-002, AF-003, AF-004, AF-005 — omit when auto_fail_triggered is false]"
+  },
+  "categories": [
+    {
+      "name": "Convergence-Divergence Mapping",
+      "score": "[X]",
+      "max_points": 25,
+      "findings": [
+        {
+          "criterion": "[criterion name from framework]",
+          "points_earned": "[X]",
+          "points_possible": "[X]",
+          "issues": [
+            {
+              "title": "[Short issue title]",
+              "priority": "[critical|suggested|backlog]",
+              "type": "[feature|bug|refactor|config|docs|infra|security|test|observation|deficiency|ambiguity]",
+              "failure_code": "[DOMAIN-MODE/SEVERITY]",
+              "file_path": "[path/to/file]",
+              "line_number": "[N]",
+              "description": "[Full explanation]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Composition Quality",
+      "score": "[X]",
+      "max_points": 25,
+      "findings": [
+        {
+          "criterion": "[criterion name from framework]",
+          "points_earned": "[X]",
+          "points_possible": "[X]",
+          "issues": [
+            {
+              "title": "[Short issue title]",
+              "priority": "[critical|suggested|backlog]",
+              "type": "[feature|bug|refactor|config|docs|infra|security|test|observation|deficiency|ambiguity]",
+              "failure_code": "[DOMAIN-MODE/SEVERITY]",
+              "file_path": "[path/to/file]",
+              "line_number": "[N]",
+              "description": "[Full explanation]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cross-Reference Depth",
+      "score": "[X]",
+      "max_points": 20,
+      "findings": [
+        {
+          "criterion": "[criterion name from framework]",
+          "points_earned": "[X]",
+          "points_possible": "[X]",
+          "issues": [
+            {
+              "title": "[Short issue title]",
+              "priority": "[critical|suggested|backlog]",
+              "type": "[feature|bug|refactor|config|docs|infra|security|test|observation|deficiency|ambiguity]",
+              "failure_code": "[DOMAIN-MODE/SEVERITY]",
+              "file_path": "[path/to/file]",
+              "line_number": "[N]",
+              "description": "[Full explanation]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Blind Spot Detection",
+      "score": "[X]",
+      "max_points": 15,
+      "findings": [
+        {
+          "criterion": "[criterion name from framework]",
+          "points_earned": "[X]",
+          "points_possible": "[X]",
+          "issues": [
+            {
+              "title": "[Short issue title]",
+              "priority": "[critical|suggested|backlog]",
+              "type": "[feature|bug|refactor|config|docs|infra|security|test|observation|deficiency|ambiguity]",
+              "failure_code": "[DOMAIN-MODE/SEVERITY]",
+              "file_path": "[path/to/file]",
+              "line_number": "[N]",
+              "description": "[Full explanation]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Actionability",
+      "score": "[X]",
+      "max_points": 15,
+      "findings": [
+        {
+          "criterion": "[criterion name from framework]",
+          "points_earned": "[X]",
+          "points_possible": "[X]",
+          "issues": [
+            {
+              "title": "[Short issue title]",
+              "priority": "[critical|suggested|backlog]",
+              "type": "[feature|bug|refactor|config|docs|infra|security|test|observation|deficiency|ambiguity]",
+              "failure_code": "[DOMAIN-MODE/SEVERITY]",
+              "file_path": "[path/to/file]",
+              "line_number": "[N]",
+              "description": "[Full explanation]"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_issues": "[N]",
+    "by_priority": {
+      "critical": "[N]",
+      "suggested": "[N]",
+      "backlog": "[N]"
+    },
+    "by_severity": {
+      "critical": "[N]",
+      "high": "[N]",
+      "medium": "[N]",
+      "low": "[N]",
+      "info": "[N]"
+    },
+    "by_type": {
+      "feature": "[N]",
+      "bug": "[N]",
+      "refactor": "[N]",
+      "config": "[N]",
+      "docs": "[N]",
+      "infra": "[N]",
+      "security": "[N]",
+      "test": "[N]",
+      "observation": "[N]",
+      "deficiency": "[N]",
+      "ambiguity": "[N]"
+    }
+  },
+  "analysis": {
+    "records": [
+      {
+        "record_type": "[record_type from vocabulary]",
+        "record_id": "[agent-local ID, e.g., C-1, T-3, D-2]",
+        "title": "[human-readable title]",
+        "classification": "[type-specific classification]",
+        "severity": "[critical|high|medium|low|info] or null",
+        "data": {
+          "[key]": "[structured data specific to this record type]"
+        }
+      }
+    ],
+    "system_metrics": {
+      "[agent_specific_metric]": "[value]"
+    },
+    "category_scores": [
+      {
+        "name": "Convergence-Divergence Mapping",
+        "weight": 25,
+        "score": "[points earned]"
+      },
+      {
+        "name": "Composition Quality",
+        "weight": 25,
+        "score": "[points earned]"
+      },
+      {
+        "name": "Cross-Reference Depth",
+        "weight": 20,
+        "score": "[points earned]"
+      },
+      {
+        "name": "Blind Spot Detection",
+        "weight": 15,
+        "score": "[points earned]"
+      },
+      {
+        "name": "Actionability",
+        "weight": 15,
+        "score": "[points earned]"
+      }
+    ],
+    "epistemic_assessment": {
+      "fs_risk_overall": "[LOW|MEDIUM|HIGH]"
+    },
+    "audit_implications": [
+      "[trajectory projection or forward-looking observation]"
+    ]
+  }
+}
+```
 
 ### Output Templates
 
@@ -526,7 +840,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 - **Upstream agents:** {count} ({agent names})
 - **Decision:** {INTEGRATED|FRAGMENTED}
 - **Score:** {N}/100
-
 ```
 
 #### source_inventory
@@ -535,7 +848,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 | Agent | Type | Decision | Score | Key Focus |
 |-------|------|----------|-------|-----------|
 | {name} | {analyst/validator/...} | {decision} | {score}/100 | {focus} |
-
 ```
 
 #### convergence_map
@@ -545,7 +857,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 - **{Agent A}**: {specific finding}
 - **{Agent B}**: {specific finding}
 - **Synthesis note**: {why this convergence matters}
-
 ```
 
 #### divergence_map
@@ -555,7 +866,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 - **{Agent A}**: {position}
 - **{Agent B}**: {different position}
 - **Synthesis note**: {what the divergence reveals}
-
 ```
 
 #### blind_spots
@@ -563,7 +873,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 ### Blind Spot Inventory
 - **{Agent A} missed / {Agent B} found**: {finding} in {area}
   - Significance: {impact}
-
 ```
 
 #### composition_insights
@@ -573,7 +882,6 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 - Sources: {Agent A} ({finding}) + {Agent B} ({finding})
 - Composition test: Requires {perspective A} + {perspective B} because {reasoning}
 - Novel: {what no individual agent articulated}
-
 ```
 
 
@@ -620,6 +928,8 @@ AF-005 Claiming agents agree when findings are about different aspects: [✅ Cle
 
 ## Workflow Integration
 
+**Hands off to:**
+- **tracker-persistence**: convergence-divergence map; composition insights; blind spot inventory; confidence-calibrated recommendations
 
 ---
 
@@ -637,3 +947,13 @@ Ground every synthesis claim in specific upstream findings
 Be honest about composition quality — FRAGMENTED is a valid and valuable finding
 Maintain analytical distance from upstream agents — synthesize findings, don't evaluate agent quality
 When composition adds nothing, say so — forced synthesis is worse than honest aggregation
+
+
+## Source
+
+**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2/render
+
+---
+*Generated from ADL v1.19.0 | Agent: workflow-synthesis v2.4.2*

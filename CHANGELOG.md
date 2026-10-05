@@ -4,6 +4,26 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-05
+
+### Fixed
+
+- **Starter-pack agents shipped without their failure taxonomy.** `scripts/generate-assets.sh` rendered agents with `udl`'s default `core` profile. That profile silently strips the Failure Taxonomy Reference, the priority mapping, the failure codes and the tracker frontmatter, and still exits 0. All 23 starter agents, on all four harnesses, shipped without a taxonomy table, so they invented out-of-taxonomy failure codes at runtime. Agents now render with `--render-profile uluops-full`, as the corpus does.
+- **Starter commands shipped without their Auto-Fail Conditions.** `udl generate` resolves a command's invoked agent relative to the current directory. When it can't find the agent, it drops the agent-derived sections without warning. The script ran from this package's directory, so every starter command lost its auto-fail table. It now renders from inside `uluops-agent-workflows`.
+- **The assets were three months stale.** They were last generated on 2026-07-06. This regeneration, at `udl` 0.41.0 (definition-factory 0.76.0), brings every starter agent up to its current version (for example `code-auditor` 2.4.0 → 2.7.3). It also brings every command and workflow up to the current tracking instructions:
+  - the `[agent:]` tag line;
+  - each agent's own spawn-captured `definition_version`, never copied from the run;
+  - metrics collected by run token and `agent_id`, never by time.
+
+### Added
+
+- **A fidelity check in `generate-assets.sh`.** After rendering, every Claude Code asset must be byte-identical to the file `uluops-agent-workflows` commits. Those renders use no `--target` and no `--model`, so any difference means a different renderer, a different profile, or a stale corpus, and the script exits 1. This check found the working-directory drop. Control: tampering with one asset fails it, naming the file.
+- `udl` errors are no longer sent to `/dev/null`.
+
+### Why this matters
+
+Setup is how anyone other than the maintainers gets UluOps definitions. Until this release, everything built for definition-version attribution (agent-metrics 0.12.0, ops-mcp 0.28.0, factory 0.75.0/0.76.0) stopped at setup's July-era starter pack.
+
 ## [0.14.1] - 2026-10-04
 
 ### Changed

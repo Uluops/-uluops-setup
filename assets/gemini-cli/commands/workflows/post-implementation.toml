@@ -25,10 +25,14 @@ Group 5 (sequential): security
 ```
 ## Phases
 
+**Run token:** before the first phase, mint one run token for the whole workflow — generate the nonce with Bash — `openssl rand -hex 3` — and append it: `post-implementation-<nonce>`. Never type the nonce yourself or reuse one you have seen. Check the token matches `^[a-z0-9][a-z0-9-]{2,63}$` before launching; a token that does not match is silently ignored and every row is lost. If this workflow is running as a stage of a pipeline that is still executing in this same turn, reuse the pipeline's token instead; a token from an earlier, finished run in this conversation is never reused. Record the agentId each Agent tool result reports, paired with the agent name from the same call. Every agent launched in this workflow, directly or by a slash command, carries this one token.
+
+**Agent launch protocol:** When a phase runs an agent directly via the Agent tool, begin the prompt with `[agent:<agent-name>] [run:<token>]` (lowercase kebab-case, in that order). The agent-metrics hook reads the name only from `[agent:]` and the run token only from `[run:]`: omitting `[agent:]` captures the agent nameless, and omitting `[run:]` drops it from the tracker collection. Phases that invoke slash commands get both from the command's own definition, which reuses this workflow's token instead of minting its own.
+
 | # | Agent | Threshold | Gate | Condition |
 |---|-------|-----------|------|-----------|
-| 1 | validate@latest | threshold >= 70, on fail: stop | stop | — |
-| 2 | type-safety@latest | threshold >= 75, on fail: stop | stop | context.typescript_detected |
+| 1 | validate@latest | threshold >= 75, on fail: stop | stop | — |
+| 2 | type-safety@latest | threshold >= 80, on fail: stop | stop | context.typescript_detected |
 | 3 | mcp-validate@latest | threshold >= 80, warn if < 65, on fail: stop | stop | context.mcp_detected |
 | 4 | test-review@latest | threshold >= 70, on fail: warn | stop | — |
 | 5 | optimize@latest | threshold >= 75, on fail: warn | stop | — |
@@ -51,6 +55,15 @@ Group 5 (sequential): security
 ## Results Submission
 
 Write markdown report to: `{{ target_path }}/{{ features_file }}`
-Save ALL findings to tracker via `mcp_uluops-tracker_save_run` with project=`{{ target_name }}`, workflow_type=`post-implementation`, definition_type=`workflow`, definition_name=`post-implementation`, definition_version=`3.2.1`. Include agents array (name, score, decision, model, tokens) and recommendations array (agent, title, priority, severity, description, file_path, line_number). Each file:line reference becomes a separate recommendation. Priority: blocking=critical, warnings=suggested, post-ship=backlog.
+Save ALL findings to tracker via `mcp_uluops-tracker_save_run` with project=`{{ target_name }}`, workflow_type=`post-implementation`, definition_type=`workflow`, definition_name=`post-implementation`, definition_version=`3.2.3`. Include agents array (name, score, decision) with every field of each `agent-metrics buffer list --run <token> -f tracker` entry spliced verbatim and unfiltered (rows selected by this workflow's run token, never by time; from what it returns, keep only rows whose `agent_id` matches an agentId reported by an Agent tool result from this invocation, and drop the rest — a reused or colliding token can return another run's rows, and a row you did not launch is never yours) — including definition_version, the version of that agent's own definition captured at spawn — and recommendations array (agent, title, priority, severity, description, file_path, line_number). Each file:line reference becomes a separate recommendation. Priority: blocking=critical, warnings=suggested, post-ship=backlog. The definition_version above is this workflow's; never copy it onto an agent. Per entry: if agent-metrics omitted an entry's definition_version, omit it on that entry — never type one, read it from the agent file, or move one between entries (same-name entries included). An agent with no agent-metrics row keeps its score and decision with no tokens, agent_id or definition_version. Never invent, copy or reuse an agent_id, and never drop or rename entries to clear a tracker warning. If a launched agentId has no matching row, a `[run:]` tag was dropped: recover it with `agent-metrics extract <agentId> -f tracker --agent-name <name>`, pairing the agentId with the name from the same Agent tool call — never an id whose launch you did not see. Apply the no-row rule only for an agent whose Agent tool result reported no agentId, and note the shortfall. Never widen the query (drop `--run`, add `--since`, list the whole buffer) to find a missing row.
 After saving, query tracker and compare counts. Mismatches from cross-phase deduplication are expected — warn only, do not re-attempt.
+
+## Source
+
+**Schema:** https://uluops.ai/schemas/wdl/v3.1.0/workflow.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/workflow/post-implementation@3.2.3
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/workflow/post-implementation@3.2.3/render
+
+---
+*Generated from WDL v3.1.0 | Workflow: post-implementation v3.2.3*
 '''

@@ -24,6 +24,13 @@ CDL_DIR="$WORKFLOWS_REPO/udl/cdl/v1"
 WDL_DIR="$WORKFLOWS_REPO/udl/wdl/v2"
 PDL_DIR="$WORKFLOWS_REPO/udl/pdl/v1"
 
+# Render from inside the corpus. `udl generate` resolves a command's invoked agent relative
+# to the CURRENT DIRECTORY, and when it cannot find it, it silently drops the agent-derived
+# sections (the Auto-Fail Conditions table among them) and still exits 0. Run from this
+# package's directory, every starter command shipped without its auto-fail table until
+# 2026-10-05 (found by the fidelity check below; the CLI's silent drop is tracked separately).
+cd "$WORKFLOWS_REPO"
+
 # --- Starter pack: agents that ship with setup ---
 AGENTS=(
   anxiety-reader
@@ -128,7 +135,11 @@ for entry in "${HARNESSES[@]}"; do
     fi
     # Output filename: name-agent.{ext}
     out="$agent_dir/$name-agent.$agent_ext"
-    udl generate "$src" -o "$out" $TARGET_FLAG $MODEL_FLAG --skip-validation 2>/dev/null
+    # --render-profile uluops-full is NOT optional: the default `core` profile silently
+    # strips the failure-taxonomy reference, priority mapping, failure codes and tracker
+    # frontmatter, and exits 0. Until 2026-10-05 this line omitted it, so every starter
+    # agent setup shipped had no taxonomy table (workspace CLAUDE.md, "UDL CLI").
+    udl generate "$src" -o "$out" $TARGET_FLAG $MODEL_FLAG --render-profile uluops-full --skip-validation
     agent_count=$((agent_count + 1))
   done
   echo "  agents: $agent_count"
@@ -152,7 +163,7 @@ for entry in "${HARNESSES[@]}"; do
       else
         out="$cmd_agent_dir/$name.toml"
       fi
-      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation 2>/dev/null
+      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation
       cmd_count=$((cmd_count + 1))
     done
     echo "  agent commands: $cmd_count"
@@ -174,7 +185,7 @@ for entry in "${HARNESSES[@]}"; do
       else
         out="$cmd_wf_dir/$name.toml"
       fi
-      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation 2>/dev/null
+      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation
       wf_count=$((wf_count + 1))
     done
     echo "  workflow commands: $wf_count"
@@ -196,12 +207,31 @@ for entry in "${HARNESSES[@]}"; do
       else
         out="$cmd_pl_dir/${name//-pipeline/}.toml"
       fi
-      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation 2>/dev/null
+      udl generate "$src" -o "$out" $TARGET_FLAG --skip-validation
       pl_count=$((pl_count + 1))
     done
     echo "  pipeline commands: $pl_count"
   fi
 done
+
+# --- Fidelity check: claude-code assets must equal the committed corpus ---
+# The claude-code renders use no --target and no --model, so each must be byte-identical
+# to the file uluops-agent-workflows commits (rendered there at package.json#renderer.udl).
+# A mismatch means a different renderer, a different profile, or a stale corpus — and
+# shipping it would put a different prompt in users' hands than the one we validate.
+echo ""
+echo "--- fidelity check (claude-code vs corpus) ---"
+mismatch=0
+check() { if ! cmp -s "$1" "$2"; then echo "  MISMATCH: $1 vs $2"; mismatch=$((mismatch + 1)); fi; }
+for name in "${AGENTS[@]}"; do check "$ASSETS_DIR/claude-code/agents/$name-agent.md" "$WORKFLOWS_REPO/agents/v3/$name-agent.md"; done
+for name in "${AGENT_COMMANDS[@]}"; do check "$ASSETS_DIR/claude-code/commands/agents/$name.md" "$WORKFLOWS_REPO/commands/agents/$name.md"; done
+for name in "${WORKFLOWS[@]}"; do check "$ASSETS_DIR/claude-code/commands/workflows/$name.md" "$WORKFLOWS_REPO/commands/workflows/$name.md"; done
+for name in "${PIPELINES[@]}"; do check "$ASSETS_DIR/claude-code/commands/pipelines/${name//-pipeline/}.md" "$WORKFLOWS_REPO/commands/pipelines/$name.md"; done
+if [[ $mismatch -gt 0 ]]; then
+  echo "FAIL: $mismatch claude-code asset(s) differ from the corpus. Check udl --version against the corpus's package.json#renderer.udl, and the render profile."
+  exit 1
+fi
+echo "  all claude-code assets match the corpus"
 
 echo ""
 echo "Done. Assets generated in $ASSETS_DIR/"

@@ -18,7 +18,7 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.14.1 bundles agent-metrics **0.12.0** for hook installation and pins
+Setup 0.15.0 bundles agent-metrics **0.12.0** for hook installation and pins
 tracker MCP **0.28.0** and registry MCP **0.12.0** in generated configs. Tracker
 MCP uses ops-sdk **6.14.0**. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
