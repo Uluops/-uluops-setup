@@ -4,6 +4,16 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-09
+
+### Changed
+
+- **Generated MCP configs now pin `@uluops/ops-mcp@0.30.0` (was 0.28.0) and `@uluops/registry-mcp@0.15.0` (was 0.12.0).** Re-run setup to pick them up, then restart the MCP connections. The pins had fallen behind the bump rule in `src/lib/mcp-packages.ts`: two tracker releases and three registry releases shipped without a setup release. What a re-run brings:
+  - **Tracker MCP 0.29.0–0.30.0:** `get_project_log` accepts `format: "actionable"`; `get_org_audit_feed` adds `hasMore`/`nextCursor` beside its existing aliases; `get_agent_reliability`, `get_analytics`, `get_agent_matrix` and `get_agent_runs_analysis` add a caveat content block saying their figures carry no definition version (`content[0]` unchanged); ops-sdk 6.16.0; `@modelcontextprotocol/sdk` 1.32.1 (GHSA-6qxp-vccf-f47h).
+  - **Registry MCP 0.13.0–0.15.0:** `get_model`/`list_models` return `capabilities.reasoning` (registry-sdk 0.61.0); `get_execution_stats` and `get_ecosystem_overview` add the same unversioned-figures caveat block; `list_definitions` gains exact-name/prefix `name`/`match`, `search_definitions` gains `match`, paging and sort; `batch_users` gains `format: 'envelope'`; `@modelcontextprotocol/sdk` 1.32.1. (That MCP published 0.12.0–0.14.0 without per-version headings; its CHANGELOG groups them.)
+  - Nothing is removed or renamed. One behaviour change: list requests with no `limit` now send 50 explicitly, so the offset arithmetic matches the server's page size.
+- **Not pinned: `@uluops/rah-mcp-server`.** Setup has never configured it, and this release does not start.
+
 ## [0.15.0] - 2026-10-05
 
 ### Fixed
