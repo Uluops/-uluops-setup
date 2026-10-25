@@ -169,7 +169,14 @@ export async function resolveApiKey(options: {
   return { apiKey, email: null };
 }
 
-async function readCredentialsFile(): Promise<string | undefined> {
+/**
+ * The `default` profile's API key from ~/.uluops/credentials.json, or
+ * undefined when the file is absent or holds no string key. Throws when the
+ * file exists but cannot be read or parsed — a present-but-broken file is a
+ * finding, not an absence. Shared with `--verify`, which resolves the key in
+ * the same order as install (env, then this file).
+ */
+export async function readCredentialsFile(): Promise<string | undefined> {
   const credsPath = credentialsPath();
   let raw: string;
   try {
@@ -203,23 +210,32 @@ async function readCredentialsFile(): Promise<string | undefined> {
   return typeof candidate === "string" && candidate ? candidate : undefined;
 }
 
+/**
+ * The endpoint that answers "whose key is this?". Self-identity lives in
+ * ops-uluops-api (`/api/v1/auth/me`), not the registry-api users namespace:
+ * registry-api's `/users/:id` is a public lookup that Zod-validates the id as
+ * a UUID, so `/registry/users/me` answers 400 for EVERY key, valid or not.
+ * b177631 moved validateKey off that route and missed the copy in
+ * `--verify`, which then failed every exported key with "Server returned
+ * 400" until 0.19.0. Both callers now read this one constant.
+ */
+export const SELF_IDENTITY_URL = "https://api.uluops.ai/api/v1/auth/me";
+
+/** What a 401 from SELF_IDENTITY_URL tells the user, at install and at verify. */
+export const INVALID_KEY_MESSAGE =
+  "Invalid API key — generate a new one at app.uluops.ai/settings/api-keys";
+
 async function validateKey(
   apiKey: string,
 ): Promise<{ email: string | null }> {
-  // Self-identity lives in ops-uluops-api (`/api/v1/auth/me`), not the
-  // registry-api users namespace. Registry-api `/users/:id` Zod-validates the
-  // id as UUID, so /users/me returns 400 with `id: ["Invalid uuid"]`.
-  const url = "https://api.uluops.ai/api/v1/auth/me";
   try {
-    const res = await fetch(url, {
+    const res = await fetch(SELF_IDENTITY_URL, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(15000),
     });
 
     if (res.status === 401) {
-      throw new Error(
-        "Invalid API key — generate a new one at app.uluops.ai/settings/api-keys",
-      );
+      throw new Error(INVALID_KEY_MESSAGE);
     }
 
     if (!res.ok) {

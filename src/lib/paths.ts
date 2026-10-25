@@ -14,6 +14,10 @@ export const ASSETS_DIR = join(PACKAGE_ROOT, "assets");
 /** Explicit project root override via --project-root flag or env var. */
 let projectRootOverride: string | null = null;
 
+/**
+ * Pin the project root that findProjectRoot returns, ahead of
+ * ULUOPS_PROJECT_ROOT and the upward walk. `null` clears the pin.
+ */
 export function setProjectRoot(path: string | null): void {
   projectRootOverride = path;
 }

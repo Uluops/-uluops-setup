@@ -1,12 +1,13 @@
 import chalk from "chalk";
 import { verify } from "../steps/verify.js";
-import { ok, fail, info } from "../lib/display.js";
+import { ok, warn, fail, info } from "../lib/display.js";
 import { getVersion } from "../lib/version.js";
 
 /**
  * The `--verify` flow: prints one check line per verify-step result
  * (manifest, per-harness readiness/MCP/files/hook, API key) and exits 1
- * when any check failed. Read-only — makes no changes.
+ * when any check failed. A skipped check prints with a warning glyph and
+ * does not fail the run. Read-only — makes no changes.
  */
 export async function runVerify(): Promise<void> {
   const version = await getVersion();
@@ -18,9 +19,14 @@ export async function runVerify(): Promise<void> {
 
   const result = await verify();
 
+  // Details print on every row, passed ones included. Until 0.19.0 a passed
+  // row printed its label only, which hid hook drift: that row passes but
+  // fails the run, so the output was all ticks followed by "Some checks failed".
   for (const check of result.checks) {
-    if (check.passed) {
-      ok(check.label);
+    if (check.skipped) {
+      warn(`${check.label}${check.detail ? ` — ${check.detail}` : ""}`);
+    } else if (check.passed) {
+      ok(`${check.label}${check.detail ? chalk.dim(` — ${check.detail}`) : ""}`);
     } else {
       fail(`${check.label}${check.detail ? ` — ${check.detail}` : ""}`);
     }

@@ -36,6 +36,8 @@ update existing `@uluops/cli` or `@uluops/agent-metrics` global installs with np
 
 > **Codex note:** the TOML writer seeds `approval_mode = "approve"` for every read-side MCP tool exported by `@uluops/ops-mcp` and `@uluops/registry-mcp` so interactive sessions don't surface an approval prompt on every `list_*`/`get_*`/`query_*` call. Write-side tools (`save_run`, `bulk_update_status`, `publish_definition`, etc.) are intentionally NOT pre-approved — Codex still asks before any state-changing operation. A re-install over a hand-tuned config (any `[mcp_servers.<server>.tools.*]` block present) preserves your customizations verbatim and skips the seed step.
 
+> **Gemini CLI note:** setup writes `trust: true` on both UluOps server entries in `~/.gemini/settings.json`. Gemini CLI then skips its confirmation prompt for **every** tool on those servers, write-side tools included — unlike Codex above, where only read tools are pre-approved. That covers the tracker's 12 destructive tools (`delete_run`, `soft_delete_project`, `merge_issues`, …), which stay enabled unless `ULUOPS_ALLOW_DESTRUCTIVE=false` is set in the tracker server's `env` (setup does not set it). To be asked before tool calls, remove `"trust": true` from either entry; a re-run of setup writes it back.
+
 ```bash
 # Install for Claude Code (default)
 npx @uluops/setup
@@ -163,8 +165,8 @@ npx @uluops/setup [options]
                        run them. Non-interactive runs skip the username step
                        entirely unless this flag is passed.
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
-  --local-defs         Install definitions into ./uluops/ (project-scoped)
-                       instead of the harness's home directory
+  --local-defs         Copy definitions into ./uluops/ instead of the
+                       harness's home directory (one harness per project)
   --shell              Write API key export to shell profile
   --with-cli           Install @uluops/cli globally (skip prompt)
   --no-cli             Skip @uluops/cli install (skip prompt)
@@ -177,7 +179,7 @@ npx @uluops/setup [options]
                        @uluops/agent-metrics CLI prompt is also suppressed.
   --skip-validation    Accept API key without server verification
   --list               Show available agents and workflows without installing
-  --verify             Check installation health: manifest, files, MCP config, API connectivity (no changes)
+  --verify             Check installation health: manifest, files, MCP config, API key (no changes)
   --uninstall          Remove UluOps-managed artifacts. Combine with --harness
                        <name>[,<name>] to uninstall from a subset only —
                        remaining harnesses (and global infrastructure like
@@ -193,7 +195,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.12.0 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.19.0 — available agents and workflows
 
   WORKFLOWS
     /workflows:post-implementation    Iterative validation workflow. Run af...
@@ -211,24 +213,26 @@ Displays all agents and workflows included in the current version of the setup t
 ```
 
 #### Check installation health (`--verify`)
-Validates your current installation against the local manifest and checks API connectivity.
+Validates your current installation against the local manifest and checks your API key.
 
 ```text
-  ⟨u⟩ ulu·ops Installation Check v0.12.0
+  ⟨u⟩ ulu·ops Installation Check v0.19.0
 
-  ✓ Manifest found (v0.12.0, installed 2026-08-21)
-  ✓ [Claude Code] Readiness
+  ✓ Manifest found (v0.19.0, installed 2026-10-25)
+  ✓ [Claude Code] Readiness — Active (loaded)
   ✓ [Claude Code] MCP config present in ~/.claude.json (2 servers)
   ✓ [Claude Code] 23/23 agents in ~/.claude/agents
   ✓ [Claude Code] 28/28 commands
-  ✓ [Claude Code] Agent metrics hook configured
-  ✓ API key valid
+  ✓ [Claude Code] Agent metrics hook configured — v0.12.1
+  ✓ API key valid (user: you@example.com) — key from ~/.uluops/credentials.json
   ✓ MCP packages resolvable on npm
 
   All checks passed.
 ```
 
 > With multiple harnesses installed, `--verify` prints one `[<Harness>]` block per manifest entry.
+>
+> The API key is found the way install finds it: `ULUOPS_API_KEY` first, then `~/.uluops/credentials.json`. With no key in either place the row reads `⚠ API key check skipped` and does not fail the run. A key the server rejects fails it with the same remedy install gives. Before 0.19.0 the check read `ULUOPS_API_KEY` only and was left out silently without it.
 
 ### Examples
 
@@ -260,6 +264,13 @@ npx @uluops/setup --api-key ulr_abc123 --all-detected -y
 
 # Local MCP config (project-scoped)
 npx @uluops/setup --scope local
+
+# Copy definitions into ./uluops/ instead of the harness home (one harness
+# per project — see "How updates work" for the multi-harness edge)
+npx @uluops/setup --harness claude-code --local-defs
+
+# Skip the agent-metrics hook (no run capture, no hook tool files)
+npx @uluops/setup --no-metrics
 
 # Preview without changes while offline
 npx @uluops/setup --dry-run --api-key ulr_abc123 --skip-validation
@@ -293,8 +304,14 @@ Re-running `npx @uluops/setup` is designed to be safe to repeat:
   on re-run, and switching `--local-defs` between runs starts a fresh tree —
   the previous scope's files stay on disk untracked (setup warns when this
   happens)
+- **Known limitation — `--local-defs` with more than one harness:** every
+  harness writes to the same `./uluops/agents/` (and `commands/`, `skills/`),
+  and the harnesses ship identically named files rendered differently, so the
+  last harness installed wins. A subset `--uninstall --harness <name>` then
+  removes files the remaining harnesses also record. Use `--local-defs` with
+  one harness per project until the tree is namespaced per harness.
 
-Setup manages four surfaces: agent files, command files, MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can cleanly reverse all changes. The manifest supports multiple harnesses — each gets its own installation state.
+Setup manages five surfaces: agent files, command files, skill files (Codex), MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can reverse it. The manifest supports multiple harnesses — each gets its own installation state. `--uninstall` leaves `~/.uluops/credentials.json` in place, because `@uluops/cli` and the SDKs read the same file.
 
 ## Troubleshooting
 

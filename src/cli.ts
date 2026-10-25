@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+/**
+ * The `uluops-setup` binary: parses flags with commander, resolves which
+ * harnesses to target (selectHarnesses), and dispatches to one of four flows
+ * — `--list` (printAgentList), `--verify` (runVerify), `--uninstall`
+ * (runUninstall), or the default install (runSetup). Typed errors from those
+ * flows are turned into exit codes and one-line messages here.
+ */
+
 import { Command } from "commander";
 import chalk from "chalk";
 
@@ -47,12 +55,12 @@ async function main(): Promise<void> {
     )
     .option(
       "--scope <mode>",
-      'MCP connectivity scope: "global" (~/.claude.json) or "local" (.mcp.json)',
+      'MCP config scope: "global" (the harness\'s user config, e.g. ~/.claude.json) or "local" (the project config, e.g. .mcp.json)',
       "global",
     )
     .option(
       "--local-defs",
-      "Save agents/commands locally (./uluops/) for project isolation",
+      "Copy agents/commands/skills into ./uluops/ instead of the harness home (one harness per project)",
       false,
     )
     .option("--shell", "Write API key export to shell profile", false)

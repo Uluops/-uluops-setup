@@ -13,14 +13,6 @@
  */
 
 /**
- * Narrow `{ data: { email: string } }` from an unknown response body.
- * Returns the email string when present and well-typed, null otherwise.
- * Throws when `body` is not an object at all — that indicates the endpoint
- * is no longer the one we expect (HTML error page, redirect to a captive
- * portal, schema breakage) and should surface to the user rather than be
- * papered over as "logged in with no email."
- */
-/**
  * Recursively delete `__proto__` OWN keys from parsed-JSON data. Our own
  * merges are spread-based (CreateDataProperty semantics — they cannot be
  * polluted), but a config we read and write BACK would hand a `__proto__`
@@ -48,6 +40,14 @@ export function stripDangerousKeys<T>(value: T): T {
   return value;
 }
 
+/**
+ * Narrow `{ data: { email: string } }` from an unknown response body.
+ * Returns the email string when present and well-typed, null otherwise.
+ * Throws when `body` is not an object at all — that indicates the endpoint
+ * is no longer the one we expect (HTML error page, redirect to a captive
+ * portal, schema breakage) and should surface to the user rather than be
+ * papered over as "logged in with no email."
+ */
 export function extractEmail(body: unknown): string | null {
   if (typeof body !== "object" || body === null) {
     throw new Error(

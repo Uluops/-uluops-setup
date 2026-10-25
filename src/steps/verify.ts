@@ -5,15 +5,111 @@ import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
 import { readInstalledMetricsVersion } from "./metrics.js";
 import { extractEmail } from "../lib/json-guards.js";
+import {
+  INVALID_KEY_MESSAGE,
+  SELF_IDENTITY_URL,
+  readCredentialsFile,
+} from "./auth.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
 
 export interface VerifyResult {
   ok: boolean;
-  checks: { label: string; passed: boolean; detail?: string }[];
+  /**
+   * `skipped` marks a check that could not run. It carries `passed: true` so
+   * it never fails the run on its own, and the renderer shows it with a
+   * warning glyph rather than a tick, so "not checked" never reads as "fine".
+   */
+  checks: { label: string; passed: boolean; skipped?: boolean; detail?: string }[];
 }
 
 type HarnessProfileLike = ReturnType<typeof getProfile>;
 type CheckList = VerifyResult["checks"];
+
+/**
+ * API key check. Resolves the key the way install does — ULUOPS_API_KEY, then
+ * ~/.uluops/credentials.json — and asks SELF_IDENTITY_URL whose it is.
+ *
+ * Until 0.19.0 this read the env var only and skipped silently without it, so
+ * the common install (`--api-key`, no `--shell`) printed "All checks passed"
+ * having checked no key; and it called registry `/users/me`, which answers
+ * 400 to every key, so an exported key always failed. With no key in either
+ * place the check is reported as skipped, not passed and not failed: setup
+ * cannot tell a deliberately keyless machine from a broken one. Returns false
+ * only when a key was found and did not check out, or the file is unreadable.
+ */
+async function checkApiKey(checks: CheckList): Promise<boolean> {
+  let apiKey = process.env["ULUOPS_API_KEY"] || undefined;
+  let source = "ULUOPS_API_KEY";
+  if (!apiKey) {
+    try {
+      apiKey = await readCredentialsFile();
+    } catch (err) {
+      checks.push({
+        label: "API key",
+        passed: false,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+    source = "~/.uluops/credentials.json";
+  }
+  if (!apiKey) {
+    checks.push({
+      label: "API key check skipped",
+      passed: true,
+      skipped: true,
+      detail: "no key in ULUOPS_API_KEY or ~/.uluops/credentials.json",
+    });
+    return true;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(SELF_IDENTITY_URL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(getHealthTimeout()),
+    });
+  } catch {
+    checks.push({
+      label: "API connectivity",
+      passed: false,
+      detail: "Can't reach api.uluops.ai",
+    });
+    return false;
+  }
+  if (!res.ok) {
+    checks.push({
+      label: "API key valid",
+      passed: false,
+      detail:
+        res.status === 401
+          ? `${INVALID_KEY_MESSAGE} (key from ${source})`
+          : `Server returned ${String(res.status)}`,
+    });
+    return false;
+  }
+  // Decode via the shared envelope guard. Bare `as { email?: string }` would
+  // silently produce a "key valid (no user)" label on HTML error pages or
+  // schema drift. extractEmail throws when the body is not an object at all
+  // (surfaced as a check failure) and returns null when data/email are absent
+  // or wrong-typed.
+  try {
+    const email = extractEmail(await res.json());
+    checks.push({
+      label: `API key valid${email ? ` (user: ${email})` : ""}`,
+      passed: true,
+      detail: `key from ${source}`,
+    });
+    return true;
+  } catch (err) {
+    checks.push({
+      label: "API key valid",
+      passed: false,
+      detail: err instanceof Error ? err.message : "Unexpected response shape",
+    });
+    return false;
+  }
+}
 
 /**
  * Readiness probe: did the harness pick up the config after install?
@@ -297,63 +393,8 @@ export async function verify(): Promise<VerifyResult> {
     if (!ok) allOk = false;
   }
 
-  // 3. API connectivity (harness-agnostic)
-  const apiKey = process.env["ULUOPS_API_KEY"];
-  if (apiKey) {
-    try {
-      const res = await fetch(
-        "https://api.uluops.ai/api/v1/registry/users/me",
-        {
-          headers: { Authorization: `Bearer ${apiKey}` },
-          signal: AbortSignal.timeout(getHealthTimeout()),
-        },
-      );
-      if (res.ok) {
-        // Decode via the shared envelope guard. Bare `as { email?: string }`
-        // would silently produce a "key valid (no user)" label on HTML error
-        // pages or schema drift. extractEmail throws when the body is not an
-        // object at all (surfaced below as a check failure) and returns null
-        // when data/email are absent or wrong-typed.
-        let email: string | null;
-        // No early return on a bad body: failing this check must not
-        // suppress the unrelated npm-resolvability check below.
-        let emailDecodeFailed = false;
-        try {
-          email = extractEmail(await res.json());
-        } catch (err) {
-          checks.push({
-            label: "API key valid",
-            passed: false,
-            detail:
-              err instanceof Error ? err.message : "Unexpected response shape",
-          });
-          allOk = false;
-          emailDecodeFailed = true;
-          email = null;
-        }
-        if (!emailDecodeFailed) {
-          checks.push({
-            label: `API key valid${email ? ` (user: ${email})` : ""}`,
-            passed: true,
-          });
-        }
-      } else {
-        checks.push({
-          label: "API key valid",
-          passed: false,
-          detail: `Server returned ${res.status}`,
-        });
-        allOk = false;
-      }
-    } catch {
-      checks.push({
-        label: "API connectivity",
-        passed: false,
-        detail: "Can't reach api.uluops.ai",
-      });
-      allOk = false;
-    }
-  }
+  // 3. API key (harness-agnostic)
+  if (!(await checkApiKey(checks))) allOk = false;
 
   // MCP client packages resolvable on npm. The install-time probe warns and
   // moves on (non-blocking by design) — this is where that warning stops

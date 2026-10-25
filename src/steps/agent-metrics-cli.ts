@@ -44,24 +44,6 @@ export function parseGlobalAgentMetricsVersion(stdout: string | undefined): stri
   }
 }
 
-/**
- * Detect whether `@uluops/agent-metrics` is installed in npm's GLOBAL prefix.
- *
- * IMPORTANT: this cannot be a simple `spawnSync("agent-metrics", ["--version"])`.
- * `@uluops/agent-metrics` is a runtime dependency of `@uluops/setup` (used by
- * `findMetricsSource` to resolve files to copy into the harness tree). When
- * setup runs under `npx @uluops/setup`, npx prepends its transient cache
- * `.bin/` to PATH for the spawned process — `agent-metrics` resolves there
- * even when the user has nothing installed globally. The check then returns
- * "already installed" and setup skips the global install, leaving the user
- * with `command not found` after npx exits. This was the actual bug behavior
- * observed in v0.7.0 on the first ship.
- *
- * We query npm directly via `npm ls -g --depth=0 --json` — answers the actual
- * question ("is it in the user's global install") instead of a PATH-resolution
- * proxy. `npm ls` exits non-zero when the queried package is missing but still
- * emits valid JSON, so we rely on the JSON content rather than the exit code.
- */
 /** Same bounds as the @uluops/cli installer — see src/steps/cli.ts rationale. */
 const NPM_TIMEOUT_MS = 5 * 60_000;
 const DETECT_TIMEOUT_MS = 30_000;
@@ -99,6 +81,21 @@ function summarizeNpmResult(
  * Returns the installed version string, or null when absent (or when npm
  * itself fails/times out — absence and detection failure are deliberately
  * indistinguishable: both mean "offer the install").
+ *
+ * IMPORTANT: this cannot be a simple `spawnSync("agent-metrics", ["--version"])`.
+ * `@uluops/agent-metrics` is a runtime dependency of `@uluops/setup` (used by
+ * `findMetricsSource` to resolve files to copy into the harness tree). When
+ * setup runs under `npx @uluops/setup`, npx prepends its transient cache
+ * `.bin/` to PATH for the spawned process — `agent-metrics` resolves there
+ * even when the user has nothing installed globally. The check then returns
+ * "already installed" and setup skips the global install, leaving the user
+ * with `command not found` after npx exits. This was the actual bug behavior
+ * observed in v0.7.0 on the first ship.
+ *
+ * We query npm directly via `npm ls -g --depth=0 --json` — answers the actual
+ * question ("is it in the user's global install") instead of a PATH-resolution
+ * proxy. `npm ls` exits non-zero when the queried package is missing but still
+ * emits valid JSON, so we rely on the JSON content rather than the exit code.
  */
 export function detectGlobalAgentMetrics(): string | null {
   const r = spawnSync(

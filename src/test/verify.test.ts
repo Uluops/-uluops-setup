@@ -8,6 +8,19 @@ import { tmpdir } from "node:os";
 // use their real McpConfigStrategy implementations.
 vi.mock("../lib/manifest.js");
 
+// verify() reads ~/.uluops/credentials.json when ULUOPS_API_KEY is unset.
+// Every test gets a throwaway home so none reads the developer's real file.
+// vi.hoisted: the mock factory runs before module-level `let`s initialise
+// (profiles call homedir() at import).
+const home = vi.hoisted(() => ({ dir: null as string | null }));
+vi.mock("node:os", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:os")>();
+  return {
+    ...original,
+    homedir: () => home.dir ?? original.homedir(),
+  };
+});
+
 import { verify } from "../steps/verify.js";
 import { loadManifest } from "../lib/manifest.js";
 import type { Manifest } from "../lib/manifest.js";
@@ -48,6 +61,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubEnv("ULUOPS_API_KEY", "");
   tmpDir = await mkdtemp(join(tmpdir(), "uluops-verify-"));
+  home.dir = join(tmpDir, "home");
   // verify() now probes npm resolvability (and may hit auth/health
   // endpoints): stub fetch so NO test in this file depends on live network,
   // and reset the availability cache so per-test stubs actually apply.
@@ -65,6 +79,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   globalThis.fetch = originalFetch;
+  vi.unstubAllEnvs();
+  home.dir = null;
   const { __resetAvailabilityCacheForTesting } = await import(
     "../lib/config-merger.js"
   );
@@ -350,5 +366,144 @@ describe("MCP package resolvability check", () => {
     // not pass silently AND must carry a detail naming the condition.
     expect(check!.passed).toBe(false);
     expect(check!.detail).toBeTruthy();
+  });
+});
+
+describe("API key check", () => {
+  // A healthy install, so the API key row is the only variable.
+  async function healthySetup(): Promise<void> {
+    const defsPath = join(tmpDir, "defs");
+    await mkdir(join(defsPath, "agents"), { recursive: true });
+    const configPath = join(tmpDir, "claude.json");
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        mcpServers: {
+          "uluops-tracker": { command: "npx", args: [], env: {} },
+          "uluops-registry": { command: "npx", args: [], env: {} },
+        },
+      }),
+    );
+    mockLoadManifest.mockResolvedValue(makeManifest(defsPath, configPath));
+  }
+
+  async function writeCredentials(contents: string): Promise<void> {
+    await mkdir(join(home.dir!, ".uluops"), { recursive: true });
+    await writeFile(join(home.dir!, ".uluops", "credentials.json"), contents);
+  }
+
+  // Answers the self-identity endpoint per `identity`, answers the npm
+  // registry 200, and answers registry-api /users/me 400 the way production
+  // does (its /users/:id route validates the id as a UUID before any auth).
+  function routeFetch(identity: { status: number; body?: unknown }) {
+    const fetchMock = vi.fn().mockImplementation((url: string | URL) => {
+      const u = String(url);
+      if (u.includes("/api/v1/auth/me")) {
+        return Promise.resolve({
+          ok: identity.status >= 200 && identity.status < 300,
+          status: identity.status,
+          json: async () => identity.body,
+        } as unknown as Response);
+      }
+      if (u.includes("/registry/users/")) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          json: async () => ({ error: { id: ["Invalid uuid"] } }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      } as unknown as Response);
+    });
+    globalThis.fetch = fetchMock;
+    return fetchMock;
+  }
+
+  function apiRow(result: Awaited<ReturnType<typeof verify>>) {
+    return result.checks.find((c) => c.label.startsWith("API key"));
+  }
+
+  it("validates an exported key against /api/v1/auth/me, not registry /users/me", async () => {
+    await healthySetup();
+    vi.stubEnv("ULUOPS_API_KEY", "ulr_env");
+    const fetchMock = routeFetch({ status: 200, body: { data: { email: "env@test" } } });
+
+    const result = await verify();
+
+    const row = apiRow(result);
+    expect(row).toBeDefined();
+    expect(row!.passed).toBe(true);
+    expect(row!.label).toBe("API key valid (user: env@test)");
+    expect(row!.detail).toBe("key from ULUOPS_API_KEY");
+    expect(result.ok).toBe(true);
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.some((u) => u.includes("/registry/users/"))).toBe(false);
+  });
+
+  it("falls back to the credentials file when ULUOPS_API_KEY is unset", async () => {
+    await healthySetup();
+    await writeCredentials(JSON.stringify({ default: { apiKey: "ulr_file" } }));
+    const fetchMock = routeFetch({ status: 200, body: { data: { email: "file@test" } } });
+
+    const result = await verify();
+
+    const row = apiRow(result);
+    expect(row).toBeDefined();
+    expect(row!.passed).toBe(true);
+    expect(row!.detail).toBe("key from ~/.uluops/credentials.json");
+    const identityCall = fetchMock.mock.calls.find((c) =>
+      String(c[0]).includes("/api/v1/auth/me"),
+    );
+    expect(identityCall).toBeDefined();
+    const init = identityCall![1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer ulr_file");
+  });
+
+  it("reports a skipped row, not a silent pass, when no key exists anywhere", async () => {
+    await healthySetup();
+    routeFetch({ status: 200, body: { data: { email: "unused@test" } } });
+
+    const result = await verify();
+
+    const row = apiRow(result);
+    expect(row).toBeDefined();
+    expect(row!.skipped).toBe(true);
+    expect(row!.passed).toBe(true);
+    expect(row!.detail).toBe("no key in ULUOPS_API_KEY or ~/.uluops/credentials.json");
+    expect(result.ok).toBe(true);
+  });
+
+  it("gives the install-time remedy on a 401", async () => {
+    await healthySetup();
+    vi.stubEnv("ULUOPS_API_KEY", "ulr_revoked");
+    routeFetch({ status: 401 });
+
+    const result = await verify();
+
+    const row = apiRow(result);
+    expect(row).toBeDefined();
+    expect(row!.passed).toBe(false);
+    expect(row!.detail).toBe(
+      "Invalid API key — generate a new one at app.uluops.ai/settings/api-keys (key from ULUOPS_API_KEY)",
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("fails on an unreadable credentials file rather than reporting no key", async () => {
+    await healthySetup();
+    await writeCredentials("{ not json");
+    routeFetch({ status: 200, body: { data: { email: "unused@test" } } });
+
+    const result = await verify();
+
+    const row = apiRow(result);
+    expect(row).toBeDefined();
+    expect(row!.passed).toBe(false);
+    expect(row!.detail).toMatch(/^Malformed credentials file at /);
+    expect(result.ok).toBe(false);
   });
 });

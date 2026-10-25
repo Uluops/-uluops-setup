@@ -16,7 +16,6 @@ export interface Environment {
 
 const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
 
-/** Detect the current environment: OS, shell, Node version, harnesses, and Claude home status. */
 /** Lowest supported Node.js release; `engines.node` is pinned to it by detect.test.ts. */
 export const NODE_FLOOR = { major: 22, minor: 12 } as const;
 
@@ -27,6 +26,7 @@ function unsupportedNodeMessage(nodeVersion: string): string {
   );
 }
 
+/** Detect the current environment: OS, shell, Node version, harnesses, and Claude home status. */
 export async function detect(): Promise<Environment> {
   const p = platform();
   if (!SUPPORTED_PLATFORMS.has(p)) {
