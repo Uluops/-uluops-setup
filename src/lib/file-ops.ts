@@ -223,3 +223,34 @@ export async function syncAssets(opts: {
 
   return { copied, skipped, removed, files: assetFiles };
 }
+
+/**
+ * Every file under `dir`, as sorted `/`-separated paths relative to it. A
+ * missing `dir` is an empty list; any other read error throws, because an
+ * empty list here is taken as authoritative (the skills manifest record, the
+ * conflict check).
+ */
+export async function listFilesRecursive(dir: string, prefix = ""): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (err) {
+    // ENOENT = no skills shipped/installed at this level. Anything else
+    // throws — an empty list here becomes the manifest's authoritative
+    // skills record.
+    if (!isEnoent(err)) throw err;
+    return [];
+  }
+
+  const files: string[] = [];
+  for (const entry of entries) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await listFilesRecursive(full, rel));
+    } else if (entry.isFile()) {
+      files.push(rel);
+    }
+  }
+  return files.sort((a, b) => a.localeCompare(b));
+}

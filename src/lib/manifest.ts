@@ -43,8 +43,10 @@ export interface HarnessManifest {
   /**
    * Version of @uluops/agent-metrics whose dist/ was copied into the harness tree.
    * Null when hooks are not installed or when the manifest predates this field.
-   * Verify uses this to detect drift between installed and currently-resolvable versions —
-   * the shared version ledger across the setup↔agent-metrics seam.
+   * Verify fails the hook row when this differs from the copy on disk (changed outside
+   * setup), and separately reports when the copy on disk differs from the version the
+   * running setup bundles (an update is available) — the shared version ledger across
+   * the setup↔agent-metrics seam.
    */
   hooksInstalledVersion?: string | null;
   /**

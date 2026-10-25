@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import { join } from "node:path";
-import { readdir } from "node:fs/promises";
 import { detect } from "../steps/detect.js";
 import { signup } from "../steps/signup.js";
 import { resolveApiKey, hasCredentialsFile, writeCredentialsFile } from "../steps/auth.js";
@@ -27,8 +26,8 @@ import type {
 } from "../steps/agent-metrics-cli.js";
 import { writeShellExport } from "../steps/shell.js";
 import { probeHookSupport } from "../lib/settings-merger.js";
-import { findProjectRoot, ASSETS_DIR } from "../lib/paths.js";
-import { isEnoent } from "../lib/file-ops.js";
+import { localDefsRoot, ASSETS_DIR } from "../lib/paths.js";
+import { listFilesRecursive } from "../lib/file-ops.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { ok, warn, fail, info } from "../lib/display.js";
 import type { HarnessProfile } from "../harnesses/index.js";
@@ -182,7 +181,7 @@ export async function installAgentsDefs(
   if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
   if (res.removed > 0) parts.push(`${res.removed} removed`);
   const dest = opts.localDefs
-    ? "./uluops/agents/"
+    ? `./uluops/${profile.name}/agents/`
     : `${profile.paths.agentsDir.replace(process.env["HOME"] ?? "", "~")}/`;
   ok(
     `${res.files.length} agents → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
@@ -195,7 +194,7 @@ export async function installAgentsDefs(
   return res;
 }
 
-/** Copy slash-command definitions from assets (Claude Code only). */
+/** Copy slash-command definitions from assets (harnesses that ship them: Claude Code, Gemini CLI). */
 export async function installCommandsDefs(
   profile: HarnessProfile,
   opts: { localDefs: boolean; dryRun: boolean },
@@ -208,9 +207,13 @@ export async function installCommandsDefs(
     prev,
   );
   if (res.skippedReason === "not-supported") {
+    // Not "coming soon": until 0.19.0 this said so for every harness without
+    // commands, including Codex, whose skill replaces them by design.
     info(
       chalk.dim(
-        `Commands not yet supported for ${profile.displayName} (coming soon)`,
+        profile.paths.skillsDir
+          ? `No slash commands for ${profile.displayName} — the uluops skill covers the workflows instead`
+          : `No slash commands ship for ${profile.displayName}`,
       ),
     );
     return res;
@@ -221,7 +224,7 @@ export async function installCommandsDefs(
   if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
   if (res.removed > 0) parts.push(`${res.removed} removed`);
   const dest = opts.localDefs
-    ? "./uluops/commands/"
+    ? `./uluops/${profile.name}/commands/`
     : `${profile.paths.commandsDir.replace(process.env["HOME"] ?? "", "~")}/`;
   ok(
     `${res.files.length} commands → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
@@ -249,7 +252,7 @@ export async function installSkillsDefs(
   if (res.skipped > 0) parts.push(`${res.skipped} unchanged`);
   if (res.removed > 0) parts.push(`${res.removed} removed`);
   const dest = opts.localDefs
-    ? "./uluops/skills/"
+    ? `./uluops/${profile.name}/skills/`
     : `${(profile.paths.skillsDir ?? "").replace(process.env["HOME"] ?? "", "~")}/`;
   ok(
     `${res.files.length} skills → ${dest}${parts.length ? ` (${parts.join(", ")})` : ""}`,
@@ -569,28 +572,89 @@ export async function confirmShellWrite(profilePath: string): Promise<boolean> {
   return answer.trim().toLowerCase() === "y";
 }
 
-/** Warn if existing agent files will be overwritten and prompt for confirmation. */
+/**
+ * Files a first install would overwrite, across every surface setup writes:
+ * agents, commands and skills. Returns paths like `agents/x.md`,
+ * `commands/agents/audit.md`, `skills/uluops/SKILL.md`, plus each destination
+ * that exists but could not be read (conflicts there are unknown).
+ *
+ * Until 0.19.0 only agents were checked, so a user's own command with a
+ * shipped name was overwritten without a prompt, recorded in the manifest,
+ * and deleted on uninstall (consumer-validate run #38, wittgenstein FR-1).
+ */
+export async function findDefinitionConflicts(
+  profile: HarnessProfile,
+  localDefs: boolean,
+): Promise<{ conflicts: string[]; unreadable: { dir: string; error: string }[] }> {
+  const localRoot = localDefs ? await localDefsRoot(profile.name) : null;
+  const surfaces: { name: string; src: string; dest: string | null | undefined }[] = [
+    {
+      name: "agents",
+      src: join(ASSETS_DIR, profile.name, "agents"),
+      dest: localRoot ? join(localRoot, "agents") : profile.paths.agentsDir,
+    },
+    {
+      name: "commands",
+      src: join(ASSETS_DIR, profile.name, "commands"),
+      dest: localRoot ? join(localRoot, "commands") : profile.paths.commandsDir,
+    },
+    {
+      name: "skills",
+      src: join(ASSETS_DIR, profile.name, "skills"),
+      dest: localRoot ? join(localRoot, "skills") : profile.paths.skillsDir,
+    },
+  ];
+
+  const conflicts: string[] = [];
+  const unreadable: { dir: string; error: string }[] = [];
+  for (const surface of surfaces) {
+    if (!surface.dest) continue; // harness has no such surface
+    let shipped: string[];
+    try {
+      shipped = await listFilesRecursive(surface.src);
+    } catch (err) {
+      // The BUNDLED assets being unreadable means the package itself is
+      // broken, not that there is nothing to conflict with. Say so; the copy
+      // step will surface the hard failure.
+      warn(
+        `Could not read bundled ${surface.name} (${err instanceof Error ? err.message : String(err)}) — conflict check for ${surface.name} skipped`,
+      );
+      continue;
+    }
+    if (shipped.length === 0) continue;
+    let existing: string[];
+    try {
+      existing = await listFilesRecursive(surface.dest);
+    } catch (err) {
+      unreadable.push({
+        dir: surface.dest,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      continue;
+    }
+    const present = new Set(existing);
+    for (const file of shipped) {
+      if (present.has(file)) conflicts.push(`${surface.name}/${file}`);
+    }
+  }
+  return { conflicts, unreadable };
+}
+
+/** Warn if existing definition files will be overwritten and prompt for confirmation. */
 export async function checkConflicts(
   profile: HarnessProfile,
   localDefs: boolean,
 ): Promise<void> {
-  const destDir = localDefs
-    ? join(await findProjectRoot(), "uluops", "agents")
-    : profile.paths.agentsDir;
-  const srcDir = join(ASSETS_DIR, profile.name, "agents");
+  const { conflicts, unreadable } = await findDefinitionConflicts(profile, localDefs);
 
-  let existingFiles: string[];
-  try {
-    existingFiles = await readdir(destDir);
-  } catch (err) {
-    if (isEnoent(err)) {
-      return; // No destination dir yet — fresh install, nothing to conflict.
-    }
+  if (unreadable.length > 0) {
     // Unreadable destination = conflicts UNKNOWN, never "no conflicts":
     // proceeding silently overwrites files we could not enumerate. Ask.
-    warn(
-      `Could not read ${destDir} (${err instanceof Error ? err.message : String(err)}) — cannot check for existing agents that would be overwritten.`,
-    );
+    for (const u of unreadable) {
+      warn(
+        `Could not read ${u.dir} (${u.error}) — cannot check for existing files that would be overwritten.`,
+      );
+    }
     if (!process.stdin.isTTY) {
       // Non-TTY can't answer the prompt; fail-safe is refusal, not a hang
       // and not a silent overwrite. This is an OPERATIONAL failure (EACCES
@@ -598,7 +662,7 @@ export async function checkConflicts(
       // plain Error (failed path), not ConflictRejectedError (exit 0).
       // (--yes skips checkConflicts entirely.)
       throw new Error(
-        `Cannot verify conflicts in ${destDir} and no TTY to ask — refusing to risk overwriting existing files. Fix the directory permissions or pass --yes to proceed without the check.`,
+        `Cannot verify conflicts in ${unreadable.map((u) => u.dir).join(", ")} and no TTY to ask — refusing to risk overwriting existing files. Fix the directory permissions or pass --yes to proceed without the check.`,
       );
     }
     const { confirm } = await import("@inquirer/prompts");
@@ -612,24 +676,10 @@ export async function checkConflicts(
     return;
   }
 
-  let assetFiles: string[];
-  try {
-    assetFiles = await readdir(srcDir);
-  } catch (err) {
-    // The BUNDLED assets being unreadable is not a fresh-install condition —
-    // it means the package itself is broken. Don't silently skip the
-    // conflict check; say so (the copy step will surface the hard failure).
-    warn(
-      `Could not read bundled agent assets (${err instanceof Error ? err.message : String(err)}) — conflict check skipped`,
-    );
-    return;
-  }
-
-  const conflicts = assetFiles.filter((f) => existingFiles.includes(f));
   if (conflicts.length === 0) return;
 
   warn(
-    `Found ${conflicts.length} existing agents that match UluOps definitions:`,
+    `Found ${conflicts.length} existing file(s) that match UluOps definitions:`,
   );
   for (const f of conflicts.slice(0, 5)) {
     info(`  ${f}`);

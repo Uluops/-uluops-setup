@@ -8,7 +8,7 @@
  * flows are turned into exit codes and one-line messages here.
  */
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import chalk from "chalk";
 
 import { info, printAgentList } from "./lib/display.js";
@@ -43,10 +43,14 @@ async function main(): Promise<void> {
       "--signup",
       "Create a new account (email + password, no browser)",
     )
-    .option(
-      "--harness <name>",
-      `Target harness: ${listHarnesses().join(", ")} (aliases: claude, oc, gemini). Accepts comma-separated subset ("claude-code,codex") or "all" to install into every detected stable harness.`,
-      "claude-code",
+    // The value stays "claude-code" (selectHarnesses tells it apart from an
+    // explicit flag via getOptionValueSource), but --help described it as the
+    // default until 0.19.0 — the real default is auto-detection.
+    .addOption(
+      new Option(
+        "--harness <name>",
+        `Target harness: ${listHarnesses().join(", ")} (aliases: claude, oc, gemini). Accepts comma-separated subset ("claude-code,codex") or "all" to install into every detected stable harness.`,
+      ).default("claude-code", "auto-detect; claude-code when none is detected"),
     )
     .option(
       "--all-detected",
@@ -60,7 +64,7 @@ async function main(): Promise<void> {
     )
     .option(
       "--local-defs",
-      "Copy agents/commands/skills into ./uluops/ instead of the harness home (one harness per project)",
+      "Copy agents/commands/skills into ./uluops/<harness>/ instead of the harness home",
       false,
     )
     .option("--shell", "Write API key export to shell profile", false)

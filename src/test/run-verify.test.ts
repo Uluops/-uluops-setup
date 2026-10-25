@@ -35,6 +35,7 @@ describe("runVerify rendering", () => {
       checks: [
         { label: "[Claude Code] Metrics hook", passed: true, detail: "drift: manifest 1.0.0, installed 1.1.0" },
       ],
+      fixCommands: [],
     });
 
     await runVerify();
@@ -55,6 +56,7 @@ describe("runVerify rendering", () => {
           detail: "no key in ULUOPS_API_KEY or ~/.uluops/credentials.json",
         },
       ],
+      fixCommands: [],
     });
 
     await runVerify();
@@ -65,5 +67,24 @@ describe("runVerify rendering", () => {
     );
     expect(lines.some((l) => l.startsWith("  ✓ API key"))).toBe(false);
     expect(process.exit).toHaveBeenCalledWith(0);
+  });
+
+  it("ends a failed run with re-run commands that keep each harness's recorded scope", async () => {
+    mockVerify.mockResolvedValue({
+      ok: false,
+      checks: [{ label: "[Codex] Agent files", passed: false, detail: "Missing 2 agent(s)" }],
+      fixCommands: [
+        "npx @uluops/setup --harness claude-code --scope local --local-defs",
+        "npx @uluops/setup --harness codex",
+      ],
+    });
+
+    await runVerify();
+
+    const lines = printedLines(logSpy);
+    expect(lines).toContain("  To fix, re-run (harnesses installed with different flags):");
+    expect(lines).toContain("    npx @uluops/setup --harness claude-code --scope local --local-defs");
+    expect(lines).toContain("    npx @uluops/setup --harness codex");
+    expect(lines.some((l) => l.includes("Run npx @uluops/setup to fix"))).toBe(false);
   });
 });

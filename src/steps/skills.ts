@@ -1,8 +1,8 @@
-import { mkdir, readdir, rmdir } from "node:fs/promises";
+import { mkdir, rmdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
-import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
-import { copyIfChanged, removeStaleFiles, unlinkFiles, isEnoent } from "../lib/file-ops.js";
+import { ASSETS_DIR, localDefsRoot } from "../lib/paths.js";
+import { copyIfChanged, removeStaleFiles, unlinkFiles, listFilesRecursive } from "../lib/file-ops.js";
 
 export interface SkillsResult {
   copied: number;
@@ -13,36 +13,11 @@ export interface SkillsResult {
   failures: { file: string; error: string }[];
 }
 
-async function listFilesRecursive(dir: string, prefix = ""): Promise<string[]> {
-  let entries;
-  try {
-    entries = await readdir(dir, { withFileTypes: true });
-  } catch (err) {
-    // ENOENT = no skills shipped/installed at this level. Anything else
-    // throws — an empty list here becomes the manifest's authoritative
-    // skills record.
-    if (!isEnoent(err)) throw err;
-    return [];
-  }
-
-  const files: string[] = [];
-  for (const entry of entries) {
-    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await listFilesRecursive(full, rel));
-    } else if (entry.isFile()) {
-      files.push(rel);
-    }
-  }
-  return files.sort((a, b) => a.localeCompare(b));
-}
-
 /**
  * Install the harness's skill files from the bundled assets: unchanged files
  * are skipped (hash comparison), updated files overwritten, and manifest
  * entries no longer in the assets removed. `localDefs` redirects the install
- * to `./uluops/skills` (project-scoped). Per-file failures are collected in
+ * to `./uluops/<harness>/skills` (project-scoped). Per-file failures are collected in
  * the result, not thrown.
  */
 export async function installSkills(
@@ -53,7 +28,7 @@ export async function installSkills(
 ): Promise<SkillsResult> {
   const srcBase = join(ASSETS_DIR, profile.name, "skills");
   const destBase = localDefs
-    ? join(await findProjectRoot(), "uluops", "skills")
+    ? join(await localDefsRoot(profile.name), "skills")
     : profile.paths.skillsDir;
 
   if (!destBase) {

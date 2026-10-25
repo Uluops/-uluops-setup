@@ -98,6 +98,15 @@ export async function readInstalledMetricsVersion(toolDir: string): Promise<stri
   return readSourceVersion(toolDir);
 }
 
+/**
+ * The agent-metrics version THIS setup would copy on a re-run (its bundled
+ * dependency), or null when it cannot be resolved. Verify compares the
+ * installed copy against it to say whether a re-run would update the hook.
+ */
+export async function bundledMetricsVersion(): Promise<string | null> {
+  return (await findMetricsSource())?.version ?? null;
+}
+
 /** Copy .js files from a source dir to a dest dir, skipping test files. */
 async function copyJsDir(
   srcDir: string,

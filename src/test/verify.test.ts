@@ -507,3 +507,31 @@ describe("API key check", () => {
     expect(result.ok).toBe(false);
   });
 });
+
+describe("re-run hints keep the recorded scope", () => {
+  it("a partial local install's hint and the fix command carry --scope local --local-defs", async () => {
+    const defsPath = join(tmpDir, "defs");
+    await mkdir(join(defsPath, "agents"), { recursive: true });
+    const configPath = join(tmpDir, "mcp.json");
+    await writeFile(configPath, JSON.stringify({ mcpServers: {} }));
+    mockLoadManifest.mockResolvedValue(
+      makeManifest(defsPath, configPath, {
+        mcpScope: "local",
+        defsScope: "local",
+        partial: "agents",
+      }),
+    );
+
+    const result = await verify();
+
+    const partial = result.checks.find((c) => c.label.includes("partial install"));
+    expect(partial).toBeDefined();
+    expect(partial!.detail).toBe(
+      "Re-run: npx @uluops/setup --harness claude-code --scope local --local-defs",
+    );
+    expect(result.fixCommands).toEqual([
+      "npx @uluops/setup --harness claude-code --scope local --local-defs",
+    ]);
+  });
+});
+

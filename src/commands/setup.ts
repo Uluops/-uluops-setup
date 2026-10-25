@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { rmdir } from "node:fs/promises";
 import {
   loadManifest,
   saveManifest,
@@ -9,7 +10,10 @@ import type {
   Manifest,
   PartialStep,
 } from "../lib/manifest.js";
-import { findProjectRoot } from "../lib/paths.js";
+import { localDefsRoot } from "../lib/paths.js";
+import { uninstallAgents } from "../steps/agents.js";
+import { uninstallCommands } from "../steps/commands.js";
+import { uninstallSkills } from "../steps/skills.js";
 import {
   info,
   warn,
@@ -341,6 +345,15 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       manifest.installedAt = now;
       manifest.shellModified = shellModified || manifest.shellModified;
 
+      // Prior trees in the pre-0.19 shared local layout (`<project>/uluops/`)
+      // that a harness moved out of on this run. Cleaned up after the loop,
+      // once we know whether any harness still records them.
+      const vacatedSharedTrees: {
+        harnessName: string;
+        path: string;
+        entry: HarnessManifest;
+      }[] = [];
+
       for (const r of perHarnessResults) {
         if (!r.mcpResult) continue; // no MCP success → no entry
         // A step that THREW produced no result — falling back to [] here
@@ -350,23 +363,54 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         // prior record; the `partial` marker names what didn't complete.
         const prevEntry = existingManifest?.harnesses[r.harnessName];
         const newDefsScope = opts.localDefs ? "local" : "global";
+        const newDefsPath = opts.localDefs
+          ? await localDefsRoot(r.harnessName)
+          : r.profile.paths.home;
         // TWO gates, deliberately: the FILE LISTS live under defsPath and
-        // may only be inherited within the same scope (a global list against
-        // a local path points uninstall at the wrong tree). The HOOK fields
-        // live in settings.json under profile.paths — scope-independent —
-        // and gating them on defsScope falsified hooksInstalled on a scope
-        // flip (audit pass 6, PROBE C).
+        // may only be inherited for the SAME tree — same scope and same path
+        // (a list against another tree points uninstall at the wrong files).
+        // The path half was added in 0.19.0: local trees moved to
+        // `<project>/uluops/<harness>/`, and findProjectRoot now walks to the
+        // real repo root, so a local re-run can land at a new path with the
+        // scope unchanged. The HOOK fields live in settings.json under
+        // profile.paths — tree-independent — and gating them on defsScope
+        // falsified hooksInstalled on a scope flip (audit pass 6, PROBE C).
         const prevLists =
-          prevEntry && prevEntry.defsScope === newDefsScope
+          prevEntry &&
+          prevEntry.defsScope === newDefsScope &&
+          prevEntry.defsPath === newDefsPath
             ? prevEntry
             : undefined;
         const prevHooks = prevEntry;
         if (prevEntry && !prevLists) {
-          // Scope flip: the prior tree at the old defsPath is no longer
-          // tracked by this manifest — say so rather than dropping it
-          // silently (cross-scope cleanup is not implemented).
+          const isVacatedSharedTree =
+            prevEntry.defsScope === "local" &&
+            newDefsScope === "local" &&
+            prevEntry.defsPath === dirname(newDefsPath);
+          if (isVacatedSharedTree) {
+            // The one move we can identify with certainty: the retired
+            // shared layout, in the same project. Cleaned up below.
+            vacatedSharedTrees.push({
+              harnessName: r.harnessName,
+              path: prevEntry.defsPath,
+              entry: prevEntry,
+            });
+          } else {
+            // Any other move — a scope flip, a different project, or the
+            // project-root walk now finding the repo root — leaves the old
+            // tree in place. A local install in another project looks the
+            // same as a move from here, so deleting would be wrong.
+            warn(
+              `[${r.harnessName}] definitions location changed (${prevEntry.defsPath} → ${newDefsPath}): previously installed files remain untracked at ${prevEntry.defsPath}`,
+            );
+          }
+        }
+        if (
+          prevEntry &&
+          prevEntry.mcpConfigPath !== r.mcpResult.configPath
+        ) {
           warn(
-            `[${r.harnessName}] defs scope changed (${prevEntry.defsScope} → ${newDefsScope}): previously installed files remain untracked at ${prevEntry.defsPath}`,
+            `[${r.harnessName}] MCP config location changed (${prevEntry.mcpConfigPath} → ${r.mcpResult.configPath}): the UluOps server entries in the old file were left in place`,
           );
         }
         // A metrics result whose skippedReason is set NEVER OBSERVED the
@@ -381,9 +425,7 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
           mcpScope: opts.scope,
           mcpConfigPath: r.mcpResult.configPath,
           defsScope: newDefsScope,
-          defsPath: opts.localDefs
-            ? join(await findProjectRoot(), "uluops")
-            : r.profile.paths.home,
+          defsPath: newDefsPath,
           agents: r.agentsResult?.files ?? prevLists?.agents ?? [],
           commands: r.commandsResult?.files ?? prevLists?.commands ?? [],
           skills: r.skillsResult?.files ?? prevLists?.skills ?? [],
@@ -397,6 +439,8 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
         };
         manifest.harnesses[r.harnessName] = harnessEntry;
       }
+
+      await cleanUpVacatedSharedTrees(vacatedSharedTrees, manifest);
 
       // Same ownership rule as before — only manifest a global install we
       // performed ourselves (not user-installed).
@@ -431,6 +475,10 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
       await printSetupSummary({
         results: perHarnessResults,
         apiKey,
+        scope: {
+          mcpScope: opts.scope,
+          defsScope: opts.localDefs ? "local" : "global",
+        },
       });
     } catch (err) {
       // A render failure must not invert the run outcome: the install and
@@ -453,5 +501,65 @@ export async function runSetup(opts: RunSetupOpts): Promise<void> {
   // inside, exit only after cleanup has run.
   if (exitCode !== 0) {
     process.exit(exitCode);
+  }
+}
+
+/**
+ * Remove files a harness recorded in the pre-0.19 shared local tree
+ * (`<project>/uluops/`) after it moved to `<project>/uluops/<harness>/`.
+ *
+ * Only once NO manifest entry still records that tree: a harness not in this
+ * run may still be installed there, and the harnesses' file names overlap,
+ * so deleting one harness's list would break the other. Such a tree is left
+ * in place with a warning naming who still uses it; re-running setup for
+ * those harnesses moves them and the last one out cleans up. Only recorded
+ * files are removed, as `--uninstall` does.
+ */
+async function cleanUpVacatedSharedTrees(
+  vacated: { harnessName: string; path: string; entry: HarnessManifest }[],
+  manifest: Manifest,
+): Promise<void> {
+  const byPath = new Map<string, typeof vacated>();
+  for (const v of vacated) {
+    byPath.set(v.path, [...(byPath.get(v.path) ?? []), v]);
+  }
+  for (const [path, movers] of byPath) {
+    const stillUsing = Object.entries(manifest.harnesses)
+      .filter(([, hm]) => hm.defsPath === path)
+      .map(([name]) => name);
+    const movedNames = movers.map((m) => m.harnessName).join(", ");
+    if (stillUsing.length > 0) {
+      warn(
+        `[${movedNames}] moved to a per-harness folder; the shared tree at ${path} is left in place because ${stillUsing.join(", ")} still use it. Re-run setup for ${stillUsing.join(", ")} to move them too.`,
+      );
+      continue;
+    }
+    try {
+      let removed = 0;
+      for (const { entry } of movers) {
+        removed += await uninstallAgents(entry.agents, path);
+        removed += await uninstallCommands(entry.commands, path);
+        removed += await uninstallSkills(entry.skills ?? [], path);
+      }
+      // Then the directories they leave empty, deepest first. rmdir refuses
+      // a non-empty directory, so anything the user keeps there survives.
+      for (const dir of [
+        "commands/agents",
+        "commands/workflows",
+        "commands/pipelines",
+        "commands",
+        "agents",
+        "skills",
+      ]) {
+        await rmdir(join(path, dir)).catch(() => undefined);
+      }
+      info(
+        `Moved ${movedNames} to per-harness folders; removed ${String(removed)} file(s) from the shared tree at ${path}`,
+      );
+    } catch (err) {
+      warn(
+        `Could not clean up the shared tree at ${path}: ${err instanceof Error ? err.message : String(err)} — those files are no longer tracked`,
+      );
+    }
   }
 }

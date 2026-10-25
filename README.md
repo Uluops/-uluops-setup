@@ -27,12 +27,14 @@ Optional global CLI installs resolve npm's current release when the CLI is
 absent. Setup preserves an existing global CLI rather than upgrading it;
 update existing `@uluops/cli` or `@uluops/agent-metrics` global installs with npm.
 
-| Harness | Status | Alias | Config |
-|---------|--------|-------|--------|
-| Claude Code | Fully supported (default) | `claude` | `~/.claude.json` |
-| OpenCode | Fully supported | `oc` | `~/.config/opencode/opencode.json` |
-| Gemini CLI | Fully supported | `gemini` | `~/.gemini/settings.json` |
-| Codex | Fully supported | — | `~/.codex/config.toml` |
+| Harness | Alias | Config | What setup installs |
+|---------|-------|--------|---------------------|
+| Claude Code | `claude` | `~/.claude.json` | MCP servers, agents, slash commands, metrics hook |
+| OpenCode | `oc` | `~/.config/opencode/opencode.json` | MCP servers, agents |
+| Gemini CLI | `gemini` | `~/.gemini/settings.json` | MCP servers, agents, slash commands, metrics hook |
+| Codex | — | `~/.codex/config.toml` | MCP servers, agents, the `uluops-operator` skill (in place of slash commands) |
+
+All four are stable targets; they differ in what each harness can load. Until 0.19.0 this table said "Fully supported" for every harness while setup printed "Commands not yet supported (coming soon)" for OpenCode and Codex.
 
 > **Codex note:** the TOML writer seeds `approval_mode = "approve"` for every read-side MCP tool exported by `@uluops/ops-mcp` and `@uluops/registry-mcp` so interactive sessions don't surface an approval prompt on every `list_*`/`get_*`/`query_*` call. Write-side tools (`save_run`, `bulk_update_status`, `publish_definition`, etc.) are intentionally NOT pre-approved — Codex still asks before any state-changing operation. A re-install over a hand-tuned config (any `[mcp_servers.<server>.tools.*]` block present) preserves your customizations verbatim and skips the seed step.
 
@@ -101,7 +103,7 @@ Each harness gets its own per-section block in the summary:
   Restart each of Claude Code, OpenCode, Gemini CLI to load agents.
 ```
 
-**Failure isolation:** one harness failing does not abort the others. The failing harness lands as `✗ [<Name>] failed — <reason>` in the summary with a `Re-run: npx @uluops/setup --harness <name>` hint; siblings install cleanly. The process exits 1 when any harness failed operationally, 0 when every harness either succeeded or was declined at the conflict prompt (user choice is not failure).
+**Failure isolation:** one harness failing does not abort the others. The failing harness lands as `✗ [<Name>] failed — <reason>` in the summary with a `Re-run: npx @uluops/setup --harness <name>` hint (plus `--scope local` / `--local-defs` when the run used them, so the re-run lands in the same place); siblings install cleanly. The process exits 1 when any harness failed operationally, 0 when every harness either succeeded or was declined at the conflict prompt (user choice is not failure).
 
 **Partial state:** if a per-harness step throws after MCP succeeded (e.g., a `mkdir` permission error during the agents step), the manifest records what landed plus `partial: "<step>"` naming the failed step. `--verify` surfaces this with a `partial install — failed at "<step>"` warning so you know a re-run is needed.
 
@@ -116,7 +118,7 @@ Each harness gets its own per-section block in the summary:
 | Pipeline commands | 2 | `~/.claude/commands/pipelines/` |
 | Agent metrics hook | 1 | `~/.claude/tools/agent-metrics/` |
 
-> Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Codex installs agents as `.toml` to `~/.codex/agents/` and ships a single `uluops-operator` skill under `~/.codex/skills/` instead of slash commands. Agent definitions and commands are transformed to the target harness format at install time from a single source.
+> Paths shown are for Claude Code (default). Gemini CLI installs agents as `.md` and commands as `.toml` to `~/.gemini/`. OpenCode installs agents to `~/.config/opencode/agents/`. Codex installs agents as `.toml` to `~/.codex/agents/` and ships a single `uluops-operator` skill under `~/.codex/skills/` instead of slash commands. Agent definitions and commands are rendered for each harness from a single source when the package is built, and copied as-is at install time.
 
 The installer runs these steps in sequence:
 
@@ -154,7 +156,8 @@ npx @uluops/setup [options]
                          --harness claude-code,codex
                          --harness all
                        Names: claude-code, opencode, gemini-cli, codex
-                       Aliases: claude, oc, gemini (default: claude-code)
+                       Aliases: claude, oc, gemini (default: every detected
+                       stable harness; claude-code when none is detected)
   --all-detected       Install into every detected stable harness. Canonical
                        synonym for --harness all. Cannot be combined with
                        --harness <single-name> (fail-fast conflict error).
@@ -165,8 +168,8 @@ npx @uluops/setup [options]
                        run them. Non-interactive runs skip the username step
                        entirely unless this flag is passed.
   --scope <mode>       MCP config scope: "global" or "local" (default: global)
-  --local-defs         Copy definitions into ./uluops/ instead of the
-                       harness's home directory (one harness per project)
+  --local-defs         Copy definitions into ./uluops/<harness>/ instead of
+                       the harness's home directory
   --shell              Write API key export to shell profile
   --with-cli           Install @uluops/cli globally (skip prompt)
   --no-cli             Skip @uluops/cli install (skip prompt)
@@ -233,6 +236,8 @@ Validates your current installation against the local manifest and checks your A
 > With multiple harnesses installed, `--verify` prints one `[<Harness>]` block per manifest entry.
 >
 > The API key is found the way install finds it: `ULUOPS_API_KEY` first, then `~/.uluops/credentials.json`. With no key in either place the row reads `⚠ API key check skipped` and does not fail the run. A key the server rejects fails it with the same remedy install gives. Before 0.19.0 the check read `ULUOPS_API_KEY` only and was left out silently without it.
+>
+> The metrics hook row fails when the installed hook files no longer match what setup recorded (they were changed outside setup), and passes with a note such as `v0.12.0 — this setup bundles v0.12.1; re-run setup to update` when a newer hook is available. When any check fails, `--verify` ends with the command that repairs each harness where it is installed, for example `npx @uluops/setup --harness claude-code --scope local --local-defs`.
 
 ### Examples
 
@@ -265,9 +270,8 @@ npx @uluops/setup --api-key ulr_abc123 --all-detected -y
 # Local MCP config (project-scoped)
 npx @uluops/setup --scope local
 
-# Copy definitions into ./uluops/ instead of the harness home (one harness
-# per project — see "How updates work" for the multi-harness edge)
-npx @uluops/setup --harness claude-code --local-defs
+# Copy definitions into ./uluops/<harness>/ instead of the harness home
+npx @uluops/setup --harness claude-code,gemini-cli --local-defs
 
 # Skip the agent-metrics hook (no run capture, no hook tool files)
 npx @uluops/setup --no-metrics
@@ -301,15 +305,22 @@ Re-running `npx @uluops/setup` is designed to be safe to repeat:
 - Custom agents and non-UluOps MCP servers are left alone, with two known
   edges: a hook whose command *contains* the UluOps ownership marker (e.g. a
   hand-forked copy of our agent-metrics hook) is treated as ours and replaced
-  on re-run, and switching `--local-defs` between runs starts a fresh tree —
-  the previous scope's files stay on disk untracked (setup warns when this
-  happens)
-- **Known limitation — `--local-defs` with more than one harness:** every
-  harness writes to the same `./uluops/agents/` (and `commands/`, `skills/`),
-  and the harnesses ship identically named files rendered differently, so the
-  last harness installed wins. A subset `--uninstall --harness <name>` then
-  removes files the remaining harnesses also record. Use `--local-defs` with
-  one harness per project until the tree is namespaced per harness.
+  on re-run, and a re-run that puts definitions somewhere else — switching
+  `--local-defs` on or off, or running a local install from another project
+  — starts a fresh tree. The previous tree stays on disk untracked, and setup
+  warns naming it.
+- **Local definitions are per harness** (`./uluops/<harness>/agents`, `commands/`,
+  `skills/`), since 0.19.0. Before, every harness shared `./uluops/`, so the last
+  harness installed overwrote the others' files and a subset uninstall removed
+  files other harnesses still recorded. Re-running setup moves a harness out of
+  the old shared tree and deletes its files there once no installed harness
+  still records that tree; until then setup leaves it and names the harnesses
+  still using it.
+- **The project is the nearest directory upward with `.git` or `package.json`**
+  (or `ULUOPS_PROJECT_ROOT`). Before 0.19.0 only the current directory and its
+  parent were checked, so a local install run from deeper inside a repo landed
+  in the subdirectory; re-running from there now targets the repo root, and
+  setup warns that the old location is no longer tracked.
 
 Setup manages five surfaces: agent files, command files, skill files (Codex), MCP config entries, and the metrics hook. A manifest at `~/.uluops/manifest.json` tracks what was installed so `--uninstall` can reverse it. The manifest supports multiple harnesses — each gets its own installation state. `--uninstall` leaves `~/.uluops/credentials.json` in place, because `@uluops/cli` and the SDKs read the same file.
 

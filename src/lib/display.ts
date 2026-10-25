@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { getAgentCommands, getWorkflowCommands } from "./asset-catalog.js";
 import type { PerHarnessResult } from "../commands/per-harness.js";
+import { rerunCommand, type RerunScope } from "./rerun.js";
 
 const ok = (msg: string) => console.log(`  ${chalk.green("✓")} ${msg}`);
 const warn = (msg: string) => console.log(`  ${chalk.yellow("⚠")} ${msg}`);
@@ -56,8 +57,11 @@ const DIVIDER = `  ${chalk.dim("━".repeat(46))}`;
 export async function printSetupSummary(input: {
   results: PerHarnessResult[];
   apiKey: string;
+  /** This run's install location, echoed in re-run hints (lib/rerun.ts). */
+  scope?: RerunScope;
 }): Promise<void> {
   const { results, apiKey } = input;
+  const scope: RerunScope = input.scope ?? { mcpScope: "global", defsScope: "global" };
 
   if (results.length === 0) {
     // runSetup's empty-list branch already printed "nothing to install"
@@ -102,7 +106,7 @@ export async function printSetupSummary(input: {
     );
     console.log();
     for (const r of results) {
-      printHarnessLine(r);
+      printHarnessLine(r, scope);
     }
   }
   console.log();
@@ -132,7 +136,9 @@ export async function printSetupSummary(input: {
   info("For SDK/CLI usage, add to your shell profile:");
   info(`  ${chalk.cyan(`export ULUOPS_API_KEY="${masked}"`)}`);
   console.log();
-  info(`Run again to update: ${chalk.cyan("npx @uluops/setup")}`);
+  info(
+    `Run again to update: ${chalk.cyan(rerunCommand(results.map((r) => r.harnessName), scope))}`,
+  );
   console.log();
 
   console.log(DIVIDER);
@@ -151,7 +157,7 @@ export async function printSetupSummary(input: {
   }
 }
 
-function printHarnessLine(r: PerHarnessResult): void {
+function printHarnessLine(r: PerHarnessResult, scope: RerunScope): void {
   const label = chalk.bold(`[${r.profile.displayName}]`);
   switch (r.status) {
     case "ok": {
@@ -170,7 +176,7 @@ function printHarnessLine(r: PerHarnessResult): void {
         );
       }
       console.log(
-        `     ${chalk.dim(`Re-run: npx @uluops/setup --harness ${r.harnessName}`)}`,
+        `     ${chalk.dim(`Re-run: ${rerunCommand([r.harnessName], scope)}`)}`,
       );
       return;
     }

@@ -1,7 +1,7 @@
 import { readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
-import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
+import { ASSETS_DIR, localDefsRoot } from "../lib/paths.js";
 import {
   copyIfChanged,
   unlinkFiles,
@@ -37,7 +37,7 @@ export async function installCommands(
 ): Promise<CommandsResult> {
   const srcBase = join(ASSETS_DIR, profile.name, "commands");
   const destBase = localDefs
-    ? join(await findProjectRoot(), "uluops", "commands")
+    ? join(await localDefsRoot(profile.name), "commands")
     : profile.paths.commandsDir;
 
   // If no commands directory exists for this harness, skip gracefully

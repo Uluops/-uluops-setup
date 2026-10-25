@@ -22,7 +22,15 @@ export function setProjectRoot(path: string | null): void {
   projectRootOverride = path;
 }
 
-/** Walk upward from cwd to find the nearest directory containing .git or package.json. Falls back to cwd. */
+/**
+ * Walk upward from cwd to find the nearest directory containing .git or
+ * package.json. Falls back to cwd.
+ *
+ * Until 0.19.0 the walk stopped at cwd's PARENT: `const root = dirname(cwd)`
+ * was computed once and used as the loop bound, so only cwd and its parent
+ * were ever checked (4527c9a). Run from two or more levels inside a repo,
+ * "project-local" config and definitions landed in the subdirectory.
+ */
 export async function findProjectRoot(): Promise<string> {
   if (projectRootOverride) return projectRootOverride;
 
@@ -38,13 +46,26 @@ export async function findProjectRoot(): Promise<string> {
   }
 
   let dir = process.cwd();
-  const root = dirname(dir);
-  while (dir !== root) {
+  for (;;) {
     if (await isProjectMarker(dir)) return dir;
-    dir = dirname(dir);
+    const parent = dirname(dir);
+    if (parent === dir) return process.cwd(); // filesystem root, no marker
+    dir = parent;
   }
-  if (await isProjectMarker(dir)) return dir;
-  return process.cwd();
+}
+
+/**
+ * Where `--local-defs` installs one harness's definitions:
+ * `<project>/uluops/<harness>/`, holding `agents/`, `commands/` and `skills/`.
+ *
+ * Per harness since 0.19.0. Before, every harness shared `<project>/uluops/`,
+ * and the harnesses ship identically named files rendered differently, so
+ * the last harness installed overwrote the others and a subset uninstall
+ * deleted files the remaining harnesses still recorded. The manifest's
+ * `defsPath` records this directory; setup.ts migrates the old layout.
+ */
+export async function localDefsRoot(harnessName: string): Promise<string> {
+  return join(await findProjectRoot(), "uluops", harnessName);
 }
 
 async function isProjectMarker(dir: string): Promise<boolean> {

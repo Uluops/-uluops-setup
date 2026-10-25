@@ -20,8 +20,9 @@ export async function runVerify(): Promise<void> {
   const result = await verify();
 
   // Details print on every row, passed ones included. Until 0.19.0 a passed
-  // row printed its label only, which hid hook drift: that row passes but
-  // fails the run, so the output was all ticks followed by "Some checks failed".
+  // row printed its label only, which hid hook drift (then a passed row that
+  // failed the run: all ticks followed by "Some checks failed") and still
+  // hides nothing now that rows carry versions and "update available" notes.
   for (const check of result.checks) {
     if (check.skipped) {
       warn(`${check.label}${check.detail ? ` — ${check.detail}` : ""}`);
@@ -36,7 +37,17 @@ export async function runVerify(): Promise<void> {
   if (result.ok) {
     info(chalk.green("All checks passed."));
   } else {
-    info(chalk.red("Some checks failed. Run npx @uluops/setup to fix."));
+    info(chalk.red("Some checks failed."));
+    // The fix keeps each harness where it is installed: a bare
+    // `npx @uluops/setup` would re-run with the default (global) scope.
+    if (result.fixCommands.length > 0) {
+      info(
+        result.fixCommands.length === 1
+          ? "To fix, re-run:"
+          : "To fix, re-run (harnesses installed with different flags):",
+      );
+      for (const cmd of result.fixCommands) info(`  ${chalk.cyan(cmd)}`);
+    }
   }
   console.log();
 

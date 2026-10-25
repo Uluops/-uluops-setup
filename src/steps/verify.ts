@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { loadManifest, type HarnessManifest } from "../lib/manifest.js";
 import { getHealthTimeout } from "../lib/health.js";
 import { getProfile } from "../harnesses/index.js";
-import { readInstalledMetricsVersion } from "./metrics.js";
+import { bundledMetricsVersion, readInstalledMetricsVersion } from "./metrics.js";
 import { extractEmail } from "../lib/json-guards.js";
 import {
   INVALID_KEY_MESSAGE,
@@ -11,6 +11,7 @@ import {
   readCredentialsFile,
 } from "./auth.js";
 import { checkMcpPackageAvailability } from "../lib/config-merger.js";
+import { rerunCommand, rerunCommandsFor } from "../lib/rerun.js";
 
 export interface VerifyResult {
   ok: boolean;
@@ -20,6 +21,12 @@ export interface VerifyResult {
    * warning glyph rather than a tick, so "not checked" never reads as "fine".
    */
   checks: { label: string; passed: boolean; skipped?: boolean; detail?: string }[];
+  /**
+   * Commands that re-run setup over the installed harnesses without moving
+   * them (one per scope group; see lib/rerun.ts). Empty when there is no
+   * manifest — the "No manifest" check carries its own instruction.
+   */
+  fixCommands: string[];
 }
 
 type HarnessProfileLike = ReturnType<typeof getProfile>;
@@ -249,11 +256,22 @@ async function checkCommands(
  * means the hook will actually run on the next harness invocation.
  *
  * No-op (returns true) when the manifest says hooks weren't installed or the
- * profile doesn't expose a hook strategy. Version drift returns false even
- * though hooks are technically "present" — drift means setup was upgraded
- * but never re-ran, which silently ships a stale hook against a fresh CLI.
+ * profile doesn't expose a hook strategy.
+ *
+ * Two version conditions, reported differently:
+ * - OUT OF SYNC: the manifest's recorded version differs from the copy on
+ *   disk. Both are written by the same install, so this means the files were
+ *   changed outside setup. The row fails.
+ * - UPDATE AVAILABLE: the copy on disk differs from the version this setup
+ *   bundles — setup was upgraded and not re-run. The row passes and says so;
+ *   an available update is not a broken install.
+ * Until 0.19.0 only the first was checked, while this comment described the
+ * second, and the first was reported as a passed row that failed the run
+ * (consumer-validate run #38, wittgenstein GI-4/PP-2).
+ *
+ * @internal Exported for tests.
  */
-async function checkHooks(
+export async function checkHooks(
   profile: HarnessProfileLike,
   hm: HarnessManifest,
   checks: CheckList,
@@ -302,21 +320,29 @@ async function checkHooks(
     ? await readInstalledMetricsVersion(profile.paths.toolsDir)
     : null;
   const recordedVersion = hm.hooksInstalledVersion ?? null;
-  const drift =
-    !!recordedVersion &&
-    !!installedVersion &&
-    recordedVersion !== installedVersion;
-  const detail = installedVersion
-    ? `v${installedVersion}${drift ? ` (manifest records v${recordedVersion} — out of sync)` : ""}`
-    : "version unknown";
+  const label = `[${profile.displayName}] Agent metrics hook configured`;
+  if (!installedVersion) {
+    checks.push({ label, passed: true, detail: "version unknown" });
+    return true;
+  }
+  if (recordedVersion && recordedVersion !== installedVersion) {
+    checks.push({
+      label,
+      passed: false,
+      detail: `v${installedVersion} installed, manifest records v${recordedVersion} — changed outside setup; re-run setup`,
+    });
+    return false;
+  }
+  const bundled = await bundledMetricsVersion();
   checks.push({
-    label: `[${profile.displayName}] Agent metrics hook configured`,
+    label,
     passed: true,
-    detail,
+    detail:
+      bundled && bundled !== installedVersion
+        ? `v${installedVersion} — this setup bundles v${bundled}; re-run setup to update`
+        : `v${installedVersion}`,
   });
-  // Drift is reported as passed=true (verify is read-only) but flips allOk
-  // so the user knows a re-run is needed.
-  return !drift;
+  return true;
 }
 
 /** Verify a single harness entry, appending results to checks. Returns false if any check fails. */
@@ -349,7 +375,7 @@ async function verifyHarness(
     checks.push({
       label: `[${profile.displayName}] partial install — failed at "${hm.partial}"`,
       passed: false,
-      detail: `Re-run: npx @uluops/setup --harness ${harnessName}`,
+      detail: `Re-run: ${rerunCommand([harnessName], hm)}`,
     });
     partialOk = false;
   }
@@ -380,7 +406,7 @@ export async function verify(): Promise<VerifyResult> {
       passed: false,
       detail: "No manifest — run npx @uluops/setup first",
     });
-    return { ok: false, checks };
+    return { ok: false, checks, fixCommands: [] };
   }
   checks.push({
     label: `Manifest found (v${manifest.version}, installed ${manifest.installedAt.split("T")[0]})`,
@@ -424,5 +450,8 @@ export async function verify(): Promise<VerifyResult> {
     // double-fail the run for the same outage.
   }
 
-  return { ok: allOk, checks };
+  const fixCommands = rerunCommandsFor(
+    Object.entries(manifest.harnesses).map(([name, hm]) => [name, hm] as const),
+  );
+  return { ok: allOk, checks, fixCommands };
 }

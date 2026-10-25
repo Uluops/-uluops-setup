@@ -235,3 +235,21 @@ describe("maskKey", () => {
     expect(maskKey("abcd")).toBe("****");
   });
 });
+
+describe("printSetupSummary — re-run hints keep this run's scope", () => {
+  it("a failed harness's hint and the update line carry --scope local --local-defs", async () => {
+    await printSetupSummary({
+      results: [
+        okResult("claude-code", "Claude Code", { agents: 23 }),
+        failedResult("opencode", "OpenCode", "EACCES", undefined),
+      ],
+      apiKey: "ulr_test_xxxxxxxxx",
+      scope: { mcpScope: "local", defsScope: "local" },
+    });
+    const out = output();
+    expect(out).toContain("Re-run: npx @uluops/setup --harness opencode --scope local --local-defs");
+    expect(out).toContain(
+      "Run again to update: npx @uluops/setup --harness claude-code,opencode --scope local --local-defs",
+    );
+  });
+});

@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtemp, mkdir, writeFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 /**
  * Integration harness for runSetup — the step-injection rig the tracker's
@@ -29,8 +32,10 @@ import * as helpers from "../commands/helpers.js";
 import { acquireInstallLock } from "../lib/install-lock.js";
 import { loadManifest, saveManifest } from "../lib/manifest.js";
 import { maybeSetUsername } from "../steps/username.js";
-import { printSetupSummary } from "../lib/display.js";
+import { printSetupSummary, warn } from "../lib/display.js";
+import { setProjectRoot } from "../lib/paths.js";
 import type { Manifest } from "../lib/manifest.js";
+import { getProfile } from "../harnesses/index.js";
 
 const h = vi.mocked(helpers);
 const mockAcquireLock = vi.mocked(acquireInstallLock);
@@ -252,7 +257,10 @@ describe("runSetup partial-state preservation over a prior install", () => {
         mcpScope: "global" as const,
         mcpConfigPath: "/fake/claude.json",
         defsScope: "global" as const,
-        defsPath: "/fake/home",
+        // The real profile home: since 0.19.0 file lists are inherited only
+        // for the same tree (scope AND path), so a placeholder path here
+        // would read as a moved install and test nothing.
+        defsPath: getProfile("claude-code").paths.home,
         agents: ["prev-a.md", "prev-b.md"],
         commands: ["agents/prev.md"],
         skills: ["skill/prev.md"],
@@ -443,5 +451,107 @@ describe("hook-state-unknown never overwrites the record (audit pass 7/8)", () =
     ]!;
     expect(entry.hooksInstalled).toBe(false);
     expect(entry.hooksInstalledVersion).toBeNull();
+  });
+});
+
+describe("--local-defs moves to a per-harness folder (0.19.0)", () => {
+  // Real files on disk: the cleanup calls the real uninstall helpers, and
+  // the assertion is what is left in the old shared tree.
+  let root: string;
+
+  function localEntry(defsPath: string, agents: string[]) {
+    return {
+      installedAt: "2026-08-01T00:00:00.000Z",
+      setupVersion: "0.18.0",
+      mcpScope: "global" as const,
+      mcpConfigPath: "/fake/claude.json",
+      defsScope: "local" as const,
+      defsPath,
+      agents,
+      commands: [],
+      skills: [],
+      hooksInstalled: false,
+      hooksInstalledVersion: null,
+      partial: null,
+    };
+  }
+
+  async function seedSharedTree(files: string[]): Promise<string> {
+    const shared = join(root, "uluops");
+    await mkdir(join(shared, "agents"), { recursive: true });
+    for (const f of files) await writeFile(join(shared, "agents", f), "old");
+    return shared;
+  }
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "uluops-migrate-"));
+    setProjectRoot(root);
+    stubHappyPath();
+  });
+
+  afterEach(() => {
+    setProjectRoot(null);
+  });
+
+  it("records the per-harness path and cleans the vacated shared tree", async () => {
+    const shared = await seedSharedTree(["a.md", "b.md"]);
+    mockLoadManifest.mockResolvedValue({
+      version: "0.18.0",
+      installedAt: "2026-08-01T00:00:00.000Z",
+      shellModified: false,
+      harnesses: { "claude-code": localEntry(shared, ["a.md", "b.md"]) },
+    });
+
+    await runSetup({ ...baseOpts, localDefs: true });
+
+    const entry = (mockSaveManifest.mock.calls[0]![0] as Manifest).harnesses["claude-code"]!;
+    expect(entry.defsPath).toBe(join(root, "uluops", "claude-code"));
+    // The emptied agents/ directory goes too; uluops/ itself stays (it now
+    // holds the per-harness folders).
+    expect(await readdir(shared)).not.toContain("agents");
+  });
+
+  it("leaves the shared tree alone while another harness still records it", async () => {
+    const shared = await seedSharedTree(["a.md"]);
+    mockLoadManifest.mockResolvedValue({
+      version: "0.18.0",
+      installedAt: "2026-08-01T00:00:00.000Z",
+      shellModified: false,
+      harnesses: {
+        "claude-code": localEntry(shared, ["a.md"]),
+        "gemini-cli": localEntry(shared, ["a.md"]),
+      },
+    });
+
+    await runSetup({ ...baseOpts, localDefs: true }); // claude-code only
+
+    expect(await readdir(join(shared, "agents"))).toEqual(["a.md"]);
+    const saved = mockSaveManifest.mock.calls[0]![0] as Manifest;
+    expect(saved.harnesses["gemini-cli"]!.defsPath).toBe(shared);
+    const warned = vi.mocked(warn).mock.calls.map((c) => String(c[0]));
+    expect(warned.some((w) => w.includes("gemini-cli still use it"))).toBe(true);
+  });
+
+  it("never deletes a tree it cannot identify as the retired layout (another project)", async () => {
+    const otherProject = await mkdtemp(join(tmpdir(), "uluops-other-"));
+    await mkdir(join(otherProject, "uluops", "claude-code", "agents"), { recursive: true });
+    await writeFile(join(otherProject, "uluops", "claude-code", "agents", "a.md"), "theirs");
+    mockLoadManifest.mockResolvedValue({
+      version: "0.18.0",
+      installedAt: "2026-08-01T00:00:00.000Z",
+      shellModified: false,
+      harnesses: {
+        "claude-code": localEntry(join(otherProject, "uluops", "claude-code"), ["a.md"]),
+      },
+    });
+
+    await runSetup({ ...baseOpts, localDefs: true });
+
+    expect(await readdir(join(otherProject, "uluops", "claude-code", "agents"))).toEqual(["a.md"]);
+    const entry = (mockSaveManifest.mock.calls[0]![0] as Manifest).harnesses["claude-code"]!;
+    // The old list is not inherited onto the new tree.
+    expect(entry.defsPath).toBe(join(root, "uluops", "claude-code"));
+    const warned = vi.mocked(warn).mock.calls.map((c) => String(c[0]));
+    expect(warned.some((w) => w.includes("definitions location changed"))).toBe(true);
   });
 });

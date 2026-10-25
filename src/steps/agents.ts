@@ -1,7 +1,7 @@
 import { readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { HarnessProfile } from "../harnesses/index.js";
-import { ASSETS_DIR, findProjectRoot } from "../lib/paths.js";
+import { ASSETS_DIR, localDefsRoot } from "../lib/paths.js";
 import {
   copyIfChanged,
   unlinkFiles,
@@ -33,7 +33,7 @@ export async function installAgents(
 ): Promise<AgentsResult> {
   const srcDir = join(ASSETS_DIR, profile.name, "agents");
   const destDir = localDefs
-    ? join(await findProjectRoot(), "uluops", "agents")
+    ? join(await localDefsRoot(profile.name), "agents")
     : profile.paths.agentsDir;
 
   if (!dryRun) {
