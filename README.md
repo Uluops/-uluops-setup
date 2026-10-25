@@ -18,9 +18,9 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.16.0 bundles agent-metrics **0.12.0** for hook installation and pins
-tracker MCP **0.30.0** and registry MCP **0.15.0** in generated configs. Tracker
-MCP uses ops-sdk **6.16.0**. Re-run setup to refresh existing configs and hook
+Setup 0.17.0 bundles agent-metrics **0.12.1** for hook installation and pins
+tracker MCP **0.32.0** and registry MCP **0.17.0** in generated configs. Tracker
+MCP uses ops-sdk **7.0.0**; both MCP servers run on zod 4.6.7. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
 
 Optional global CLI installs resolve npm's current release when the CLI is

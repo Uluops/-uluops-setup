@@ -1,6 +1,6 @@
 {
   "name": "@uluops/setup",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Zero-friction installer for UluOps agentic harnesses",
   "license": "MIT",
   "repository": {
@@ -49,16 +49,16 @@
     "prepublishOnly": "npm test && npm run typecheck && npm run build"
   },
   "dependencies": {
-    "@inquirer/prompts": "8.6.0",
-    "@uluops/agent-metrics": "0.12.0",
-    "chalk": "5.6.2",
+    "@inquirer/prompts": "8.7.4",
+    "@uluops/agent-metrics": "0.12.1",
+    "chalk": "6.0.1",
     "commander": "15.0.0",
     "jsonc-parser": "3.3.1"
   },
   "devDependencies": {
     "@types/node": "25.9.3",
-    "tsx": "4.23.12",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }

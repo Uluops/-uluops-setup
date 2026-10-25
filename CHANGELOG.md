@@ -4,6 +4,18 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-25
+
+### Changed
+
+- **Pins `@uluops/ops-mcp` 0.30.0 → 0.32.0 and `@uluops/registry-mcp` 0.15.0 → 0.17.0** (bump rule, `src/lib/mcp-packages.ts`). Both are the zod-4 release-train builds (spec v0.2.1, T4): zod 4.6.7, which clears GHSA-mrhx-c7xc-m3w5, with ops-sdk 7.0.0 / registry-sdk 0.63.0. Their `tools/list` accepts exactly what the previous pins accepted (measured, see their changelogs). Both pins verified to resolve on npm (tarball 200, shasum equal to the Verdaccio-rehearsed build; a 9.9.9 control 404s).
+- **Codex read-tool seeds re-checked against the new pins, unchanged.** `TRACKER_READ_TOOLS` (33) and `REGISTRY_READ_TOOLS` (32) equal the `sideEffects: 'read'` set in each pinned server's `tool-registry.ts` (ops-mcp 55 tools, registry-mcp 44, matching their `tools/list`).
+- **`@uluops/agent-metrics` 0.12.0 → 0.12.1** (bundled for hook installation): a transcript record containing a raw U+2028/U+2029 was dropped, undercounting its tokens. **`@inquirer/prompts` 8.6.0 → 8.7.4**, **`chalk` 5.6.2 → 6.0.1** (its one breaking change is "Require Node.js 22"; setup uses only color/style methods), dev `tsx` 4.23.15, `vitest` 4.1.12. `npm audit`: 0 (was 2 high in dev `vite`/`source-map-js`, 2 moderate in `vitest`).
+
+### Notes
+
+- **Node.js 20 still works; npm will warn there.** `commander` 15.0.0 (pinned since 0.9.8) declares `node >=22.12.0` and `chalk` 6 declares `>=22`, so on Node 20/21 npm prints `EBADENGINE`. setup itself runs: the CLI starts on Node 20.20, 21.7, 22.11 and 22.12, and the full suite (445 tests) passes on Node 20.20.2 (2026-10-25). `engines`, the README and the runtime gate (`detect.ts`, `< 20`) keep `>= 20`. Raising the floor to 22.12 to match the dependencies is a separate decision. Held back as majors: `typescript` 7, `vitest` 5, `@types/node` 26.
+
 ## [0.16.0] - 2026-10-09
 
 ### Changed
