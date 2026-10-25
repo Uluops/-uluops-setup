@@ -37,7 +37,8 @@ vi.mock("../lib/paths.js", async (importOriginal) => {
   };
 });
 
-import { detect } from "../steps/detect.js";
+import { detect, NODE_FLOOR } from "../steps/detect.js";
+import { readFileSync } from "node:fs";
 import { platform, release } from "node:os";
 import { access } from "node:fs/promises";
 import { detectHarnesses } from "../harnesses/index.js";
@@ -51,7 +52,7 @@ beforeEach(() => {
   vi.mocked(access).mockResolvedValue(undefined);
   vi.mocked(detectHarnesses).mockReturnValue([]);
   Object.defineProperty(process, "version", {
-    value: "v20.10.0",
+    value: "v22.12.0",
     configurable: true,
   });
 });
@@ -116,66 +117,76 @@ describe("detect — WSL detection", () => {
 });
 
 describe("detect — Node version gate", () => {
+  const setVersion = (value: string) =>
+    Object.defineProperty(process, "version", { value, configurable: true });
+
   it("rejects Node 18", async () => {
-    Object.defineProperty(process, "version", {
-      value: "v18.19.0",
-      configurable: true,
-    });
-    await expect(detect()).rejects.toThrow(/Node\.js 20 or higher/);
+    setVersion("v18.19.0");
+    await expect(detect()).rejects.toThrow(/Node\.js 22\.12 or higher/);
   });
 
-  it("accepts Node 20", async () => {
-    Object.defineProperty(process, "version", {
-      value: "v20.0.0",
-      configurable: true,
-    });
-    const env = await detect();
-    expect(env.nodeVersion).toBe("v20.0.0");
+  it("rejects Node 20 (the floor through 0.17.x)", async () => {
+    setVersion("v20.19.0");
+    await expect(detect()).rejects.toThrow(/Node\.js 22\.12 or higher/);
   });
 
-  it("accepts Node 22", async () => {
-    Object.defineProperty(process, "version", {
-      value: "v22.5.1",
-      configurable: true,
-    });
+  it("rejects Node 22 below 22.12", async () => {
+    setVersion("v22.11.0");
+    await expect(detect()).rejects.toThrow(/Node\.js 22\.12 or higher/);
+  });
+
+  it("accepts Node 22.12.0, the floor itself", async () => {
+    setVersion("v22.12.0");
     const env = await detect();
-    expect(env.nodeVersion).toBe("v22.5.1");
+    expect(env.nodeVersion).toBe("v22.12.0");
+  });
+
+  it("accepts a later 22.x minor", async () => {
+    setVersion("v22.23.4");
+    const env = await detect();
+    expect(env.nodeVersion).toBe("v22.23.4");
+  });
+
+  it("accepts Node 24.0.0 (above 22 the minor is not read)", async () => {
+    setVersion("v24.0.0");
+    const env = await detect();
+    expect(env.nodeVersion).toBe("v24.0.0");
   });
 
   it("rejects unparseable version string with a distinct error message", async () => {
-    Object.defineProperty(process, "version", {
-      value: "vBOGUS",
-      configurable: true,
-    });
-    // Distinct message from the "requires 20 or higher" gate — someone whose
+    setVersion("vBOGUS");
+    // Distinct message from the "requires 22.12 or higher" gate — someone whose
     // actual problem is an unparseable runtime should see "your runtime is
     // wrong", not the misleading version-too-low error.
     await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
   });
 
   it("rejects a bare 'v' with no major number", async () => {
-    Object.defineProperty(process, "version", {
-      value: "v",
-      configurable: true,
-    });
+    setVersion("v");
     await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
   });
 
   it("rejects an empty version string", async () => {
-    Object.defineProperty(process, "version", {
-      value: "",
-      configurable: true,
-    });
+    setVersion("");
     await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
   });
 
-  it("accepts v20.x.y where minor/patch are non-numeric (major is what matters)", async () => {
-    Object.defineProperty(process, "version", {
-      value: "v20.x.y",
-      configurable: true,
-    });
+  it("rejects v22.x.y: at the floor's major the minor decides, so it must parse", async () => {
+    setVersion("v22.x.y");
+    await expect(detect()).rejects.toThrow(/Cannot parse Node\.js version/);
+  });
+
+  it("accepts v24.x.y where minor/patch are non-numeric (above 22 only the major matters)", async () => {
+    setVersion("v24.x.y");
     const env = await detect();
-    expect(env.nodeVersion).toBe("v20.x.y");
+    expect(env.nodeVersion).toBe("v24.x.y");
+  });
+
+  it("package.json engines.node states the same floor as the runtime gate", () => {
+    const pkg = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { engines?: { node?: string } };
+    expect(pkg.engines?.node).toBe(`>=${NODE_FLOOR.major}.${NODE_FLOOR.minor}.0`);
   });
 });
 

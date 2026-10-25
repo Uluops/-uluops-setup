@@ -4,6 +4,16 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-25
+
+### Changed
+
+- **BREAKING: Node.js 22.12 or later is required (was 20).** setup now refuses to run on Node 20, 21 or 22.0–22.11, with `Unsupported Node.js version: <v>. @uluops/setup requires Node.js 22.12 or higher.` (`src/steps/detect.ts`). `engines.node` is `>=22.12.0`, and the README says the same. **Why:** 0.17.0 left the floor open while its dependencies had already moved past it. `commander` 15 declares `>=22.12.0` and `chalk` 6 `>=22`, so on Node 20 npm printed `EBADENGINE`, and setup ran on releases its own dependencies do not support. Node 20 reached end of life on 2026-04-30. **What breaks:** a user on Node 20 who installed 0.17.0 with a warning now gets a refusal. Upgrade Node, or stay on `@uluops/setup@0.17.0`.
+  - **The runtime gate is the enforcement, not `engines`:** npm only warns on `engines` unless `engine-strict` is set.
+  - **At major 22 the minor decides, so it must parse.** `v22.x.y` is refused as an unparseable version, not let through. Above 22 the minor is still not read (`v24.x.y` passes), as before.
+  - `NODE_FLOOR` in `detect.ts` is the one source of the floor. A test pins `engines.node` to it, so the two cannot drift apart.
+  - Control: the new rejection tests (Node 18, 20, 22.11 and `v22.x.y`) fail against 0.17.0's `< 20` gate, and all 23 version-gate tests pass on this one.
+
 ## [0.17.0] - 2026-10-25
 
 ### Changed

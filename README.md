@@ -10,7 +10,7 @@ Zero-friction installer for [UluOps](https://uluops.ai) agentic harnesses. One c
 npx @uluops/setup
 ```
 
-> Requires **Node.js >= 20** ([full requirements](#requirements)).
+> Requires **Node.js >= 22.12** ([full requirements](#requirements)).
 
 > **⚠️ Windows Users:** Native Windows is not yet supported. Please use **WSL2 (Ubuntu)** and run the setup inside your WSL environment.
 
@@ -18,7 +18,7 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.17.0 bundles agent-metrics **0.12.1** for hook installation and pins
+Setup 0.18.0 bundles agent-metrics **0.12.1** for hook installation and pins
 tracker MCP **0.32.0** and registry MCP **0.17.0** in generated configs. Tracker
 MCP uses ops-sdk **7.0.0**; both MCP servers run on zod 4.6.7. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
@@ -344,7 +344,7 @@ org's telemetry policy before enabling the hook on shared projects.
 
 ## Requirements
 
-- **Node.js:** >= 20.0.0
+- **Node.js:** >= 22.12.0 (setup refuses to run on anything older; Node 20 reached end of life on 2026-04-30)
 - **Platform:** Linux, macOS, or WSL2 (native Windows not supported)
 - **Harness:** Claude Code, OpenCode, Gemini CLI, or Codex
 - **Auth:** UluOps API key ([get one here](https://app.uluops.ai/settings/api-keys))

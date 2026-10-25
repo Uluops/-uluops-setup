@@ -17,6 +17,16 @@ export interface Environment {
 const SUPPORTED_PLATFORMS = new Set<string>(["linux", "darwin", "win32"]);
 
 /** Detect the current environment: OS, shell, Node version, harnesses, and Claude home status. */
+/** Lowest supported Node.js release; `engines.node` is pinned to it by detect.test.ts. */
+export const NODE_FLOOR = { major: 22, minor: 12 } as const;
+
+function unsupportedNodeMessage(nodeVersion: string): string {
+  return (
+    `Unsupported Node.js version: ${nodeVersion}. ` +
+    `@uluops/setup requires Node.js ${NODE_FLOOR.major}.${NODE_FLOOR.minor} or higher.`
+  );
+}
+
 export async function detect(): Promise<Environment> {
   const p = platform();
   if (!SUPPORTED_PLATFORMS.has(p)) {
@@ -34,29 +44,45 @@ export async function detect(): Promise<Environment> {
     os === "linux" && release().toLowerCase().includes("microsoft");
   const profile = getShellProfile();
   const nodeVersion = process.version;
-  // Standard process.version is v-prefixed semver ("v20.10.0"). We take the
-  // major after stripping the "v". The `?? "0"` removed from the prior version
+  // Standard process.version is v-prefixed semver ("v22.12.0"). We take the
+  // major after stripping the "v". The `?? "0"` removed from an earlier version
   // here was dead code — `"".split(".")` returns `[""]`, not an empty array,
   // so the nullish coalesce never fired and an unparseable major silently
-  // resulted in NaN, which then fell through the `< 20` gate.
-  const majorVersion = parseInt(nodeVersion.slice(1).split(".")[0] ?? "", 10);
+  // resulted in NaN, which then fell through the version gate.
+  const [majorPart, minorPart] = nodeVersion.slice(1).split(".");
+  const majorVersion = parseInt(majorPart ?? "", 10);
 
   if (Number.isNaN(majorVersion)) {
     // Defense in depth: a tampered binary, a wrapper that spoofs
     // process.version, or a future Node release that breaks the v-prefixed
-    // semver convention would all silently pass the major-version gate.
+    // semver convention would all silently pass the version gate.
     // Reject with a distinct error so the user sees "your runtime is wrong"
-    // rather than the misleading "requires Node.js 20 or higher."
+    // rather than the misleading "requires Node.js 22.12 or higher."
     throw new Error(
       `Cannot parse Node.js version "${nodeVersion}". ` +
-        `@uluops/setup requires a standard v-prefixed semver (e.g., v20.10.0).`,
+        `@uluops/setup requires a standard v-prefixed semver (e.g., v22.12.0).`,
     );
   }
 
-  if (majorVersion < 20) {
-    throw new Error(
-      `Unsupported Node.js version: ${nodeVersion}. @uluops/setup requires Node.js 20 or higher.`,
-    );
+  // Floor: 22.12.0 (0.18.0; was 20 through 0.17.x). Node 20 reached end of
+  // life on 2026-04-30, and commander 15 declares `>=22.12.0`. Below 22 the
+  // major decides; at 22 the minor must parse and be at least 12, because an
+  // unparseable minor there cannot be shown to meet the floor; above 22 the
+  // minor is not read. `engines` alone does not enforce this: npm only warns
+  // (EBADENGINE) unless engine-strict is set.
+  if (majorVersion === NODE_FLOOR.major) {
+    const minorVersion = parseInt(minorPart ?? "", 10);
+    if (Number.isNaN(minorVersion)) {
+      throw new Error(
+        `Cannot parse Node.js version "${nodeVersion}". ` +
+          `@uluops/setup requires a standard v-prefixed semver (e.g., v22.12.0).`,
+      );
+    }
+    if (minorVersion < NODE_FLOOR.minor) {
+      throw new Error(unsupportedNodeMessage(nodeVersion));
+    }
+  } else if (majorVersion < NODE_FLOOR.major) {
+    throw new Error(unsupportedNodeMessage(nodeVersion));
   }
 
   let claudeHomeExists = false;
