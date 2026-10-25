@@ -4,6 +4,17 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-25
+
+### Changed
+
+- **Pins `@uluops/ops-mcp` 0.32.0 → 0.34.0 and `@uluops/registry-mcp` 0.17.0 → 0.18.0** (bump rule, `src/lib/mcp-packages.ts`). 0.33.0 shipped without a setup release, so this catches up two tracker releases. What a re-run brings (details in each server's changelog):
+  - **Both servers move to `mcp-secure-server` 0.1.1-security.** A compound emoji in a tool argument no longer refuses the whole call (the zero-width joiner was rejected outright), and every bidirectional control character is refused, not only U+202E (Trojan Source).
+  - **ops-mcp: transport limits now match what the tracker API accepts.** A `save_run` at the API's limits (500 recommendations, a 500,000-character report) used to be refused at the protocol layer: the key-count cap stopped saves at roughly 150–230 recommendations.
+  - **ops-mcp: `get_latest_run` on a project with no runs** returns `{ run: null, message }` instead of an error (`@uluops/ops-sdk` 7.1.0).
+  - **registry-mcp: tool schemas refuse what the registry API refuses, by field name** (YAML over 153,600 characters, and on `update_and_publish` over 153,600 UTF-8 bytes, which publishing enforces). Its transport envelope now matches the API's 1 MiB definition-route body limit, and the README documents `ULUOPS_REGISTRY_URL`.
+- **Codex read-tool seeds re-checked against the new pins, unchanged.** `TRACKER_READ_TOOLS` (33) and `REGISTRY_READ_TOOLS` (32) equal the `sideEffects: 'read'` set in each pinned server's `tool-registry` (installed 0.34.0 and 0.18.0; ops-mcp 55 tools, registry-mcp 44, matching their `tools/list`). Both pins resolve on npm (tarball 200; a 9.9.9 control 404s).
+
 ## [0.18.0] - 2026-10-25
 
 ### Changed
