@@ -4,6 +4,40 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-30
+
+### Changed
+
+- **Assets regenerated at `udl` 0.51.0 (definition-factory 0.87.0) from `uluops-agent-workflows`
+  main `41658a03`.** They were last rendered at 0.41.0 (0.19.0's release). What a re-run installs:
+  - **The `ship` and `aristotle` pipeline commands carry PDL 1.6.0's Execution Rules.** These cover
+    reading an agent's decision and score, the 13-token register, gate modes including `fail`,
+    ERRORED stages, and the run decision. Neither command had them before. **ship 1.3.0 is
+    stricter:**
+    - its parallel validation gates each agent at its own bar: type-safety 80, test-architect 75,
+      public-interface 75 (all three were 70);
+    - its security gate requires SECURE, so a CONDITIONAL now fails ship.
+  - **Every starter agent's frontmatter now carries `agentType`, and 22 of 23 carry
+    `decision_vocabulary`** (0 of 23 before), which runtimes read to classify decisions.
+  - **Nine starter agents move version:** security-analyst 2.7.1 → 3.0.3, api-contract-validator
+    2.3.7 → 2.5.1, docs-validator 2.5.2 → 2.5.4, plus patch moves for anxiety-reader,
+    aristotle-analyst, aristotle-forecaster, assumption-excavator, pre-implementation-architect and
+    release-readiness. **docs-validator and assumption-excavator are now declared blocking**
+    (`safety` / `gate`): pre-implementation's design review may fail on them.
+  - The `pre-implementation` *workflow* command is unchanged in behaviour (WDL 2.2.0). The PDL
+    pre-implementation 1.5.0 is not a starter pipeline.
+- **`generate-assets.sh` refuses a stale corpus, and takes `WORKFLOWS_REPO`.** The fidelity check
+  compares renders to the corpus checkout they came from, so it could not see a stale one. On
+  2026-10-30 the shared sibling checkout sat on an old feature branch, 50 commits behind main at
+  `renderer.udl` 0.48.0, and a run from it would have passed. The script now prints the corpus
+  commit it renders from, and refuses unless `udl --version` equals the corpus's
+  `package.json#renderer.udl`. `WORKFLOWS_REPO` points it at a checkout of the commit you mean to
+  ship. Control: the stale sibling checkout is refused (`udl 0.51.0 is not the corpus renderer
+  … 0.48.0`).
+
+The Gemini read-tool policy (`gemini-read-tool-policy` spec v0.1.0) was targeted at 0.20.0. This
+assets release takes that number, so the policy now targets 0.21.0.
+
 ## [0.19.0] - 2026-10-25
 
 ### Changed

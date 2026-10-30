@@ -32,9 +32,9 @@ Group 4 (sequential): prompt-quality
 | # | Agent | Threshold | Gate | Condition |
 |---|-------|-----------|------|-----------|
 | 1 | prompt-security@latest | threshold >= 85, on fail: stop | stop | — |
-| 2 | pattern-analyzer@latest | threshold >= 50, on fail: warn | stop | — |
+| 2 | pattern-analyzer@latest | threshold >= 50, on fail: warn | warn | — |
 | 3 | prompt-validate@latest | threshold >= 75, on fail: stop | stop | — |
-| 4 | prompt-quality@latest | threshold >= 70, on fail: warn | stop | — |
+| 4 | prompt-quality@latest | threshold >= 70, on fail: warn | warn | — |
 
 **Prompt Security Scan**: Injection, jailbreak, and obfuscation patterns; Data exfiltration and malicious capability requests
 **Ecosystem Pattern Analysis** (after prompt-security): Ecosystem scoring patterns and conventions; Decision vocabulary and threshold standards
@@ -44,6 +44,15 @@ Group 4 (sequential): prompt-quality
 
 **Method**: weighted_average
  — prompt-security: 20%, pattern-analyzer: 10%, prompt-engineer: 45%, prompt-quality: 25%
+
+**Decision** — check in the order listed; the first rule that holds is the workflow's decision:
+
+| Decision | When |
+|----------|------|
+| APPROVED | `prompt-engineer.decision == 'DEPLOY' AND blockers == 0` |
+| IMPROVEMENTS AVAILABLE | `prompt-engineer.decision == 'CONDITIONAL' AND blockers == 0` |
+| REVISION REQUIRED | `prompt-engineer.decision == 'REVISE' OR blockers > 0` |
+
 ## Results Submission
 
 Write markdown report to: `{{ target_path }}/{{ report_file }}`
@@ -52,9 +61,9 @@ After saving, query tracker and compare counts. Mismatches from cross-phase dedu
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/wdl/v3.1.0/workflow.json
+**Schema:** https://uluops.ai/schemas/wdl/v3.2.0/workflow.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/workflow/prompt-audit@2.4.0
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/workflow/prompt-audit@2.4.0/render
 
 ---
-*Generated from WDL v3.1.0 | Workflow: prompt-audit v2.4.0*
+*Generated from WDL v3.2.0 | Workflow: prompt-audit v2.4.0*

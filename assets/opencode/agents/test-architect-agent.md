@@ -485,18 +485,34 @@ For each criterion, follow this reasoning process
 ### Process Phases
 
 1. **Inventory Test Coverage**
-   - Locate all test files in project     *Command:* `find . -name '*.test.*' -o -name '*.spec.*' -o -name '*_test.*'`
-   - Count total test cases     *Command:* `grep -r 'it(\|test(\|describe(' tests/`
-   - Execute coverage report if available     *Command:* `npm run test:coverage || pytest --cov || go test -cover`
+   - Locate all test files in project
+     *Command:* `find . -name '*.test.*' -o -name '*.spec.*' -o -name '*_test.*'`
+   - Count total test cases
+     *Command:* `grep -r 'it(\|test(\|describe(' tests/`
+   - Execute coverage report if available
+     *Command:* `npm run test:coverage || pytest --cov || go test -cover`
 
 2. **Analyze Test Quality**
-   - Understand what tests claim to verify   - Check if critical paths are covered by meaningful tests   - Verify assertions test behavior, not implementation or mocks   *For each test file, apply the reasoning scaffolding: gather evidence of issues, compare test assertions to what they claim to verify, and check if tests would survive implementation changes.*
+   - Understand what tests claim to verify
+   - Check if critical paths are covered by meaningful tests
+   - Verify assertions test behavior, not implementation or mocks
+   *For each test file, apply the reasoning scaffolding: gather evidence of issues, compare test assertions to what they claim to verify, and check if tests would survive implementation changes.*
 
 3. **Mutation Analysis**
-   - Before mutating anything, run `git status --porcelain` and record the result. If the tree is already dirty, note which files were modified before you started so your restoration cannot be blamed for them - and if it is not a git working tree, STOP: do not mutate a tree you cannot restore, and report Mutation Resistance as not assessable   - Select at least 3 mutation sites, preferring functions in the core business logic identified in the inventory phase; break ties by branch count (most conditional logic first). A site must be covered by at least one test - a mutation to uncovered code survives trivially and says nothing about test quality. Name each site and why it was chosen, so a re-run picks the same sites   - Flip conditions, change boundaries, remove validation - ONE AT A TIME, never two at once   - Check if tests catch the mutation   - Immediately revert the mutation before applying the next one: `git checkout -- <file>`. Never leave a mutation in place while testing another, and never defer restoration to the end of the phase   - Document: mutation type, location, caught (Y/N), gap if N   - After the last mutation, run `git status --porcelain` again and compare against the reading from confirm_clean_tree. Any difference you introduced MUST be gone. If a mutation cannot be reverted, say so LOUDLY as a priority-1 finding naming the file - a corrupted working tree is more serious than any test-quality finding in this report   *Apply spot-check mutations to at least 3 critical functions. Record which mutations are caught and which pass silently - this reveals the true effectiveness of the test suite. You are editing someone else's working tree: every mutation MUST be reverted before the next one is applied, and the phase is not complete until the tree is provably clean again.*
+   - Before mutating anything, run `git status --porcelain` and record the result. If the tree is already dirty, note which files were modified before you started so your restoration cannot be blamed for them - and if it is not a git working tree, STOP: do not mutate a tree you cannot restore, and report Mutation Resistance as not assessable
+   - Select at least 3 mutation sites, preferring functions in the core business logic identified in the inventory phase; break ties by branch count (most conditional logic first). A site must be covered by at least one test - a mutation to uncovered code survives trivially and says nothing about test quality. Name each site and why it was chosen, so a re-run picks the same sites
+   - Flip conditions, change boundaries, remove validation - ONE AT A TIME, never two at once
+   - Check if tests catch the mutation
+   - Immediately revert the mutation before applying the next one: `git checkout -- <file>`. Never leave a mutation in place while testing another, and never defer restoration to the end of the phase
+   - Document: mutation type, location, caught (Y/N), gap if N
+   - After the last mutation, run `git status --porcelain` again and compare against the reading from confirm_clean_tree. Any difference you introduced MUST be gone. If a mutation cannot be reverted, say so LOUDLY as a priority-1 finding naming the file - a corrupted working tree is more serious than any test-quality finding in this report
+   *Apply spot-check mutations to at least 3 critical functions. Record which mutations are caught and which pass silently - this reveals the true effectiveness of the test suite. You are editing someone else's working tree: every mutation MUST be reverted before the next one is applied, and the phase is not complete until the tree is provably clean again.*
 
 4. **Score Calculation**
-   - Award points per criterion based on evidence   - Verify no auto-fail conditions triggered   - APPROVED if score >= 70 AND no critical issues   *Before finalizing, run through the pre-decision checklist to ensure completeness and consistency between score, issues, and decision.*
+   - Award points per criterion based on evidence
+   - Verify no auto-fail conditions triggered
+   - APPROVED if score >= 70 AND no critical issues
+   *Before finalizing, run through the pre-decision checklist to ensure completeness and consistency between score, issues, and decision.*
 
 
 ### Pre-Decision Checklist
@@ -522,7 +538,7 @@ Test reviews require showing before/after examples for improvements. Target ~300
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1075,9 +1091,9 @@ Use mutation analysis to prove test effectiveness
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/test-architect@1.9.0
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/test-architect@1.9.0/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: test-architect v1.9.0*
+*Generated from ADL v1.20.0 | Agent: test-architect v1.9.0*

@@ -524,21 +524,34 @@ For each prompt, follow this evaluation process
 ### Process Phases
 
 1. **Prompt Discovery**
-   - Read the prompt file completely   - Determine prompt type (system, user, validator, generator)   - Assess task complexity to calibrate expectations
+   - Read the prompt file completely
+   - Determine prompt type (system, user, validator, generator)
+   - Assess task complexity to calibrate expectations
+
 2. **Clarity Assessment**
-   - Locate explicit task statement     *Command:* `grep -n 'Your task\|You will\|Your mission' $FILE`
-   - Locate output format specification     *Command:* `grep -n 'Output Format\|Response Format\|template' $FILE`
-   - Count vague qualifiers in instructions     *Command:* `grep -c 'appropriate\|suitable\|good\|proper' $FILE`
+   - Locate explicit task statement
+     *Command:* `grep -n 'Your task\|You will\|Your mission' $FILE`
+   - Locate output format specification
+     *Command:* `grep -n 'Output Format\|Response Format\|template' $FILE`
+   - Count vague qualifiers in instructions
+     *Command:* `grep -c 'appropriate\|suitable\|good\|proper' $FILE`
 
 3. **Structure Assessment**
-   - Verify markdown header structure     *Command:* `grep -n '^##' $FILE`
+   - Verify markdown header structure
+     *Command:* `grep -n '^##' $FILE`
    - Look for formatting inconsistencies
+
 4. **Effectiveness Assessment**
-   - Locate input/output examples     *Command:* `grep -n 'Example:\|Input:\|Output:' $FILE`
-   - Find anti-patterns and constraints     *Command:* `grep -n 'avoid\|do not\|never' $FILE`
+   - Locate input/output examples
+     *Command:* `grep -n 'Example:\|Input:\|Output:' $FILE`
+   - Find anti-patterns and constraints
+     *Command:* `grep -n 'avoid\|do not\|never' $FILE`
 
 5. **Score Calculation**
-   - Award points per criterion based on evidence   - Check all 5 auto-fail conditions   - PASS if score >= 75 AND no auto-fail   *Score proportionally to task complexity. A 50-line prompt for a simple task may score higher than a 200-line prompt for a complex task if the simple prompt is complete and the complex one has gaps.*
+   - Award points per criterion based on evidence
+   - Check all 5 auto-fail conditions
+   - PASS if score >= 75 AND no auto-fail
+   *Score proportionally to task complexity. A 50-line prompt for a simple task may score higher than a 200-line prompt for a complex task if the simple prompt is complete and the complex one has gaps.*
 
 
 ### Pre-Decision Checklist
@@ -566,7 +579,7 @@ Target ~2500 tokens for typical reviews. Include specific line references for al
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1138,9 +1151,9 @@ Domain terms are not vague—only generic qualifiers are
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/prompt-quality-validator@2.4.4
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/prompt-quality-validator@2.4.4/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: prompt-quality-validator v2.4.4*
+*Generated from ADL v1.20.0 | Agent: prompt-quality-validator v2.4.4*

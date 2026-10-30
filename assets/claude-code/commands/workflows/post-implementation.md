@@ -39,11 +39,11 @@ Group 5 (sequential): security
 | 1 | validate@latest | threshold >= 75, on fail: stop | stop | — |
 | 2 | type-safety@latest | threshold >= 80, on fail: stop | stop | context.typescript_detected |
 | 3 | mcp-validate@latest | threshold >= 80, warn if < 65, on fail: stop | stop | context.mcp_detected |
-| 4 | test-review@latest | threshold >= 70, on fail: warn | stop | — |
-| 5 | optimize@latest | threshold >= 75, on fail: warn | stop | — |
-| 6 | public-interface@latest | threshold >= 75, on fail: warn | stop | — |
-| 7 | frontend@latest | threshold >= 75, on fail: warn | stop | context.frontend_enabled |
-| 8 | security@latest | threshold >= 75, on fail: warn | stop | — |
+| 4 | test-review@latest | threshold >= 70, on fail: warn | warn | — |
+| 5 | optimize@latest | threshold >= 75, on fail: warn | warn | — |
+| 6 | public-interface@latest | threshold >= 75, on fail: warn | warn | — |
+| 7 | frontend@latest | threshold >= 75, on fail: warn | warn | context.frontend_enabled |
+| 8 | security@latest | threshold >= 75, on fail: warn | warn | — |
 
 **Code Validation**: Correctness and best practices; Error handling patterns
 **TypeScript Validation** (after validate): Explicit any usage and type holes; Public API type quality
@@ -57,6 +57,15 @@ Group 5 (sequential): security
 
 **Method**: weighted_average
  — validate: 20%, type-safety: 15%, mcp-validator: 10%, test-architect: 15%, optimizer: 10%, public-interface: 10%, frontend: 10%, security: 10%
+
+**Decision** — check in the order listed; the first rule that holds is the workflow's decision:
+
+| Decision | When |
+|----------|------|
+| PASS | `score >= 80 AND blockers == 0` |
+| WARN | `score >= 70` |
+| FAIL | `score < 70 OR blockers > 0` |
+
 ## Results Submission
 
 Write markdown report to: `{{ target_path }}/{{ features_file }}`
@@ -65,9 +74,9 @@ After saving, query tracker and compare counts. Mismatches from cross-phase dedu
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/wdl/v3.1.0/workflow.json
+**Schema:** https://uluops.ai/schemas/wdl/v3.2.0/workflow.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/workflow/post-implementation@3.2.3
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/workflow/post-implementation@3.2.3/render
 
 ---
-*Generated from WDL v3.1.0 | Workflow: post-implementation v3.2.3*
+*Generated from WDL v3.2.0 | Workflow: post-implementation v3.2.3*

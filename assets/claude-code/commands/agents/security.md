@@ -1,10 +1,10 @@
 ---
 name: security
-description: Run comprehensive security audit on a project. Use as FINAL gate before deployment. Scans for vulnerabilities, OWASP compliance, and security best practices.
+description: Run a static security audit of a repository, or of one directory in it. Final gate before deployment. Decides SECURE / CONDITIONAL / BLOCKED.
 ---
 
 # Security Analyst v1
-Run comprehensive security audit on a project. Use as FINAL gate before deployment. Scans for vulnerabilities, OWASP compliance, and security best practices.
+Run a static security audit of a repository, or of one directory in it. Final gate before deployment. Decides SECURE / CONDITIONAL / BLOCKED.
 
 ## What's New in v1
 
@@ -76,12 +76,12 @@ Critical issues that trigger immediate FAIL regardless of score:
 
 | ID | Condition |
 |----|-----------|
-| **AF-001** | Hardcoded secrets or API keys in source code |
-| **AF-002** | SQL injection or command injection confirmed |
-| **AF-003** | Authentication bypass possible |
-| **AF-004** | Critical npm vulnerability (CVSS >= 9.0) |
-| **AF-005** | Secrets committed in git history |
-| **AF-006** | RCE (Remote Code Execution) vector identified |
+| **AF-001** | Live credential in source |
+| **AF-002** | SQL or command injection confirmed |
+| **AF-003** | Authentication bypass |
+| **AF-004** | Critical advisory in a production dependency |
+| **AF-005** | Live credential in git history |
+| **AF-006** | Untrusted input reaches code execution |
 
 ---
 
@@ -100,7 +100,7 @@ Critical issues that trigger immediate FAIL regardless of score:
 
 ### On Success
 
-Security audit passed with score >= 85
+Security audit: SECURE — score >= 85, no auto-fail, and no cap (non-switch /C finding, UNVERIFIED auto-fail, undecided criterion, empty scan). (The generic PASS/FAIL table above does not apply: this agent decides SECURE / CONDITIONAL / BLOCKED.)
 
 ```bash
 exit 0
@@ -108,7 +108,7 @@ exit 0
 
 ### On Failure
 
-Security audit failed. Review vulnerabilities above.
+Security audit: CONDITIONAL (score 70-84, or a SECURE-band score under a cap) or BLOCKED (score < 70, or any auto-fail at any score). See the decision, auto-fails and findings above.
 
 ```bash
 exit 1
@@ -141,7 +141,7 @@ mcp__uluops-tracker__save_run
 |---------------|-------|-------|
 | `definition_type` | `command` | From CDL interface |
 | `definition_name` | `security` | From CDL interface |
-| `definition_version` | `1.0.3` | From CDL interface — this command's version, never an agent's |
+| `definition_version` | `1.1.0` | From CDL interface — this command's version, never an agent's |
 
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
@@ -177,10 +177,10 @@ mcp__uluops-tracker__save_run
 ## Source
 
 **Schema:** https://uluops.ai/schemas/cdl/v2.0.0/command.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/command/security@1.0.3
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/command/security@1.0.3/render
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/command/security@1.1.0
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/command/security@1.1.0/render
 **Agent:** https://api.uluops.ai/api/v1/registry/definitions/agent/security-analyst (declared: latest)
 
 
 ---
-*Generated from CDL v2.0.0 | Command: security v1.0.3*
+*Generated from CDL v2.0.0 | Command: security v1.1.0*

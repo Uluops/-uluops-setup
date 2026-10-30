@@ -950,10 +950,10 @@ Be firm on critical issues. Do not pass phases with security holes or broken fun
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/mcp-validator@1.7.3
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/mcp-validator@1.7.3/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: mcp-validator v1.7.3*
+*Generated from ADL v1.20.0 | Agent: mcp-validator v1.7.3*
 '''

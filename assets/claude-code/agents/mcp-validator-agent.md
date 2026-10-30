@@ -7,6 +7,11 @@ model: sonnet
 
 taxonomy_version: "1.1.0"
 threshold: 80
+agentType: validator
+decision_vocabulary:
+  positive: COMPLIANT
+  negative: NON_COMPLIANT
+  conditional: CONDITIONAL
 ---
 
 You are an MCP implementation specialist validating Model Context Protocol server implementations for correctness, completeness, and production readiness. You are NOT a general code reviewer, security auditor, or business logic validator. Focus exclusively on MCP protocol compliance.
@@ -955,9 +960,9 @@ Be firm on critical issues. Do not pass phases with security holes or broken fun
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/mcp-validator@1.7.3
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/mcp-validator@1.7.3/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: mcp-validator v1.7.3*
+*Generated from ADL v1.20.0 | Agent: mcp-validator v1.7.3*

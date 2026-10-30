@@ -10,14 +10,31 @@
 #
 # Requires:
 #   - udl CLI installed globally (npm install -g @uluops/definition-factory-cli)
-#   - uluops-agent-workflows repo at ../../uluops-agent-workflows (sibling dir)
+#   - uluops-agent-workflows repo at ../../uluops-agent-workflows (sibling dir), or set
+#     WORKFLOWS_REPO to a checkout of the corpus commit you mean to ship (for example a
+#     worktree at origin/main). The sibling checkout is shared and may sit on any branch, so
+#     the script prints the commit it renders from.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ASSETS_DIR="$PACKAGE_ROOT/assets"
-WORKFLOWS_REPO="$(cd "$PACKAGE_ROOT/../../uluops-agent-workflows" && pwd)"
+WORKFLOWS_REPO="$(cd "${WORKFLOWS_REPO:-$PACKAGE_ROOT/../../uluops-agent-workflows}" && pwd)"
+
+# The fidelity check at the end compares these renders to the corpus checkout they came from, so
+# it cannot see a STALE corpus. A checkout 50 commits behind main passes it, because both sides are
+# equally stale (found 2026-10-30: the sibling checkout sat on an old feature branch at
+# renderer.udl 0.48.0). Name the commit, and refuse a udl that is not the corpus's renderer.
+corpus_head="$(git -C "$WORKFLOWS_REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+corpus_branch="$(git -C "$WORKFLOWS_REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+want_udl="$(node -e "console.log(require('$WORKFLOWS_REPO/package.json').renderer?.udl ?? '')")"
+have_udl="$(udl --version | tr -d '[:space:]')"
+echo "corpus: $WORKFLOWS_REPO @ $corpus_head ($corpus_branch), renderer.udl $want_udl; udl $have_udl"
+if [[ -z "$want_udl" || "$have_udl" != "$want_udl" ]]; then
+  echo "REFUSED: udl $have_udl is not the corpus renderer (package.json#renderer.udl = ${want_udl:-unset})." >&2
+  exit 1
+fi
 
 ADL_DIR="$WORKFLOWS_REPO/udl/adl/v3"
 CDL_DIR="$WORKFLOWS_REPO/udl/cdl/v1"

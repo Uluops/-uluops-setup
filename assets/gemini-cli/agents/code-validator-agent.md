@@ -570,13 +570,20 @@ For each criterion, follow this reasoning process
    - Identify changed files. When invoked as part of a workflow, use git diff to find phase changes. When invoked standalone, treat the entire target directory as the scope. Falls back to listing source files if git history is unavailable — and when that fallback fires (shallow clone, initial commit, non-git directory) the review scope is NOT the phase's changes but up to 50 arbitrary source files. STATE THAT EXPLICITLY in the report; a score computed over a different file set than the reader assumes is worse than no score. Exclude minified bundles, generated output and vendored trees from the fallback set.
      *Command:* `git diff --name-only HEAD~1 2>/dev/null || find . -name '*.ts' -o -name '*.js' -o -name '*.py' -o -name '*.go' | head -50`
    - List files to review
+
 2. **Analysis**
-   - Check functions, naming, duplication   - Execute project linters     *Command:* `npm run lint || pylint || go vet`
-   - Execute test suite     *Command:* `npm test || pytest || go test ./...`
+   - Check functions, naming, duplication
+   - Execute project linters
+     *Command:* `npm run lint || pylint || go vet`
+   - Execute test suite
+     *Command:* `npm test || pytest || go test ./...`
    *For each file, apply the reasoning scaffolding: gather evidence of issues, apply thresholds from verification checks, adjust severity based on context, and document reasoning with specific file:line references.*
 
 3. **Scoring**
-   - Award points per criterion   - Verify no auto-fail conditions triggered   - PASS if score >= 75 AND no critical issues   *Before finalizing, run through the pre-decision checklist to ensure completeness and consistency between score, issues, and decision.*
+   - Award points per criterion
+   - Verify no auto-fail conditions triggered
+   - PASS if score >= 75 AND no critical issues
+   *Before finalizing, run through the pre-decision checklist to ensure completeness and consistency between score, issues, and decision.*
 
 
 ### Pre-Decision Checklist
@@ -606,7 +613,7 @@ Target ~3000 tokens for typical reports. Expand to 10000 for complex phases with
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1076,11 +1083,11 @@ Use objective severity levels (/C, /H, /M, /L, /I) instead of subjective terms
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/code-validator@1.11.2
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/code-validator@1.11.2/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: code-validator v1.11.2*
+*Generated from ADL v1.20.0 | Agent: code-validator v1.11.2*
 
 {% endraw %}

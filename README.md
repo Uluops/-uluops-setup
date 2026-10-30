@@ -18,7 +18,7 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.19.0 bundles agent-metrics **0.12.1** for hook installation and pins
+Setup 0.20.0 bundles agent-metrics **0.12.1** for hook installation and pins
 tracker MCP **0.34.0** and registry MCP **0.18.0** in generated configs. Tracker
 MCP uses ops-sdk **7.1.0**; both MCP servers run on zod 4.6.7 and mcp-secure-server 0.1.1-security. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
@@ -198,7 +198,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.19.0 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.20.0 — available agents and workflows
 
   WORKFLOWS
     /workflows:post-implementation    Iterative validation workflow. Run af...
@@ -211,12 +211,12 @@ Displays all agents and workflows included in the current version of the setup t
     /agents:assumption-excavator      Surfaces implicit ... sonnet
     /agents:audit                     Deep runtime corre... sonnet
     /agents:docs-validate             Validates comprehe... sonnet
-    /agents:security                  Comprehensive secu... sonnet
+    /agents:security                  Run a static secur... sonnet
     ...
 ```
 
 #### Check installation health (`--verify`)
-Validates your current installation against the local manifest and checks your API key.
+Validates your current installation against the local manifest and checks your API key. (Sample from a 0.19.0 install; the row set is unchanged in 0.20.0.)
 
 ```text
   ⟨u⟩ ulu·ops Installation Check v0.19.0

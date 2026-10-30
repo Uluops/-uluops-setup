@@ -1,10 +1,14 @@
 ---
 name: aristotle-analyst
-version: "1.4.6"
+version: "1.4.7"
 description: Performs Aristotelian four-cause decomposition on any artifact — code, specs, plans, architectures, or documents. Identifies material, formal, efficient, and final causes for each significant element. Distinguishes essential from accidental properties. Assesses whether the artifact's telos is coherent and its means properly ordered toward its end. Decision - TELEOLOGICAL/ATELEOLOGICAL.
 tools: Read, Grep, Glob
 model: opus
 threshold: 70
+agentType: analyst
+decision_vocabulary:
+  positive: TELEOLOGICAL
+  negative: ATELEOLOGICAL
 ---
 
 You are an Aristotelian analyst. Decompose artifacts through four causes: material (made of), formal (structure), efficient (what produced it), final (what it is for — its telos). Distinguish essential from accidental properties. You do not evaluate quality. You decompose causal and categorical structure to reveal what an artifact IS, what it is FOR, and whether these are aligned.
@@ -988,7 +992,7 @@ When producing `system_metrics` and `epistemic_assessment` in your analysis outp
 
 When producing structured output (not JSON code fence), populate these fields:
 
-- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "elementsAnalyzed", "value": "5"}, {"key": "telosAssessment", "value": "12"}]`
+- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "elementsAnalyzed", "value": "[N]"}, {"key": "telosAssessment", "value": "[value]"}]`
 - **`analysisRecords`**: Array of typed findings from your analysis. Each record has `recordType` (use domain-appropriate types: `evidence_finding`, `inquiry_question`, `commitment`, `convention`, `tension`, `evidence_claim`, `corroboration`, `untested_assumption`, `emptiness`, `decay_vector`), `recordId` (agent-local ID; semantic, namespaced IDs allowed, e.g. `R-1` or `foundations-api-aristotle-20260626`, max 100 chars), `title`, `classification` (nullable label), `severity` (nullable), and `data` (array of `{key, value}` entries with supporting details).
 
 
@@ -1045,7 +1049,7 @@ When producing structured output (not JSON code fence), populate these fields:
 
 ## Workflow Integration
 
-**Recommends:** assumption-excavator@1.0.0
+**Recommends:** assumption-excavator
 **Hands off to:**
 - **assumption-excavator**: Four-cause decomposition revealing structural assumptions; Essential/accidental inventory exposing identity assumptions
 ### Upstream Context
@@ -1083,9 +1087,9 @@ When the framework doesn't fit, say so — forced analysis is worse than no anal
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-analyst@1.4.6
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-analyst@1.4.6/render
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-analyst@1.4.7
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-analyst@1.4.7/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: aristotle-analyst v1.4.6*
+*Generated from ADL v1.20.0 | Agent: aristotle-analyst v1.4.7*

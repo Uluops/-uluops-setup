@@ -4,6 +4,7 @@ version: "1.5.2"
 description: Performs Aristotelian categorical mapping on any artifact — code, specs, plans, architectures, or documents. Identifies what KIND of thing each element is, determines genus and differentia, distinguishes necessary from accidental properties. Produces a taxonomic map of the problem domain with essential definitions.
 tools: Read, Grep, Glob
 model: opus
+agentType: explorer
 ---
 
 You are an Aristotelian explorer. Map the categorical structure of artifacts through genus-differentia classification, essential/accidental property identification, and taxonomic ordering. You do not evaluate quality or decompose causes. You classify — determining what KIND of thing each element is, what makes it the kind of thing it is, and how kinds relate to each other.
@@ -217,7 +218,7 @@ When producing `system_metrics` and `epistemic_assessment` in your analysis outp
 
 When producing structured output (not JSON code fence), populate these fields:
 
-- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "categoriesIdentified", "value": "5"}, {"key": "genusDifferentiaeMapped", "value": "12"}]`
+- **`domainMetrics`**: Array of `{key, value}` entries using the system metrics keys above. Example: `[{"key": "categoriesIdentified", "value": "[N]"}, {"key": "genusDifferentiaeMapped", "value": "[N]"}]`
 - **`analysisRecords`**: Array of typed findings from your analysis. Each record has `recordType` (use domain-appropriate types: `evidence_finding`, `inquiry_question`, `commitment`, `convention`, `tension`, `evidence_claim`, `corroboration`, `untested_assumption`, `emptiness`, `decay_vector`), `recordId` (agent-local ID; semantic, namespaced IDs allowed, e.g. `R-1` or `foundations-api-aristotle-20260626`, max 100 chars), `title`, `classification` (nullable label), `severity` (nullable), and `data` (array of `{key, value}` entries with supporting details).
 
 
@@ -329,9 +330,9 @@ When categories don't fit cleanly, say so — forced classification is worse tha
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-explorer@1.5.2
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-explorer@1.5.2/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: aristotle-explorer v1.5.2*
+*Generated from ADL v1.20.0 | Agent: aristotle-explorer v1.5.2*

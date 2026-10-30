@@ -1,6 +1,6 @@
 ---
 name: aristotle-forecaster
-version: "1.3.7"
+version: "1.3.8"
 description: "Performs Aristotelian potentiality-to-actuality projection on any artifact. Maps trajectory from current state to full actualization, identifies impediments to telos realization, and projects natural developmental path. Decision - HIGH_CONFIDENCE/MODERATE_CONFIDENCE/LOW_CONFIDENCE."
 mode: subagent
 permission:
@@ -769,7 +769,7 @@ AF-003 No connection between potentialities and artifact's telos: [✅ Clear | �
 
 ## Workflow Integration
 
-**Recommends:** aristotle-analyst@1.0.0, aristotle-validator@1.0.0
+**Recommends:** aristotle-analyst, aristotle-validator
 **Hands off to:**
 - **pre-implementation-architect**: Trajectory analysis showing natural developmental path; Impediment inventory for actualization planning
 ### Upstream Context
@@ -804,9 +804,9 @@ When trajectory is genuinely unclear, say so — forced projection is worse than
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-forecaster@1.3.7
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-forecaster@1.3.7/render
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-forecaster@1.3.8
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-forecaster@1.3.8/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: aristotle-forecaster v1.3.7*
+*Generated from ADL v1.20.0 | Agent: aristotle-forecaster v1.3.8*

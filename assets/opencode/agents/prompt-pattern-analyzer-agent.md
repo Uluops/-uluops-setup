@@ -424,23 +424,41 @@ For each pattern type, follow this extraction process
 ### Process Phases
 
 1. **Ecosystem Discovery**
-   - Discover all agent definitions     *Command:* `find agents -name '*-agent.md' 2>/dev/null | wc -l`
-   - Discover all command definitions     *Command:* `find commands -name '*.md' 2>/dev/null | wc -l`
-   - Discover all workflow definitions     *Command:* `find commands/workflows -name '*.md' 2>/dev/null | wc -l`
-   - Discover ADL schema definitions     *Command:* `find udl/adl -name '*.yaml' 2>/dev/null | wc -l`
+   - Discover all agent definitions
+     *Command:* `find agents -name '*-agent.md' 2>/dev/null | wc -l`
+   - Discover all command definitions
+     *Command:* `find commands -name '*.md' 2>/dev/null | wc -l`
+   - Discover all workflow definitions
+     *Command:* `find commands/workflows -name '*.md' 2>/dev/null | wc -l`
+   - Discover ADL schema definitions
+     *Command:* `find udl/adl -name '*.yaml' 2>/dev/null | wc -l`
 
 2. **Pattern Extraction**
-   - Extract scoring patterns     *Command:* `grep -rh 'weight:' agents/ | sort | uniq -c`
-   - Extract decision keywords     *Command:* `grep -rohE 'PASS|FAIL|DEPLOY|REVISE|APPROVED|IMPROVE|SOUND|UNSOUND|SECURE|INSIGHTFUL' agents/ | sort | uniq -c`
-   - Extract threshold patterns     *Command:* `grep -rohE 'min_score:\s*[0-9]+|>=[0-9]+' agents/ | sort | uniq -c`
-   - Extract structural sections     *Command:* `grep -rohE '^## [A-Z][A-Za-z ]+' agents/ | sort | uniq -c`
+   - Extract scoring patterns
+     *Command:* `grep -rh 'weight:' agents/ | sort | uniq -c`
+   - Extract decision keywords
+     *Command:* `grep -rohE 'PASS|FAIL|DEPLOY|REVISE|APPROVED|IMPROVE|SOUND|UNSOUND|SECURE|INSIGHTFUL' agents/ | sort | uniq -c`
+   - Extract threshold patterns
+     *Command:* `grep -rohE 'min_score:\s*[0-9]+|>=[0-9]+' agents/ | sort | uniq -c`
+   - Extract structural sections
+     *Command:* `grep -rohE '^## [A-Z][A-Za-z ]+' agents/ | sort | uniq -c`
 
 3. **Analysis & Clustering**
-   - Group agents by domain (quality, security, docs, etc.)   - Compare patterns within clusters   - Flag agents diverging from cluster norms   - Compare older vs newer agent patterns
+   - Group agents by domain (quality, security, docs, etc.)
+   - Compare patterns within clusters
+   - Flag agents diverging from cluster norms
+   - Compare older vs newer agent patterns
+
 4. **Historical Analysis**
-   - Query uluops-tracker for validation history if available   - Identify recurring issues from historical data
+   - Query uluops-tracker for validation history if available
+   - Identify recurring issues from historical data
+
 5. **Score Calculation**
-   - Pattern coverage = agents matching most common convention / total agents   - Award points per criterion based on evidence   - Verify sample size, agent discovery, variance thresholds   - INSIGHTFUL if score >= 75 AND coverage >= 50%   *Pattern coverage is the percentage of agents matching the most common convention. If no convention covers 50%+, patterns are too fragmented.*
+   - Pattern coverage = agents matching most common convention / total agents
+   - Award points per criterion based on evidence
+   - Verify sample size, agent discovery, variance thresholds
+   - INSIGHTFUL if score >= 75 AND coverage >= 50%
+   *Pattern coverage is the percentage of agents matching the most common convention. If no convention covers 50%+, patterns are too fragmented.*
 
 
 ### Pre-Decision Checklist
@@ -468,7 +486,7 @@ Target ~3000 tokens for typical ecosystems. Pattern analysis is data-heavy but s
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1049,9 +1067,9 @@ Focus on enabling better audits, not fixing prompts directly
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/prompt-pattern-analyzer@2.6.0
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/prompt-pattern-analyzer@2.6.0/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: prompt-pattern-analyzer v2.6.0*
+*Generated from ADL v1.20.0 | Agent: prompt-pattern-analyzer v2.6.0*

@@ -510,30 +510,56 @@ For each optimization category, follow this reasoning process
 ### Process Phases
 
 1. **Project Discovery**
-   - Rule (0) of key_definitions.untrusted_input: list every symlink once, before any other read; every path that is or lies under one is skipped and named in the header. Re-run after any trusted-mode execution.     *Command:* `find . -type l -not -path './.git/*'`
-   - Check for bundlers, linters and formatters at the repository root. An overview only: modules and their configs come from key_definitions.source_roots, which wins where the two differ     *Command:* `ls package.json pyproject.toml go.mod Cargo.toml eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.ts .eslintrc .eslintrc.json .eslintrc.js .eslintrc.cjs .eslintrc.yml .eslintrc.yaml 2>/dev/null`
-   - Per key_definitions.review_scope. The command prints the changed files, or WHOLE_REPOSITORY when no usable base exists - never treat its failure or silence as 'no changes'     *Command:* `base=$(git merge-base HEAD origin/HEAD 2>/dev/null); if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD 2>/dev/null)" ]; then t=$(git describe --tags --abbrev=0 2>/dev/null); base=$([ -n "$t" ] && git rev-parse --verify --quiet "refs/tags/$t^{commit}" 2>/dev/null); fi; case "$base" in *[!0-9a-f]*|'') base='';; esac; if [ -n "$base" ]; then echo "BASE $base"; git diff --name-only "$base" HEAD -- "." ":(exclude,glob,icase)**/vendor/**" ":(exclude,glob,icase)**/node_modules/**" ":(exclude,glob,icase)**/target/**" ":(exclude,glob,icase)**/dist/**" ":(exclude,glob,icase)**/build/**" || echo DIFF_FAILED; else echo WHOLE_REPOSITORY; fi`
-   - Only for WHOLE_REPOSITORY or DIFF_FAILED: every tracked file, with the same fixed exclusions. LS_FAILED, empty output, or not a git repository: list source files with the Glob tool instead - never read any of these as 'no files'     *Command:* `git ls-files -- "." ":(exclude,glob,icase)**/vendor/**" ":(exclude,glob,icase)**/node_modules/**" ":(exclude,glob,icase)**/target/**" ":(exclude,glob,icase)**/dist/**" ":(exclude,glob,icase)**/build/**" || echo LS_FAILED`
-   - Per key_definitions.source_roots, in its order: drop excluded directories, put each changed file through ACCEPTANCE, keep the source files, skip generated ones, then find each file's module with the Read tool   - Per key_definitions.source_roots SCORING SCOPE: for each accepted changed file, the lines the diff added or modified, from the hunk headers. Only with a BASE; under WHOLE_REPOSITORY or DIFF_FAILED every line counts     *Command:* `git diff -U0 "<BASE>" HEAD -- "./<file>"`
-   - Identify primary language within the review scope   - Check the changed files for variants, request handling, retry logic, dependencies added in scope, and exports PSR-1 does not protect; exclude the criteria that do not apply (edge cases no_* and non_js_ts_project, minimal_surface's check)
+   - Rule (0) of key_definitions.untrusted_input: list every symlink once, before any other read; every path that is or lies under one is skipped and named in the header. Re-run after any trusted-mode execution.
+     *Command:* `find . -type l -not -path './.git/*'`
+   - Check for bundlers, linters and formatters at the repository root. An overview only: modules and their configs come from key_definitions.source_roots, which wins where the two differ
+     *Command:* `ls package.json pyproject.toml go.mod Cargo.toml eslint.config.js eslint.config.mjs eslint.config.cjs eslint.config.ts .eslintrc .eslintrc.json .eslintrc.js .eslintrc.cjs .eslintrc.yml .eslintrc.yaml 2>/dev/null`
+   - Per key_definitions.review_scope. The command prints the changed files, or WHOLE_REPOSITORY when no usable base exists - never treat its failure or silence as 'no changes'
+     *Command:* `base=$(git merge-base HEAD origin/HEAD 2>/dev/null); if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD 2>/dev/null)" ]; then t=$(git describe --tags --abbrev=0 2>/dev/null); base=$([ -n "$t" ] && git rev-parse --verify --quiet "refs/tags/$t^{commit}" 2>/dev/null); fi; case "$base" in *[!0-9a-f]*|'') base='';; esac; if [ -n "$base" ]; then echo "BASE $base"; git diff --name-only "$base" HEAD -- "." ":(exclude,glob,icase)**/vendor/**" ":(exclude,glob,icase)**/node_modules/**" ":(exclude,glob,icase)**/target/**" ":(exclude,glob,icase)**/dist/**" ":(exclude,glob,icase)**/build/**" || echo DIFF_FAILED; else echo WHOLE_REPOSITORY; fi`
+   - Only for WHOLE_REPOSITORY or DIFF_FAILED: every tracked file, with the same fixed exclusions. LS_FAILED, empty output, or not a git repository: list source files with the Glob tool instead - never read any of these as 'no files'
+     *Command:* `git ls-files -- "." ":(exclude,glob,icase)**/vendor/**" ":(exclude,glob,icase)**/node_modules/**" ":(exclude,glob,icase)**/target/**" ":(exclude,glob,icase)**/dist/**" ":(exclude,glob,icase)**/build/**" || echo LS_FAILED`
+   - Per key_definitions.source_roots, in its order: drop excluded directories, put each changed file through ACCEPTANCE, keep the source files, skip generated ones, then find each file's module with the Read tool
+   - Per key_definitions.source_roots SCORING SCOPE: for each accepted changed file, the lines the diff added or modified, from the hunk headers. Only with a BASE; under WHOLE_REPOSITORY or DIFF_FAILED every line counts
+     *Command:* `git diff -U0 "<BASE>" HEAD -- "./<file>"`
+   - Identify primary language within the review scope
+   - Check the changed files for variants, request handling, retry logic, dependencies added in scope, and exports PSR-1 does not protect; exclude the criteria that do not apply (edge cases no_* and non_js_ts_project, minimal_surface's check)
+
 2. **Scan for Duplication**
-   - Trusted mode only, Bash timeout 300000 ms: find literal clones (no_copy_paste) over the deduplicated modules (none: skip it); keep only clones with a copy overlapping a changed line, not under an excluded directory in any letter case (key_definitions.source_roots). In static mode skip this and the next step; find clones by reading     *Command:* `npx jscpd <source_roots> --ignore "**/.git/**,**/vendor/**,**/node_modules/**,**/target/**,**/dist/**,**/build/**" --min-lines 5 --reporters console`
-   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)     *Command:* `find . -type l -not -path './.git/*'`
+   - Trusted mode only, Bash timeout 300000 ms: find literal clones (no_copy_paste) over the deduplicated modules (none: skip it); keep only clones with a copy overlapping a changed line, not under an excluded directory in any letter case (key_definitions.source_roots). In static mode skip this and the next step; find clones by reading
+     *Command:* `npx jscpd <source_roots> --ignore "**/.git/**,**/vendor/**,**/node_modules/**,**/target/**,**/dist/**,**/build/**" --min-lines 5 --reporters console` (timeout 300000 ms)
+   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)
+     *Command:* `find . -type l -not -path './.git/*'`
    - Read for recurring shapes with different values (patterns_factored); do not re-count jscpd clones
+
 3. **Analyze Hot Paths**
-   - Locate allocation candidates in loops, then keep only those with hot-path evidence   - Verify consistent async/await usage; propose parallelisation only with shown independence
+   - Locate allocation candidates in loops, then keep only those with hot-path evidence
+   - Verify consistent async/await usage; propose parallelisation only with shown independence
+
 4. **Check Bundle Hygiene**
-   - Trusted mode only, Bash timeout 300000 ms, JS/TS changed files with the repository's root eslint config and no rule override: skip it when <js_files> is empty. Each finding goes to the criterion that measures it (key_definitions.trusted_target TOOL COVERAGE), never all to one. If that config enables no unused-variables rule, score no_unused_code by reading. In static mode skip this and the next step     *Command:* `npx eslint <js_files>`
-   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)     *Command:* `find . -type l -not -path './.git/*'`
-   - Exports with zero import sites, searched with the Grep tool (or rule (1)'s fallback)   - Look for export * patterns
+   - Trusted mode only, Bash timeout 300000 ms, JS/TS changed files with the repository's root eslint config and no rule override: skip it when <js_files> is empty. Each finding goes to the criterion that measures it (key_definitions.trusted_target TOOL COVERAGE), never all to one. If that config enables no unused-variables rule, score no_unused_code by reading. In static mode skip this and the next step
+     *Command:* `npx eslint <js_files>` (timeout 300000 ms)
+   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)
+     *Command:* `find . -type l -not -path './.git/*'`
+   - Exports with zero import sites, searched with the Grep tool (or rule (1)'s fallback)
+   - Look for export * patterns
+
 5. **Review Readability**
-   - Find functions over 40 lines   - Look for cryptic variable names   - Trusted mode only, Bash timeout 300000 ms, ONLY when the repository has no root eslint config but its package.json defines a lint script: the project's linter, each finding routed per key_definitions.trusted_target TOOL COVERAGE; count only findings on changed lines. In static mode, or when eslint already ran in the bundle-hygiene phase, skip this and the next step     *Command:* `npm run lint`
-   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)     *Command:* `find . -type l -not -path './.git/*'`
-   - Trusted mode only, Bash timeout 300000 ms, non-JS/TS code: the language's fixed read-only invocation exactly as key_definitions.trusted_target states it, including its per-module form and the ACCEPTANCE of every <module> and changed file (deliberately not restated here, so it cannot go stale) - never --fix, --write or install, never with an empty file list, and no write beyond the checker's own caches. Run and re-scan once per distinct tool invocation, even when several occur in this step. In static mode skip this and the next step; score by reading     *Command:* `<the fixed invocation for the language, from key_definitions.trusted_target>`
-   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob     *Command:* `find . -type l -not -path './.git/*'`
+   - Find functions over 40 lines
+   - Look for cryptic variable names
+   - Trusted mode only, Bash timeout 300000 ms, ONLY when the repository has no root eslint config but its package.json defines a lint script: the project's linter, each finding routed per key_definitions.trusted_target TOOL COVERAGE; count only findings on changed lines. In static mode, or when eslint already ran in the bundle-hygiene phase, skip this and the next step
+     *Command:* `npm run lint` (timeout 300000 ms)
+   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob (the tool just executed repository-controlled code and may have created symlinks)
+     *Command:* `find . -type l -not -path './.git/*'`
+   - Trusted mode only, Bash timeout 300000 ms, non-JS/TS code: the language's fixed read-only invocation exactly as key_definitions.trusted_target states it, including its per-module form and the ACCEPTANCE of every <module> and changed file (deliberately not restated here, so it cannot go stale) - never --fix, --write or install, never with an empty file list, and no write beyond the checker's own caches. Run and re-scan once per distinct tool invocation, even when several occur in this step. In static mode skip this and the next step; score by reading
+     *Command:* `<the fixed invocation for the language, from key_definitions.trusted_target>` (timeout 300000 ms)
+   - Trusted mode only, immediately after the step above: re-run the symlink listing before any further Read, Grep or Glob
+     *Command:* `find . -type l -not -path './.git/*'`
 
 6. **Score Calculation**
-   - Award points per applicable criterion, then rescale: earned / applicable points x 100   - Apply PSR-1..4 and the size ceiling to every proposal; withhold or classify   - APPROVED if the rescaled score >= 70; IMPROVE otherwise. The only exceptions are edge case no_files_modified (APPROVED, score null) and a missing target (missing_target_or_bad_config, missing-target branch: no decision)
+   - Award points per applicable criterion, then rescale: earned / applicable points x 100
+   - Apply PSR-1..4 and the size ceiling to every proposal; withhold or classify
+   - APPROVED if the rescaled score >= 70; IMPROVE otherwise. The only exceptions are edge case no_files_modified (APPROVED, score null) and a missing target (missing_target_or_bad_config, missing-target branch: no decision)
+
 
 ### Pre-Decision Checklist
 
@@ -565,7 +591,7 @@ Target ~3000 tokens for typical reports. Expand to 10000 for codebases with sign
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1274,11 +1300,11 @@ Use objective severity levels instead of subjective terms
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/code-optimizer@2.4.4
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/code-optimizer@2.4.4/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: code-optimizer v2.4.4*
+*Generated from ADL v1.20.0 | Agent: code-optimizer v2.4.4*
 
 {% endraw %}

@@ -378,25 +378,42 @@ The following conditions result in automatic failure regardless of score:
 
 1. **Pre-Flight Checks**
    *Identify project type and documentation surfaces*
-   - detect_project_type     *Command:* `Check for tsconfig.json, package.json, openapi.yaml, route files`
-   - inventory_docs     *Command:* `Glob all *.md files, docs/, openapi.*, JSDoc in source files`
-   - identify_public_api     *Command:* `grep -rE '^export' src/ --include='*.ts'`
+   - detect_project_type
+     *Command:* `Check for tsconfig.json, package.json, openapi.yaml, route files`
+   - inventory_docs
+     *Command:* `Glob all *.md files, docs/, openapi.*, JSDoc in source files`
+   - identify_public_api
+     *Command:* `grep -rE '^export' src/ --include='*.ts'`
 
 2. **JSDoc Coverage Scan**
    *Verify public exports have complete documentation comments*
-   - Identify all exported functions/classes     *Command:* `grep -rE '^export (async function|function|class|const)' ./src --include='*.ts'`
-   - Verify each export has preceding doc comment     *Command:* `grep -B5 'export.*function' ./src --include='*.ts'`
-   - Check @param tags match actual parameters   - Check @returns tags on non-void functions
+   - Identify all exported functions/classes
+     *Command:* `grep -rE '^export (async function|function|class|const)' ./src --include='*.ts'`
+   - Verify each export has preceding doc comment
+     *Command:* `grep -B5 'export.*function' ./src --include='*.ts'`
+   - Check @param tags match actual parameters
+   - Check @returns tags on non-void functions
+
 3. **API Specification Audit**
    *Compare API spec against implementation*
-   - Locate OpenAPI/Swagger spec     *Command:* `ls openapi.yaml openapi.json swagger.yaml 2>/dev/null`
-   - Extract paths from spec   - Compare spec paths to implemented routes   - Verify request/response schemas exist
+   - Locate OpenAPI/Swagger spec
+     *Command:* `ls openapi.yaml openapi.json swagger.yaml 2>/dev/null`
+   - Extract paths from spec
+   - Compare spec paths to implemented routes
+   - Verify request/response schemas exist
+
 4. **Changelog Audit**
    *Verify changelog format and version alignment*
-   - Check changelog follows Keep a Changelog format   - Verify latest changelog version matches package.json   - Verify recent changes are documented
+   - Check changelog follows Keep a Changelog format
+   - Verify latest changelog version matches package.json
+   - Verify recent changes are documented
+
 5. **Markdown Quality Check**
    *Validate markdown files for quality and correctness*
-   - Validate internal links point to existing files   - Verify heading hierarchy (no skipped levels)   - Verify code blocks have language identifiers
+   - Validate internal links point to existing files
+   - Verify heading hierarchy (no skipped levels)
+   - Verify code blocks have language identifiers
+
 
 ## Output Format
 
@@ -410,7 +427,7 @@ Target ~2500 tokens for typical reports. Expand for large codebases with many ex
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -759,7 +776,7 @@ When generating the JSON OUTPUT section, map issues as follows:
 
 ### Position in Pipeline
 **Runs after:** code-validator@2.0.0
-**Recommends:** public-interface-validator@1.0.0, api-contract-validator@1.0.0
+**Recommends:** public-interface-validator, api-contract-validator
 **Hands off to:**
 - **public-interface-validator**: JSDoc coverage assessment (what percentage of public exports are documented); API spec completeness findings (missing endpoints, stale schemas); Changelog version sync status
 - **dx-validator**: Documentation quality baseline (are docs accurate enough to test?); Runnable example inventory (which examples were verified)
@@ -785,10 +802,10 @@ Distinguish between missing and outdated docs
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/docs-validator@2.5.2
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/docs-validator@2.5.2/render
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/docs-validator@2.5.4
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/docs-validator@2.5.4/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: docs-validator v2.5.2*
+*Generated from ADL v1.20.0 | Agent: docs-validator v2.5.4*
 '''

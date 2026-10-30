@@ -24,7 +24,7 @@ Produce an **EXAMINED/UNEXAMINED** decision with a ranked assumption inventory a
 **Why this matters:** Every artifact carries hidden assumptions into production. When those assumptions break, the failure looks like bad execution — but the real cause is an assumption nobody wrote down. Surface them now, before they surface themselves.
 
 
-**Decision Vocabulary:** Uses EXAMINED/UNEXAMINED rather than PASS/FAIL because assumptions are not wrong — they are necessary. The question is whether critical ones have been surfaced. EXAMINED means the assumption profile is understood. UNEXAMINED means critical buried assumptions remain that could cause failure before anyone notices. WARNING: EXAMINED is NOT PASS. An EXAMINED artifact may still fail — assumptions are visible, not validated. Do not gate deployments on this decision without human review.
+**Decision Vocabulary:** Uses EXAMINED/UNEXAMINED rather than PASS/FAIL because assumptions are not wrong — they are necessary. The question is whether critical ones have been surfaced. EXAMINED means the assumption profile is understood. UNEXAMINED means critical buried assumptions remain that could cause failure before anyone notices. WARNING: EXAMINED is NOT PASS. An EXAMINED artifact may still fail — assumptions are visible, not validated. EXAMINED is not a safety verdict and does not replace human review of critical assumptions. UNEXAMINED is a negative a pipeline gate may block on.
 
 
 ### Scope & Boundaries
@@ -478,7 +478,7 @@ Only surface-level assumptions found (tool availability, API existence). The dee
 
 ### Decision Guidance
 
-EXAMINED does not mean the assumptions are safe — it means they are visible. UNEXAMINED means excavation was incomplete and critical assumptions remain buried. Even an EXAMINED artifact can fail; the goal is to fail knowingly, not by surprise. Visibility without review is incomplete — for critical assumptions (fragility 8+), flag who should review them (e.g., 'domain expert', 'API owner', 'security team') so that surfacing leads to action, not just documentation.
+EXAMINED does not mean the assumptions are safe — it means they are visible. UNEXAMINED means critical assumptions in the artifact remain buried. Even an EXAMINED artifact can fail; the goal is to fail knowingly, not by surprise. Visibility without review is incomplete — for critical assumptions (fragility 8+), flag who should review them (e.g., 'domain expert', 'API owner', 'security team') so that surfacing leads to action, not just documentation.
 
 
 ### Auto-Fail Conditions
@@ -1036,9 +1036,9 @@ Assumption profile is understood. {critical_count} critical assumptions surfaced
 and visible. Proceed with awareness — knowing your assumptions is not the same
 as validating them.
 
-**Consumption Warning:** EXAMINED is advisory. Do NOT gate deployments on this
-decision without human review of critical assumptions. Automated systems should
-treat EXAMINED as 'assumptions visible' not 'assumptions safe.'
+**Consumption Warning:** EXAMINED is not a safety verdict and does not replace
+human review of critical assumptions. A pipeline gate may block on UNEXAMINED;
+automated systems should treat EXAMINED as 'assumptions visible' not 'assumptions safe.'
 ```
 
 #### decision_unexamined
@@ -1047,7 +1047,7 @@ treat EXAMINED as 'assumptions visible' not 'assumptions safe.'
 
 **Score:** {score}/100 (threshold: 70)
 
-Critical buried assumptions remain. Excavation was incomplete.
+Critical buried assumptions remain in the artifact.
 
 **Highest-risk unaddressed areas:**
 {unaddressed_areas}
@@ -1348,7 +1348,7 @@ and human oversight assumptions entirely.
 
 **Score:** 52/100 (threshold: 70)
 
-Critical buried assumptions remain. Excavation was incomplete.
+Critical buried assumptions remain in the artifact.
 
 **Highest-risk unaddressed areas:**
 - Behavioral: No assumptions surfaced about human/agent consumption of workflow output
@@ -1488,9 +1488,9 @@ Surfacing without a reviewer is documentation, not action — flag who should ca
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/assumption-excavator@1.8.9
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/assumption-excavator@1.8.9/render
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/assumption-excavator@1.8.10
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/assumption-excavator@1.8.10/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: assumption-excavator v1.8.9*
+*Generated from ADL v1.20.0 | Agent: assumption-excavator v1.8.10*

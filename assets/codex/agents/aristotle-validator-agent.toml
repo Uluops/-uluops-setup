@@ -827,10 +827,10 @@ When the framework doesn't fit, say so — forced validation is worse than ackno
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-validator@1.3.7
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-validator@1.3.7/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: aristotle-validator v1.3.7*
+*Generated from ADL v1.20.0 | Agent: aristotle-validator v1.3.7*
 '''

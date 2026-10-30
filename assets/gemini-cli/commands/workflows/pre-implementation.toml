@@ -27,17 +27,17 @@ Group 3 (always): persist
 
 | # | Agent | Threshold | Gate | Condition |
 |---|-------|-----------|------|-----------|
-| 1 |  | threshold >= 80, on fail: stop | stop | — |
-| 2 |  | threshold >= 75, on fail: warn | stop | context.has_design_docs |
-| 3 |  | threshold >= 70, on fail: warn | stop | — |
-| 4 |  | threshold >= 70, on fail: warn | stop | — |
-| 5 |  | threshold >= 70, on fail: warn | stop | — |
-| 6 |  | threshold >= 75, on fail: warn | stop | — |
-| 7 |  | threshold >= 70, on fail: warn | stop | — |
-| 8 |  | threshold >= 85, on fail: warn | stop | context.security_enabled |
-| 9 |  | threshold >= 60, on fail: warn | stop | context.circumvention_enabled |
-| 10 |  | threshold >= 85, on fail: warn | stop | context.trust_boundary_enabled |
-| 11 | workflow-synthesis@latest | threshold >= 0, on fail: warn | stop | — |
+| 1 | agent: pre-implementation-architect@latest | threshold >= 80, on fail: stop | stop | — |
+| 2 | agent: docs-validator@latest | threshold >= 75, on fail: warn | warn | context.has_design_docs |
+| 3 | agent: assumption-excavator@latest | threshold >= 70, on fail: warn | warn | — |
+| 4 | agent: anxiety-reader@latest | threshold >= 70, on fail: warn | warn | — |
+| 5 | agent: adoption-drift-detector@latest | threshold >= 70, on fail: warn | warn | — |
+| 6 | agent: machiavelli-analyst@latest | threshold >= 75, on fail: warn | warn | — |
+| 7 | agent: dieter-rams-analyst@latest | threshold >= 70, on fail: warn | warn | — |
+| 8 | agent: security-analyst@latest | threshold >= 85, on fail: warn | warn | context.security_enabled |
+| 9 | agent: circumvention-forecaster@latest | threshold >= 60, on fail: warn | warn | context.circumvention_enabled |
+| 10 | agent: trust-boundary-cartographer@latest | threshold >= 85, on fail: warn | warn | context.trust_boundary_enabled |
+| 11 | workflow-synthesis@latest | threshold >= 0, on fail: warn | warn | — |
 
 **Architecture Review**: Architectural fit with existing codebase; Design quality and complexity; Scope bounds (LOC, files, dependencies); Completeness of error handling and data flow
 **Documentation Validation**: Design doc completeness; API contract clarity; Data flow documentation
@@ -54,6 +54,14 @@ Group 3 (always): persist
 
 **Method**: weighted_average
  — architect: 55%, assumption-review: 20%, docs-validator: 25%
+
+**Decision** — check in the order listed; the first rule that holds is the workflow's decision:
+
+| Decision | When |
+|----------|------|
+| PROCEED | `architect.score >= 75 AND blockers == 0` |
+| REVISE | `architect.score < 75 OR blockers > 0` |
+
 ## Results Submission
 
 Write markdown report to: `{{ target_path }}/{{ report_file }}`
@@ -62,10 +70,10 @@ After saving, query tracker and compare counts. Mismatches from cross-phase dedu
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/wdl/v3.1.0/workflow.json
+**Schema:** https://uluops.ai/schemas/wdl/v3.2.0/workflow.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/workflow/pre-implementation@2.2.0
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/workflow/pre-implementation@2.2.0/render
 
 ---
-*Generated from WDL v3.1.0 | Workflow: pre-implementation v2.2.0*
+*Generated from WDL v3.2.0 | Workflow: pre-implementation v2.2.0*
 '''

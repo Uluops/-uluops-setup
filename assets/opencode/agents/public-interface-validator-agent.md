@@ -572,29 +572,46 @@ For each criterion, follow this reasoning process. Every scan runs against the a
 ### Process Phases
 
 1. **Discovery**
-   - Name the comparison base for temporal claims     *Command:* `git -C "{{ target_path }}" merge-base HEAD origin/main 2>/dev/null || git -C "{{ target_path }}" describe --tags --abbrev=0 2>/dev/null || echo 'no base'`
-   - Check README.md exists at the package root     *Command:* `test -r "{{ target_path }}/README.md" && echo 'readable' || echo 'missing or unreadable'`
-   - Find the entry point package.json declares, so exports are read from the right root     *Command:* `node -e "const p=require(process.argv[1]+'/package.json');console.log(p.main||'',JSON.stringify(p.exports||{}))" "{{ target_path }}"`
-   - Find all exported functions and types — ES modules AND CommonJS. A package that exports nothing under this pattern but has a bin entry is a cli_only candidate; one that exports via module.exports is NOT     *Command:* `grep -rE '^export |^export\{|module\.exports|[[:space:]]*exports\.[A-Za-z_$][A-Za-z0-9_$]*[[:space:]]*=|[[:space:]]*exports\[|Object\.(defineProperty|defineProperties|assign)\((module\.)?exports,' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
-   - Find CLI commands if present     *Command:* `grep -rE '\.command\(' "{{ target_path }}" --include='*.ts' --include='*.js' --exclude-dir=node_modules --exclude-dir=dist`
+   - Name the comparison base for temporal claims
+     *Command:* `git -C "{{ target_path }}" merge-base HEAD origin/main 2>/dev/null || git -C "{{ target_path }}" describe --tags --abbrev=0 2>/dev/null || echo 'no base'`
+   - Check README.md exists at the package root
+     *Command:* `test -r "{{ target_path }}/README.md" && echo 'readable' || echo 'missing or unreadable'`
+   - Find the entry point package.json declares, so exports are read from the right root
+     *Command:* `node -e "const p=require(process.argv[1]+'/package.json');console.log(p.main||'',JSON.stringify(p.exports||{}))" "{{ target_path }}"`
+   - Find all exported functions and types — ES modules AND CommonJS. A package that exports nothing under this pattern but has a bin entry is a cli_only candidate; one that exports via module.exports is NOT
+     *Command:* `grep -rE '^export |^export\{|module\.exports|[[:space:]]*exports\.[A-Za-z_$][A-Za-z0-9_$]*[[:space:]]*=|[[:space:]]*exports\[|Object\.(defineProperty|defineProperties|assign)\((module\.)?exports,' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
+   - Find CLI commands if present
+     *Command:* `grep -rE '\.command\(' "{{ target_path }}" --include='*.ts' --include='*.js' --exclude-dir=node_modules --exclude-dir=dist`
 
 2. **Coverage Audit**
-   - Extract README sections     *Command:* `grep -E '^#{1,3} ' "{{ target_path }}/README.md"`
-   - Check each export against README   - Read the newest changelog entry for meaning changes to existing exports     *Command:* `sed -n '1,80p' "{{ target_path }}/CHANGELOG.md" 2>/dev/null || echo 'no changelog'`
+   - Extract README sections
+     *Command:* `grep -E '^#{1,3} ' "{{ target_path }}/README.md"`
+   - Check each export against README
+   - Read the newest changelog entry for meaning changes to existing exports
+     *Command:* `sed -n '1,80p' "{{ target_path }}/CHANGELOG.md" 2>/dev/null || echo 'no changelog'`
    *For each discovered export and CLI command, check if it appears in README. Track which features have examples vs just mentions. Decide which exports are MAJOR capabilities (AF-002's test) before scoring Feature Completeness — the site counts depend on it.*
 
 3. **Accuracy Check**
-   - Get code blocks from README     *Command:* `grep -A15 '```javascript\|```typescript' "{{ target_path }}/README.md"`
-   - Match example function calls to actual exports   *Verify README examples match the actual API by READING them: import paths, function names, parameter order, return types, identifiers defined, await used. Nothing is executed.*
+   - Get code blocks from README
+     *Command:* `grep -A15 '```javascript\|```typescript' "{{ target_path }}/README.md"`
+   - Match example function calls to actual exports
+   *Verify README examples match the actual API by READING them: import paths, function names, parameter order, return types, identifiers defined, await used. Nothing is executed.*
 
 4. **Hygiene Check**
-   - List import lines; then, per file, grep each imported identifier's use (an identifier with only the import occurrence is unused). No linter is run — a linter loads the target's executable config     *Command:* `grep -rnE '^import ' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
-   - Enumerate thrown Errors with literal messages — the site population for error_messages_helpful; READ each message, the grep only finds candidates     *Command:* `grep -rnE 'throw new [A-Za-z]*Error\(' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
-   - Enumerate console.* calls — the site population for no_debug_output; a call behind a debug flag or in a CLI entry point is not a site at all (the criterion's population is calls OUTSIDE a debug flag)     *Command:* `grep -rnE 'console\.(log|debug|info|warn|error)\(' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
-   - Look for commented-out code blocks     *Command:* `grep -rn '^\s*//.*function\|^\s*//.*const' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
+   - List import lines; then, per file, grep each imported identifier's use (an identifier with only the import occurrence is unused). No linter is run — a linter loads the target's executable config
+     *Command:* `grep -rnE '^import ' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
+   - Enumerate thrown Errors with literal messages — the site population for error_messages_helpful; READ each message, the grep only finds candidates
+     *Command:* `grep -rnE 'throw new [A-Za-z]*Error\(' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
+   - Enumerate console.* calls — the site population for no_debug_output; a call behind a debug flag or in a CLI entry point is not a site at all (the criterion's population is calls OUTSIDE a debug flag)
+     *Command:* `grep -rnE 'console\.(log|debug|info|warn|error)\(' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
+   - Look for commented-out code blocks
+     *Command:* `grep -rn '^\s*//.*function\|^\s*//.*const' "{{ target_path }}" --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.cjs' --exclude-dir=node_modules --exclude-dir=dist`
 
 5. **Scoring**
-   - Award points per criterion, sized by failing share   - Verify each auto-fail condition against its scope text; a construct that tripped one is removed from the site counts per the Scoring switch rule   - POLISHED if >=75 AND no auto-fail, ACCEPTABLE if 70-74 AND no auto-fail, NEEDS_WORK if <70 OR any auto-fail triggered; then apply caps and overrides (Edge Case Handling) and write the Modifiers line   *Before finalizing, run through the pre-decision checklist. Three rules size every deduction.
+   - Award points per criterion, sized by failing share
+   - Verify each auto-fail condition against its scope text; a construct that tripped one is removed from the site counts per the Scoring switch rule
+   - POLISHED if >=75 AND no auto-fail, ACCEPTABLE if 70-74 AND no auto-fail, NEEDS_WORK if <70 OR any auto-fail triggered; then apply caps and overrides (Edge Case Handling) and write the Modifiers line
+   *Before finalizing, run through the pre-decision checklist. Three rules size every deduction.
 SIZE BY FAILING SHARE. For each criterion, count the sites it applies to and the sites that fail it — each criterion's own line names its SITE UNIT (one major capability, one README code example, one source file, one public export, ...); use that unit and no other, and state the count in the finding. If every site fails, or the only site fails, take the criterion's full value. Otherwise take the full value scaled by the failing share, rounded up, never less than 1. A criterion with no applicable site scores full marks and is named on the Modifiers line as `vacuous (<criteria>)` — a lone one inside a scored category as much as a whole category; the consumer must be able to tell a certified 5/5 from an empty one. Every calibration anchor derives its rows this way.
 SWITCHES ARE NOT DEDUCTIONS. A construct that trips an auto-fail is accounted for by the switch and by NO criterion: it is removed from the site count of every criterion it would otherwise fail (a capability with zero README presence leaves capabilities_in_title, features_have_examples AND api_methods_represented; an example calling a non-existent symbol leaves examples_match_api AND examples_run). The criteria score the sites that remain — see the 84-anchor. When NO switch fires and one construct fails two criteria that share a site unit, charge the more specific criterion only. A construct is one DEFECT, not one artifact: a capability absent from the title (capabilities_in_title) that also lacks a quick start (features_have_examples) is two defects and is charged twice — the 60-anchor; a file with an unused import and a commented-out block is two — the 72-anchor. The rule bites when ONE defect would be counted under two criteria: an example that omits the import it needs is an examples_run site, not also examples_match_api (the call itself is correct) — the 75-anchor. A renamed symbol still called in an example is neither: it fires AF-003 and is removed. The more specific criterion is the one whose check names that defect.
 MODIFIERS. The DECISION section carries a Modifiers line naming every decision modifier in force, or `none`. The literal forms, and the only ones: `capped-at-ACCEPTABLE (sampled n of m exports)`, `capped-at-ACCEPTABLE (budget exceeded; unaudited: ...)`, `rescaled (...)`, `vacuous (<criteria>)`, `no comparison base`, `no-manifest (override: NEEDS_WORK at 0)`, `predecessor-failed (override: NEEDS_WORK at 0)`, `standalone (code-validator not run)`. More than one is joined with `; `. This line is the machine-readable surface for the modifiers until the JSON result carries a field for them.
@@ -627,7 +644,7 @@ Target ~3000 tokens for typical reports. Expand to 10000 for projects with many 
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -1243,9 +1260,9 @@ Use objective severity levels (/C, /H, /M, /L, /I)
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/public-interface-validator@1.9.6
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/public-interface-validator@1.9.6/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: public-interface-validator v1.9.6*
+*Generated from ADL v1.20.0 | Agent: public-interface-validator v1.9.6*

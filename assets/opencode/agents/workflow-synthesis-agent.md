@@ -954,9 +954,9 @@ When composition adds nothing, say so — forced synthesis is worse than honest 
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: workflow-synthesis v2.4.2*
+*Generated from ADL v1.20.0 | Agent: workflow-synthesis v2.4.2*

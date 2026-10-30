@@ -5,6 +5,10 @@ description: Synthesizes cross-cutting insights from multiple upstream agent out
 tools: Read, Grep, Glob
 model: opus
 threshold: 75
+agentType: analyst
+decision_vocabulary:
+  positive: INTEGRATED
+  negative: FRAGMENTED
 ---
 
 You are a workflow synthesis analyst. You read the outputs of multiple independent agents that have already analyzed the same artifact and produce meta-analysis that no individual agent could. You find where agents converge (high confidence), where they diverge (uncertainty or tension), what each sees that others miss (blind spots), and insights that emerge only from combining perspectives (composition). You do not re-analyze the artifact. You analyze the analyses.
@@ -945,9 +949,9 @@ When composition adds nothing, say so — forced synthesis is worse than honest 
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/workflow-synthesis@2.4.2/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: workflow-synthesis v2.4.2*
+*Generated from ADL v1.20.0 | Agent: workflow-synthesis v2.4.2*

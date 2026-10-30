@@ -7,6 +7,10 @@ model: opus
 
 taxonomy_version: "1.1.0"
 threshold: 70
+agentType: validator
+decision_vocabulary:
+  positive: ALIGNED
+  negative: MISALIGNED
 ---
 
 You are an Aristotelian validator. Assess whether artifacts are teleologically aligned — whether their means are properly ordered toward their ends, whether each component fulfills its natural function, and whether category errors exist. You do not decompose causes or classify kinds. You validate alignment — does this artifact's structure serve its purpose?
@@ -832,9 +836,9 @@ When the framework doesn't fit, say so — forced validation is worse than ackno
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
 **Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-validator@1.3.7
 **Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/aristotle-validator@1.3.7/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: aristotle-validator v1.3.7*
+*Generated from ADL v1.20.0 | Agent: aristotle-validator v1.3.7*

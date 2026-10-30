@@ -404,22 +404,40 @@ The following conditions result in automatic failure regardless of score:
 
 1. **Version Consistency Check**
    *Verify version appears correctly in all locations*
-   - Extract version from package.json     *Command:* `cat package.json | grep '"version"' | head -1`
-   - Execute CLI --version and compare exactly   - Search CHANGELOG.md for exact version string   - Verify semver bump type matches CHANGELOG entries
+   - Extract version from package.json
+     *Command:* `cat package.json | grep '"version"' | head -1`
+   - Execute CLI --version and compare exactly
+   - Search CHANGELOG.md for exact version string
+   - Verify semver bump type matches CHANGELOG entries
+
 2. **Artifact Verification**
    *Verify all published files exist and are current*
-   - Check dist/ directory exists   - Verify main, module, exports, types reference existing files   - Check for stale build — any .ts newer than corresponding .js   - Verify bin files exist and have shebang
+   - Check dist/ directory exists
+   - Verify main, module, exports, types reference existing files
+   - Check for stale build — any .ts newer than corresponding .js
+   - Verify bin files exist and have shebang
+
 3. **Release Hygiene Check**
    *Scan for debug code and release hygiene issues*
-   - Grep src/ for console.log/console.debug     *Command:* `grep -rn 'console\.log|console\.debug' ./src --exclude='*.test.*'`
-   - Grep for localhost, hardcoded secrets   - Check for .env files (except .env.example)     *Command:* `find . -name '.env*' -not -name '.env.example' 2>/dev/null`
+   - Grep src/ for console.log/console.debug
+     *Command:* `grep -rn 'console\.log|console\.debug' ./src --exclude='*.test.*'`
+   - Grep for localhost, hardcoded secrets
+   - Check for .env files (except .env.example)
+     *Command:* `find . -name '.env*' -not -name '.env.example' 2>/dev/null`
    - Check dependencies for pre-release versions
+
 4. **Documentation Check**
    *Verify README and CHANGELOG are present and current*
-   - Verify README exists and has installation instructions   - Verify CHANGELOG follows keepachangelog format   - Verify documentation matches current API
+   - Verify README exists and has installation instructions
+   - Verify CHANGELOG follows keepachangelog format
+   - Verify documentation matches current API
+
 5. **Score Calculation**
    *Apply scoring with specific file:line evidence*
-   - Score all 4 categories with evidence   - Check all 6 auto-fail conditions   - Determine READY/CONDITIONAL/NOT_READY
+   - Score all 4 categories with evidence
+   - Check all 6 auto-fail conditions
+   - Determine READY/CONDITIONAL/NOT_READY
+
 
 ## Output Format
 
@@ -433,7 +451,7 @@ Be concise — release validators need quick answers. Show exact version strings
 
 ### Section Templates
 
-These templates define your report. Emit these sections, in this order, and do not substitute a different shape — the section order above and the templates below are the same specification.
+These templates define your report. Emit these sections in the order they appear below, and do not substitute a different shape. After the last section, end the report with the block shown under **JSON OUTPUT**.
 
 #### header
 ```
@@ -780,7 +798,7 @@ When generating the JSON OUTPUT section, map issues as follows:
 
 ### Position in Pipeline
 **Runs after:** code-validator@2.0.0, test-architect@1.0.0
-**Recommends:** public-interface-validator@1.0.0
+**Recommends:** public-interface-validator
 **Hands off to:**
 - **npm-publish**: Version consistency verification (package.json, CLI, CHANGELOG all match); Release hygiene status (no debug code, secrets, stale builds); Suggested release commands
 
@@ -805,10 +823,10 @@ Documentation is the first thing users see after install
 
 ## Source
 
-**Schema:** https://uluops.ai/schemas/adl/v1.19.0/agent.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/release-readiness@2.5.1
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/release-readiness@2.5.1/render
+**Schema:** https://uluops.ai/schemas/adl/v1.20.0/agent.json
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/agent/release-readiness@2.5.2
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/agent/release-readiness@2.5.2/render
 
 ---
-*Generated from ADL v1.19.0 | Agent: release-readiness v2.5.1*
+*Generated from ADL v1.20.0 | Agent: release-readiness v2.5.2*
 '''

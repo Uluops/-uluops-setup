@@ -73,12 +73,12 @@ Critical issues that trigger immediate FAIL regardless of score:
 
 | ID | Condition |
 |----|-----------|
-| **AF-001** | Required request fields not documented |
-| **AF-002** | Response fields in docs but not returned |
-| **AF-003** | Sensitive fields exposed without documentation |
-| **AF-004** | Breaking changes without versioning |
+| **AF-001** | Required request field not documented as required |
+| **AF-002** | Documented response field never returned |
+| **AF-003** | Sensitive field returned in a response |
+| **AF-004** | Unsafe breaking change (missing deprecation notice or version signal) |
 | **AF-005** | Error formats inconsistent across endpoints |
-| **AF-006** | Security-relevant fields undocumented |
+| **AF-006** | Security-relevant parameter undocumented |
 
 ---
 
@@ -138,7 +138,7 @@ mcp__uluops-tracker__save_run
 |---------------|-------|-------|
 | `definition_type` | `command` | From CDL interface |
 | `definition_name` | `api-contract` | From CDL interface |
-| `definition_version` | `1.0.3` | From CDL interface — this command's version, never an agent's |
+| `definition_version` | `1.0.4` | From CDL interface — this command's version, never an agent's |
 
 **From JSON OUTPUT to Tracker:**
 | Source | Tracker Field | Notes |
@@ -174,11 +174,11 @@ mcp__uluops-tracker__save_run
 ## Source
 
 **Schema:** https://uluops.ai/schemas/cdl/v2.0.0/command.json
-**Definition:** https://api.uluops.ai/api/v1/registry/definitions/command/api-contract@1.0.3
-**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/command/api-contract@1.0.3/render
+**Definition:** https://api.uluops.ai/api/v1/registry/definitions/command/api-contract@1.0.4
+**Runtime:** https://api.uluops.ai/api/v1/registry/definitions/command/api-contract@1.0.4/render
 **Agent:** https://api.uluops.ai/api/v1/registry/definitions/agent/api-contract-validator (declared: latest)
 
 
 ---
-*Generated from CDL v2.0.0 | Command: api-contract v1.0.3*
+*Generated from CDL v2.0.0 | Command: api-contract v1.0.4*
 '''
