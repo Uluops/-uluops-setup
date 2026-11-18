@@ -18,9 +18,9 @@ npx @uluops/setup
 
 ## Supported harnesses
 
-Setup 0.20.0 bundles agent-metrics **0.12.1** for hook installation and pins
-tracker MCP **0.34.0** and registry MCP **0.18.0** in generated configs. Tracker
-MCP uses ops-sdk **7.1.0**; both MCP servers run on zod 4.6.7 and mcp-secure-server 0.1.1-security. Re-run setup to refresh existing configs and hook
+Setup 0.21.0 bundles agent-metrics **0.13.1** for hook installation and pins
+tracker MCP **0.35.0** and registry MCP **0.18.2** in generated configs. Tracker
+MCP uses ops-sdk **7.3.0**; both MCP servers run on zod 4.6.7 and mcp-secure-server 0.1.1-security. Re-run setup to refresh existing configs and hook
 files, then restart the affected MCP connections in your harness.
 
 Optional global CLI installs resolve npm's current release when the CLI is
@@ -198,7 +198,7 @@ npx @uluops/setup [options]
 Displays all agents and workflows included in the current version of the setup tool.
 
 ```text
-  ⟨u⟩ ulu·ops v0.20.0 — available agents and workflows
+  ⟨u⟩ ulu·ops v0.21.0 — available agents and workflows
 
   WORKFLOWS
     /workflows:post-implementation    Iterative validation workflow. Run af...
@@ -216,7 +216,7 @@ Displays all agents and workflows included in the current version of the setup t
 ```
 
 #### Check installation health (`--verify`)
-Validates your current installation against the local manifest and checks your API key. (Sample from a 0.19.0 install; the row set is unchanged in 0.20.0.)
+Validates your current installation against the local manifest and checks your API key. (Sample from a 0.19.0 install; the row set is unchanged in 0.21.0. A 0.21.0 install's hook row reads v0.13.1.)
 
 ```text
   ⟨u⟩ ulu·ops Installation Check v0.19.0
@@ -237,7 +237,7 @@ Validates your current installation against the local manifest and checks your A
 >
 > The API key is found the way install finds it: `ULUOPS_API_KEY` first, then `~/.uluops/credentials.json`. With no key in either place the row reads `⚠ API key check skipped` and does not fail the run. A key the server rejects fails it with the same remedy install gives. Before 0.19.0 the check read `ULUOPS_API_KEY` only and was left out silently without it.
 >
-> The metrics hook row fails when the installed hook files no longer match what setup recorded (they were changed outside setup), and passes with a note such as `v0.12.0 — this setup bundles v0.12.1; re-run setup to update` when a newer hook is available. When any check fails, `--verify` ends with the command that repairs each harness where it is installed, for example `npx @uluops/setup --harness claude-code --scope local --local-defs`.
+> The metrics hook row fails when the installed hook files no longer match what setup recorded (they were changed outside setup), and passes with a note such as `v0.12.1 — this setup bundles v0.13.1; re-run setup to update` when a newer hook is available. When any check fails, `--verify` ends with the command that repairs each harness where it is installed, for example `npx @uluops/setup --harness claude-code --scope local --local-defs`.
 
 ### Examples
 

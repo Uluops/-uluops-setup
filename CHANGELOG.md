@@ -4,6 +4,33 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-18
+
+### Changed
+
+- **Pins moved to the current published servers and hook.** Setup 0.20.0 stamped versions that had since been superseded:
+
+  | Pin | 0.20.0 | 0.21.0 | What a re-run picks up |
+  |---|---|---|---|
+  | `@uluops/agent-metrics` (bundled hook) | 0.12.1 | **0.13.1** | Claude Code token usage counted once per API response, not once per content block |
+  | `@uluops/ops-mcp` (tracker MCP) | 0.34.0 | **0.35.0** | `save_run` / `validate_run` say when the server rejected an agent's analysis; entry rules match the server; ops-sdk 7.1.0 → 7.3.0 |
+  | `@uluops/registry-mcp` | 0.18.0 | **0.18.2** | `registry-sdk` id-validation fix and the `hono` security override (below); no tool, schema or response changes |
+
+  Re-run setup to refresh existing configs and hook files, then restart the affected MCP connections.
+
+### Fixed
+
+- **`npm test` builds first (`pretest`).** `install-lock-integration.test.ts` spawns child processes that import the compiled `dist/lib/install-lock.js`. With no `dist/`, both children failed to import and the test failed, so `prepublishOnly` (`npm test && …`) could not pass from a clean clone. Worse, with an old `dist/` present the test passed against stale compiled code, not the source under test. That is the only reason it passed on `main`. Control: in a fresh worktree with no `dist/`, the test failed 6 of 6 runs before this change. After it, 481/481 pass from a removed `dist/`.
+
+### Security
+
+- **Through `@uluops/registry-mcp` 0.18.2:** the `hono` override moves from 4.13.7 to 4.13.14, for GHSA-5r4p-p66f-jhc7 (moderate: `serveStatic` path decoding). Configs written by setup ≤ 0.20.0 keep launching registry-mcp 0.18.0 until setup is re-run.
+
+### Upgrade impact
+
+- **Claude Code subagent token figures roughly halve after the hook is refreshed.** agent-metrics ≤ 0.12.1 counted a response once per content block, about 2× high across 2,466 measured transcripts. Figures from before and after the re-run are not comparable. Tracker rows saved earlier are not rewritten. agent-metrics' CHANGELOG (0.13.0) has the detail.
+- **Setup installs the global `agent-metrics` CLI unpinned when it is absent, so a fresh install now gets 0.13.1 for both CLI and hook.** An existing global CLI is preserved, not upgraded (see *Supported harnesses*). A machine with a pre-0.13 CLI keeps recounting per line in `buffer list -f tracker` until the CLI is updated with npm.
+
 ## [0.20.0] - 2026-10-30
 
 ### Changed
