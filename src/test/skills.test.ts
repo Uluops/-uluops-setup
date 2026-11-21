@@ -31,6 +31,9 @@ describe("installSkills", () => {
     );
     expect(content).toContain("name: uluops-operator");
     expect(content).toContain("Canonical Loop");
+    expect(content).toContain(
+      "UluOps turns agent runs into tracked findings — scored, fingerprinted, and carried forward until they're resolved.",
+    );
   });
 
   it("skips harnesses without skill assets", async () => {

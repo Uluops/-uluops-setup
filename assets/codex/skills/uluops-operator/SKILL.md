@@ -5,7 +5,9 @@ description: "Use when operating inside UluOps from Codex: using UluOps MCP tool
 
 # UluOps Operator
 
-Use this skill as the operating map for UluOps in Codex. UluOps has three main surfaces:
+UluOps is the operations layer for agentic work. UluOps turns agent runs into tracked findings — scored, fingerprinted, and carried forward until they're resolved.
+
+Use this skill as the operating map for UluOps in Codex. It has three main surfaces:
 
 - **Registry**: source of truth for agents, commands, workflows, pipelines, versions, dependencies, and harness-specific rendering.
 - **Tracker**: source of truth for projects, runs, issues, analysis summaries, analysis records, reliability, and lifecycle.
@@ -100,7 +102,7 @@ When the user asks to use a UluOps agent through Codex:
 1. Render or locate the agent definition for Codex.
 2. Read only enough of the TOML to understand the role, inputs, expected output, and scoring vocabulary.
 3. Spawn a Codex subagent using that definition's instructions and the target artifact.
-4. Ask the subagent for structured output: decision, score, findings/recommendations, analysis records, and evidence.
+4. Ask the subagent for structured output: decision, score, findings (wire key `recommendations`), analysis records, and evidence.
 5. Normalize the output before saving to tracker.
 
 For large artifacts, tell the subagent whether it read the full artifact or performed a targeted pass. Preserve that note in the tracker run summary.
@@ -112,7 +114,7 @@ When saving a Codex subagent result:
 - Project: use the user-provided tracker project, or infer from local context only when obvious.
 - Workflow type: use the registry definition name or agent name.
 - Agent name: use the UluOps agent identifier, not the subagent nickname.
-- Recommendations/issues: preserve title, severity, category/failure mode, evidence, and actionable remediation.
+- Findings/issues: preserve title, severity, category/failure mode, evidence, and actionable remediation.
 - Analysis records: preserve custom `record_type` values; do not force them into a closed enum unless the API requires it.
 - Summary: include artifact path, decision, score, method, caveats, and counts.
 

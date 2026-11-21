@@ -4,6 +4,10 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- The Codex `uluops-operator` skill now opens with the category line and one-liner, and uses *finding* for the content of the `recommendations` wire key.
+
 ## [0.21.0] - 2026-11-18
 
 ### Changed
