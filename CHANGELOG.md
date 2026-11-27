@@ -4,7 +4,17 @@ All notable changes to `@uluops/setup` will be documented in this file.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-27
+
+### Added
+
+- **A third Claude Code hook: `PreToolUse` on the Agent tool** (matcher `Agent|Task`), for agent-metrics 0.14.0's `[target:]` artifact capture (effectiveness-analytics D67). It is the only hook that sees an agent's prompt before the agent starts, which is when the reviewed file must be hashed. `check` (and `verify`) reads an install without it as needing a re-run once the installed agent-metrics is 0.14.0 or later; `remove` clears it with the others.
+  - **Version-gated for safety.** agent-metrics before 0.14.0 answers every event but `SubagentStart` with `{"decision":"approve"}`, which on `PreToolUse` permits the call without the permission prompt. Setup registers the event only when the agent-metrics installed beside `settings.json` (`tools/agent-metrics/package.json`) is at least 0.14.0, and removes its entry when it is not. `installMetrics` copies the tool files before it installs hooks, so the version read is the one about to run. A version it cannot read counts as too old.
+  - The matcher keeps the hook off every other tool call. User `PreToolUse` entries are preserved.
+
 ### Changed
+
+- **`@uluops/agent-metrics` 0.13.1 → 0.14.0** (exact). It needs Node 20.3 or later (was 18).
 
 - The Codex `uluops-operator` skill now opens with the category line and one-liner, and uses *finding* for the content of the `recommendations` wire key.
 

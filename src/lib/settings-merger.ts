@@ -79,9 +79,48 @@ export const DEFAULT_CLAUDE_HOOK_TYPE = "SubagentStop";
  */
 export const CLAUDE_SPAWN_HOOK_TYPE = "SubagentStart";
 
-/** The hook event types setup manages for Claude Code, given the resolved primary type. */
-export function claudeManagedHookTypes(primary: string = getDefaultHookEventType()): string[] {
-  return primary === DEFAULT_CLAUDE_HOOK_TYPE ? [primary, CLAUDE_SPAWN_HOOK_TYPE] : [primary];
+/**
+ * The third companion event (agent-metrics 0.14.0; effectiveness-analytics D67): on
+ * `PreToolUse` for the Agent tool, agent-metrics hashes the `[target:]` artifacts named in
+ * the subagent's prompt before the subagent starts. It is the only hook that sees the
+ * prompt at spawn (SubagentStart carries no tool_use_id in Claude Code 2.1.316).
+ *
+ * **Version-gated, for safety, not compatibility.** agent-metrics before 0.14.0 answers
+ * every event but SubagentStart with `{"decision":"approve"}`, which on `PreToolUse`
+ * permits the call without the user's permission prompt. So the event is registered only
+ * when the installed agent-metrics is at least {@link TARGET_HOOK_MIN_METRICS_VERSION},
+ * and removed again when it is not (a downgrade). The matcher keeps it off every other
+ * tool call.
+ */
+export const CLAUDE_TARGET_HOOK_TYPE = "PreToolUse";
+export const CLAUDE_TARGET_HOOK_MATCHER = "Agent|Task";
+export const TARGET_HOOK_MIN_METRICS_VERSION = "0.14.0";
+
+/** True when `version` (an installed agent-metrics version) is at least 0.14.0. Unknown is false. */
+export function metricsSupportsTargetHook(version: string | null | undefined): boolean {
+  const m = /^(\d+)\.(\d+)\.(\d+)/.exec(version ?? "");
+  if (!m) return false;
+  const [maj, min] = [Number(m[1]), Number(m[2])];
+  return maj > 0 || min >= 14;
+}
+
+/** The matcher setup writes for an event type it manages, if any. */
+export function claudeHookMatcherFor(type: string): string | undefined {
+  return type === CLAUDE_TARGET_HOOK_TYPE ? CLAUDE_TARGET_HOOK_MATCHER : undefined;
+}
+
+/**
+ * The hook event types setup manages for Claude Code, given the resolved primary type and
+ * the installed agent-metrics version (which gates `PreToolUse`, see above).
+ */
+export function claudeManagedHookTypes(
+  primary: string = getDefaultHookEventType(),
+  metricsVersion: string | null = null,
+): string[] {
+  if (primary !== DEFAULT_CLAUDE_HOOK_TYPE) return [primary];
+  return metricsSupportsTargetHook(metricsVersion)
+    ? [primary, CLAUDE_SPAWN_HOOK_TYPE, CLAUDE_TARGET_HOOK_TYPE]
+    : [primary, CLAUDE_SPAWN_HOOK_TYPE];
 }
 
 /** Configurable hook type via env var. Falls back to SubagentStop. */

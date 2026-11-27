@@ -333,6 +333,63 @@ describe("claude-code hooks: SubagentStart beside SubagentStop (agent-metrics 0.
   });
 });
 
+describe("claude-code hooks: PreToolUse on the Agent tool (agent-metrics 0.14.0, D67)", () => {
+  const cmd = "node /home/u/.claude/tools/agent-metrics/dist/hook.js";
+  const fsp = () => import("node:fs/promises");
+  /** A claude home with settings.json and, when `metrics` is set, tools/agent-metrics at that version. */
+  const home = async (metrics: string | null, content: unknown = {}): Promise<string> => {
+    const dir = await mkdtemp(join(tmpdir(), "setup-pretool-"));
+    if (metrics !== null) {
+      await (await fsp()).mkdir(join(dir, "tools", "agent-metrics"), { recursive: true });
+      await writeFile(join(dir, "tools", "agent-metrics", "package.json"), JSON.stringify({ name: "@uluops/agent-metrics", version: metrics }));
+    }
+    const p = join(dir, "settings.json");
+    await writeFile(p, JSON.stringify(content));
+    return p;
+  };
+  type M = { matcher?: string; hooks: Array<{ command: string }> };
+  const read = async (p: string): Promise<{ hooks?: Record<string, M[]> }> => JSON.parse(await (await fsp()).readFile(p, "utf-8"));
+
+  it("registers PreToolUse with the Agent matcher when agent-metrics >= 0.14.0", async () => {
+    const p = await home("0.14.0", { hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "user-bash" }] }] } });
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    const pre = (await read(p)).hooks!["PreToolUse"]!;
+    expect(pre.map((m) => [m.matcher, m.hooks[0]!.command])).toEqual([["Bash", "user-bash"], ["Agent|Task", cmd]]);
+    expect(await claudeCodeProfile.hooks!.check(p)).toBe(true);
+  });
+
+  it("control: never registers it for agent-metrics 0.13.x, whose PreToolUse output approves the call", async () => {
+    const p = await home("0.13.1");
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    expect((await read(p)).hooks!["PreToolUse"]).toBeUndefined();
+    expect(await claudeCodeProfile.hooks!.check(p)).toBe(true);
+    const unknown = await home(null);
+    await claudeCodeProfile.hooks!.install(unknown, cmd, false);
+    expect((await read(unknown)).hooks!["PreToolUse"]).toBeUndefined();
+  });
+
+  it("a downgrade removes ours from PreToolUse and keeps the user's", async () => {
+    const p = await home("0.13.1", { hooks: { PreToolUse: [{ matcher: "Agent|Task", hooks: [{ type: "command", command: cmd }] }, { matcher: "Bash", hooks: [{ type: "command", command: "user-bash" }] }] } });
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    expect((await read(p)).hooks!["PreToolUse"]!.map((m) => m.hooks[0]!.command)).toEqual(["user-bash"]);
+  });
+
+  it("check reads an install missing PreToolUse as needing a re-run once agent-metrics is 0.14.0", async () => {
+    const p = await home("0.14.0", { hooks: {
+      SubagentStop: [{ hooks: [{ type: "command", command: cmd }] }],
+      SubagentStart: [{ hooks: [{ type: "command", command: cmd }] }],
+    } });
+    expect(await claudeCodeProfile.hooks!.check(p)).toBe(false);
+  });
+
+  it("remove clears PreToolUse too", async () => {
+    const p = await home("0.14.0");
+    await claudeCodeProfile.hooks!.install(p, cmd, false);
+    await claudeCodeProfile.hooks!.remove(p, false);
+    expect((await read(p)).hooks).toBeUndefined();
+  });
+});
+
 describe("opencode profile", () => {
   it("has correct basic properties", () => {
     expect(opencodeProfile.name).toBe("opencode");
